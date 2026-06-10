@@ -125,6 +125,29 @@
     };
   }
 
+  function updateSkuFromCard(card) {
+    const sku = state.skus.find((item) => item.id === card.dataset.skuId);
+    if (!sku) return;
+    sku.length = Number(card.querySelector(".sku-length").value);
+    sku.width = Number(card.querySelector(".sku-width").value);
+    sku.height = Number(card.querySelector(".sku-height").value);
+    sku.target = Number(card.querySelector(".sku-target").value);
+    sku.color = card.querySelector(".sku-color").value;
+  }
+
+  function getSkuInputs() {
+    elements.skuList.querySelectorAll(".sku-card").forEach(updateSkuFromCard);
+    relabelSkus();
+    return state.skus.map((sku) => ({
+      label: sku.label,
+      length: sku.length,
+      width: sku.width,
+      height: sku.height,
+      target: sku.target,
+      color: sku.color,
+    }));
+  }
+
   function relabelSkus() {
     state.skus = state.skus.map((sku, index) => ({
       ...sku,
@@ -227,6 +250,27 @@
     elements.statusChip.textContent = result.totalBoxes > 0 ? "已完成计算" : "无法装载";
   }
 
+  function updateSkuBreakdown(result) {
+    if (state.mode !== "multi" || !result.skuSummary) {
+      elements.skuBreakdown.classList.add("hidden");
+      elements.skuBreakdown.innerHTML = "";
+      return;
+    }
+
+    elements.skuBreakdown.classList.remove("hidden");
+    elements.skuBreakdown.innerHTML = result.skuSummary
+      .map(
+        (sku) => `
+          <div class="sku-breakdown-row">
+            <span class="sku-swatch" style="background:${sku.color}"></span>
+            <strong>SKU ${sku.label}</strong>
+            <span>${formatNumber(sku.loaded)} / ${formatNumber(sku.target)}${sku.shortfall ? ` · 差 ${formatNumber(sku.shortfall)}` : ""}</span>
+          </div>
+        `,
+      )
+      .join("");
+  }
+
   function updateColorValue() {
     state.color = elements.cartonColor.value;
     const rgb = hexToRgb(state.color);
@@ -249,9 +293,15 @@
   function calculateAndRender(options = {}) {
     try {
       updateColorValue();
-      const result = Packing.calculatePacking(getContainerInput(), getCartonInput());
+      const result =
+        state.mode === "multi"
+          ? Packing.calculateMultiSkuPacking(getContainerInput(), getSkuInputs(), {
+              strategy: elements.skuStrategy.value,
+            })
+          : Packing.calculatePacking(getContainerInput(), getCartonInput());
       state.result = result;
       updateSummary(result);
+      updateSkuBreakdown(result);
       updateProgress(result, options.keepProgress);
       drawAll();
     } catch (error) {
@@ -924,6 +974,33 @@
     });
     elements.skuCount.addEventListener("input", syncSkuCount);
     elements.skuStrategy.addEventListener("change", markNeedsCalculation);
+    elements.skuList.addEventListener("input", (event) => {
+      const card = event.target.closest(".sku-card");
+      if (card) updateSkuFromCard(card);
+      markNeedsCalculation();
+    });
+    elements.skuList.addEventListener("dragstart", (event) => {
+      const card = event.target.closest(".sku-card");
+      if (!card) return;
+      state.draggedSkuId = card.dataset.skuId;
+      event.dataTransfer.effectAllowed = "move";
+    });
+    elements.skuList.addEventListener("dragover", (event) => {
+      event.preventDefault();
+    });
+    elements.skuList.addEventListener("drop", (event) => {
+      event.preventDefault();
+      const targetCard = event.target.closest(".sku-card");
+      if (!targetCard || !state.draggedSkuId) return;
+      const fromIndex = state.skus.findIndex((sku) => sku.id === state.draggedSkuId);
+      const toIndex = state.skus.findIndex((sku) => sku.id === targetCard.dataset.skuId);
+      if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
+      const [moved] = state.skus.splice(fromIndex, 1);
+      state.skus.splice(toIndex, 0, moved);
+      state.draggedSkuId = null;
+      renderSkuList();
+      markNeedsCalculation();
+    });
     elements.progress.addEventListener("input", handleProgressInput);
     window.addEventListener("resize", drawAll);
     setupSceneControls();
