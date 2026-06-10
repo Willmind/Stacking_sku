@@ -179,6 +179,21 @@
   }
 
   function findCurrentLayer(result, visibleCount) {
+    if (Array.isArray(result.orderedPositions)) {
+      const visiblePositions = result.orderedPositions.slice(0, visibleCount);
+      const lastPosition = visiblePositions[visiblePositions.length - 1];
+      if (lastPosition) {
+        const layer =
+          result.layers.find((item) => item.index === lastPosition.stackIndex) ||
+          result.layers[lastPosition.stackIndex] ||
+          { index: 0, boxCount: 0, z: 0 };
+        return {
+          layer,
+          countInLayer: visiblePositions.filter((position) => position.stackIndex === lastPosition.stackIndex).length,
+        };
+      }
+    }
+
     let remaining = visibleCount;
     for (const layer of result.layers) {
       if (remaining <= layer.boxCount) {
