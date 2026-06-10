@@ -195,6 +195,31 @@ assert.deepEqual(Packing.CONTAINERS["20GP"], {
   assert.equal(result.orderedPositions[11].skuLabel, "A");
   assert.equal(result.orderedPositions[12].skuLabel, "B");
   assert.equal(result.orderedPositions[20].skuLabel, "C");
+  assert.equal(
+    result.layers.reduce((sum, layer) => sum + layer.boxCount, 0),
+    result.totalBoxes,
+  );
+}
+
+{
+  const result = Packing.calculateMultiSkuPacking(
+    customContainer(1000, 500, 500),
+    [
+      sku("A", 200, 100, 100, 12, "#d8923a"),
+      sku("B", 200, 100, 100, 8, "#42d6a4"),
+    ],
+    {
+      strategy: "multi-destination",
+      cornerBlock: { length: 0, width: 0, height: 0 },
+    },
+  );
+
+  assert.equal(result.totalBoxes, 20);
+  assert.equal(
+    result.layers.reduce((sum, layer) => sum + layer.boxCount, 0),
+    result.totalBoxes,
+  );
+  assert.ok(result.utilizationRatio < 1);
 }
 
 {
@@ -234,6 +259,32 @@ for (const target of [0.5, 1.5]) {
     /target quantity|integer/,
   );
 }
+
+assert.throws(
+  () =>
+    Packing.calculateMultiSkuPacking(
+      customContainer(600, 200, 200),
+      [
+        sku("A", 100, 100, 100, 1, "#d8923a"),
+        sku("A", 100, 100, 100, 1, "#42d6a4"),
+      ],
+      { cornerBlock: { length: 0, width: 0, height: 0 } },
+    ),
+  /unique|duplicate|SKU label/,
+);
+
+assert.throws(
+  () =>
+    Packing.calculateMultiSkuPacking(
+      customContainer(600, 200, 200),
+      [
+        null,
+        sku("B", 100, 100, 100, 1, "#42d6a4"),
+      ],
+      { cornerBlock: { length: 0, width: 0, height: 0 } },
+    ),
+  /SKU.*object/,
+);
 
 assert.throws(
   () =>

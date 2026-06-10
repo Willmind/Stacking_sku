@@ -76,6 +76,9 @@
   }
 
   function normalizeSku(input, index) {
+    if (!input || typeof input !== "object") {
+      throw new Error("SKU entry must be an object");
+    }
     const label = input.label || String.fromCharCode(65 + index);
     const target = positiveNumber(input.target, `${label} target quantity`);
     if (!Number.isInteger(target)) {
@@ -95,7 +98,15 @@
     if (!Array.isArray(inputs) || inputs.length < 2 || inputs.length > 10) {
       throw new Error("multi-SKU mode requires 2 to 10 SKUs");
     }
-    return inputs.map(normalizeSku);
+    const skus = inputs.map(normalizeSku);
+    const labels = new Set();
+    for (const sku of skus) {
+      if (labels.has(sku.label)) {
+        throw new Error(`SKU label "${sku.label}" must be unique`);
+      }
+      labels.add(sku.label);
+    }
+    return skus;
   }
 
   function getOrientations(carton) {
@@ -845,6 +856,16 @@
         ? assignSameDestinationSkus(sourcePositions, skus)
         : assignMultiDestinationSkus(sourcePositions, skus);
     const skuSummary = summarizeSkuAllocation(skus, assignedPositions);
+    const layers = baseResult.layers.map((layer) => ({
+      ...layer,
+      boxCount: assignedPositions.filter((position) => position.stackIndex === layer.index).length,
+    }));
+    const usedHeight =
+      assignedPositions.length === 0
+        ? 0
+        : (Math.max(...assignedPositions.map((position) => position.stackIndex)) + 1) * baseResult.carton.height;
+    const containerVolume = baseResult.container.length * baseResult.container.width * baseResult.container.height;
+    const volumeLoaded = assignedPositions.length * firstSku.length * firstSku.width * firstSku.height;
 
     return {
       ...baseResult,
@@ -852,7 +873,10 @@
       strategy,
       skus,
       orderedPositions: assignedPositions,
+      layers,
       totalBoxes: assignedPositions.length,
+      usedHeight,
+      utilizationRatio: containerVolume > 0 ? volumeLoaded / containerVolume : 0,
       skuSummary,
     };
   }
