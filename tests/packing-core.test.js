@@ -9,6 +9,14 @@ function customContainer(length, width, height) {
   return { id: "CUSTOM", name: "Custom", length, width, height };
 }
 
+function sku(label, length, width, height, target, color = "#d8923a") {
+  return { label, length, width, height, target, color };
+}
+
+function summarizeSkuCounts(result) {
+  return Object.fromEntries(result.skuSummary.map((item) => [item.label, item.loaded]));
+}
+
 function assertClose(actual, expected, tolerance = 0.0001) {
   assert.ok(
     Math.abs(actual - expected) <= tolerance,
@@ -165,6 +173,51 @@ assert.deepEqual(Packing.CONTAINERS["20GP"], {
   const positions = Packing.generateBoxPositions(result, result.totalBoxes);
   assert.equal(positions.length, result.totalBoxes);
   assertNoCornerCollisions(result, positions);
+}
+
+{
+  const result = Packing.calculateMultiSkuPacking(
+    customContainer(1000, 500, 500),
+    [
+      sku("A", 200, 100, 100, 12, "#d8923a"),
+      sku("B", 200, 100, 100, 8, "#42d6a4"),
+      sku("C", 200, 100, 100, 200, "#6e8bff"),
+    ],
+    {
+      strategy: "multi-destination",
+      cornerBlock: { length: 0, width: 0, height: 0 },
+    },
+  );
+
+  assert.deepEqual(summarizeSkuCounts(result), { A: 12, B: 8, C: 105 });
+  assert.equal(result.skuSummary[2].shortfall, 95);
+  assert.equal(result.orderedPositions[0].skuLabel, "A");
+  assert.equal(result.orderedPositions[11].skuLabel, "A");
+  assert.equal(result.orderedPositions[12].skuLabel, "B");
+  assert.equal(result.orderedPositions[20].skuLabel, "C");
+}
+
+{
+  const result = Packing.calculateMultiSkuPacking(
+    customContainer(600, 200, 200),
+    [
+      sku("A", 100, 100, 100, 5, "#d8923a"),
+      sku("B", 100, 100, 100, 4, "#42d6a4"),
+    ],
+    {
+      strategy: "same-destination",
+      cornerBlock: { length: 0, width: 0, height: 0 },
+    },
+  );
+
+  assert.deepEqual(summarizeSkuCounts(result), { A: 5, B: 4 });
+
+  const face0 = result.orderedPositions.filter((position) => position.faceIndex === 0);
+  assert.equal(new Set(face0.map((position) => position.skuLabel)).size, 1);
+  assert.equal(face0[0].skuLabel, "A");
+
+  const remainder = result.orderedPositions.slice(4, 9);
+  assert.deepEqual(remainder.map((position) => position.skuLabel), ["A", "B", "B", "B", "B"]);
 }
 
 assert.throws(
