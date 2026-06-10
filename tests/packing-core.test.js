@@ -128,7 +128,9 @@ assert.deepEqual(Packing.CONTAINERS["20GP"], {
   assert.equal(result.container.id, "40HQ");
   assert.equal(result.usedHeight, 2619);
   assertStartsBottomToTop(result);
-  assertNoCornerCollisions(result, Packing.generateBoxPositions(result, result.totalBoxes));
+  const positions = Packing.generateBoxPositions(result, result.totalBoxes);
+  assert.equal(positions.length, result.totalBoxes);
+  assertNoCornerCollisions(result, positions);
 }
 
 {
@@ -141,7 +143,9 @@ assert.deepEqual(Packing.CONTAINERS["20GP"], {
   assert.equal(result.container.id, "40HQ");
   assert.equal(result.usedHeight, 2619);
   assertStartsBottomToTop(result);
-  assertNoCornerCollisions(result, Packing.generateBoxPositions(result, result.totalBoxes));
+  const positions = Packing.generateBoxPositions(result, result.totalBoxes);
+  assert.equal(positions.length, result.totalBoxes);
+  assertNoCornerCollisions(result, positions);
 }
 
 assert.throws(
