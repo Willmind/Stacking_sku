@@ -1,0 +1,479 @@
+:root {
+  --ink: #f5f7fb;
+  --muted: #aeb8c9;
+  --panel: rgba(15, 22, 31, 0.88);
+  --panel-strong: rgba(9, 14, 22, 0.94);
+  --line: rgba(255, 255, 255, 0.14);
+  --accent: #42d6a4;
+  --accent-2: #ffbe55;
+  --field: rgba(255, 255, 255, 0.08);
+  --shadow: 0 18px 60px rgba(0, 0, 0, 0.36);
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Microsoft YaHei", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  background:
+    linear-gradient(90deg, rgba(5, 10, 16, 0.9), rgba(5, 10, 16, 0.48) 45%, rgba(5, 10, 16, 0.78)),
+    linear-gradient(0deg, rgba(5, 10, 16, 0.92), rgba(5, 10, 16, 0.35)),
+    url("assets/loading-yard-bg.png") center / cover fixed;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(320px, 410px) minmax(0, 1fr);
+  gap: 18px;
+  padding: 18px;
+}
+
+.control-panel,
+.workbench,
+.view-panel {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(16px);
+}
+
+.control-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  border-radius: 8px;
+  padding: 18px;
+  min-width: 0;
+}
+
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.brand-mark {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  color: #071018;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  font-size: 23px;
+  font-weight: 800;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 24px;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+
+.brand-lockup p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.form-grid {
+  display: grid;
+  gap: 14px;
+}
+
+fieldset {
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+legend {
+  padding: 0 6px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+select,
+input[type="number"] {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  color: var(--ink);
+  background: var(--field);
+  padding: 0 11px;
+  outline: none;
+}
+
+select:focus,
+input[type="number"]:focus,
+input[type="range"]:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(66, 214, 164, 0.16);
+}
+
+select {
+  margin-bottom: 10px;
+}
+
+option {
+  color: #101820;
+}
+
+.triple-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.color-row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+input[type="color"] {
+  width: 52px;
+  height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  padding: 2px;
+}
+
+.calculate-actions {
+  display: grid;
+}
+
+.calculate-actions button {
+  min-height: 44px;
+  border: 1px solid rgba(66, 214, 164, 0.58);
+  border-radius: 7px;
+  color: #061014;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 10px 28px rgba(66, 214, 164, 0.18);
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.calculate-actions button:focus {
+  outline: none;
+  box-shadow:
+    0 0 0 3px rgba(66, 214, 164, 0.2),
+    0 10px 28px rgba(66, 214, 164, 0.18);
+}
+
+.calculate-actions button:hover {
+  filter: brightness(1.05);
+}
+
+#color-value {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.summary-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.hero-number {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  align-items: end;
+  padding: 16px;
+  border: 1px solid rgba(66, 214, 164, 0.32);
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(66, 214, 164, 0.14), rgba(255, 190, 85, 0.08));
+}
+
+.hero-number span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.hero-number strong {
+  grid-row: span 2;
+  font-size: clamp(42px, 8vw, 62px);
+  line-height: 0.9;
+  color: var(--accent);
+}
+
+.hero-number em {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.metric-grid div,
+.detail-list div {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.metric-grid div {
+  padding: 12px;
+}
+
+.metric-grid span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.metric-grid strong {
+  display: block;
+  margin-top: 7px;
+  font-size: 19px;
+}
+
+.detail-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.detail-list div {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px 12px;
+}
+
+.detail-list dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.detail-list dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: right;
+}
+
+.workbench {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 14px;
+  min-width: 0;
+  border-radius: 8px;
+  padding: 14px;
+  background: rgba(11, 18, 27, 0.78);
+}
+
+.top-strip {
+  display: grid;
+  grid-template-columns: minmax(180px, auto) minmax(260px, 1fr);
+  align-items: center;
+  gap: 16px;
+}
+
+.status-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+#status-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid rgba(66, 214, 164, 0.34);
+  border-radius: 6px;
+  color: var(--accent);
+  background: rgba(66, 214, 164, 0.12);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+#progress-text {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.progress-control {
+  grid-template-columns: 82px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.views-grid {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.view-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 560px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--panel-strong);
+}
+
+.view-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.view-panel h2 {
+  font-size: 17px;
+  letter-spacing: 0;
+}
+
+.view-panel header span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    rgba(3, 8, 14, 0.72);
+  background-size: 28px 28px;
+}
+
+.three-d-panel canvas {
+  cursor: grab;
+}
+
+.three-d-panel canvas.rotating {
+  cursor: crosshair;
+}
+
+.three-d-panel canvas.panning {
+  cursor: grabbing;
+}
+
+@media (max-width: 1180px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .control-panel {
+    display: grid;
+    grid-template-columns: minmax(280px, 0.8fr) minmax(300px, 1fr);
+    align-items: start;
+  }
+
+  .brand-lockup {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 860px) {
+  .app-shell {
+    padding: 10px;
+  }
+
+  .control-panel {
+    display: flex;
+  }
+
+  .top-strip,
+  .views-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .view-panel {
+    min-height: 440px;
+  }
+}
+
+@media (max-width: 520px) {
+  .triple-grid,
+  .metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-number {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-number strong {
+    grid-row: auto;
+  }
+
+  .detail-list div {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-list dd {
+    text-align: left;
+  }
+}
