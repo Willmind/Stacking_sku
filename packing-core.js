@@ -77,12 +77,16 @@
 
   function normalizeSku(input, index) {
     const label = input.label || String.fromCharCode(65 + index);
+    const target = Math.floor(positiveNumber(input.target, `${label} target quantity`));
+    if (target < 1) {
+      throw new Error(`${label} target quantity must be a positive number`);
+    }
     return {
       label,
       length: positiveNumber(input.length, `${label} carton length`),
       width: positiveNumber(input.width, `${label} carton width`),
       height: positiveNumber(input.height, `${label} carton height`),
-      target: Math.floor(positiveNumber(input.target, `${label} target quantity`)),
+      target,
       color: input.color || "#d8923a",
     };
   }

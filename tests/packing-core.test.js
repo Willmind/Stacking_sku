@@ -222,6 +222,19 @@ assert.deepEqual(Packing.CONTAINERS["20GP"], {
 
 assert.throws(
   () =>
+    Packing.calculateMultiSkuPacking(
+      customContainer(600, 200, 200),
+      [
+        sku("A", 100, 100, 100, 0.5, "#d8923a"),
+        sku("B", 100, 100, 100, 1, "#42d6a4"),
+      ],
+      { cornerBlock: { length: 0, width: 0, height: 0 } },
+    ),
+  /positive number|target quantity/,
+);
+
+assert.throws(
+  () =>
     Packing.calculatePacking(
       customContainer(500, 330, 250),
       carton(0, 100, 100),
