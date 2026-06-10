@@ -16,6 +16,29 @@ function assertClose(actual, expected, tolerance = 0.0001) {
   );
 }
 
+function assertNoCornerCollisions(result, positions) {
+  for (const position of positions) {
+    assert.equal(
+      Packing.collidesCornerBlock(position, result.container, result.cornerBlock),
+      false,
+      `position ${position.sequenceIndex ?? "unknown"} intersects a corner fitting`,
+    );
+  }
+}
+
+function assertStartsBottomToTop(result) {
+  const positions = Packing.generateBoxPositions(result, 3);
+  assert.ok(positions.length >= 3, "expected at least three generated positions");
+  assert.equal(positions[0].x, 0);
+  assert.equal(positions[0].z, 0);
+  assert.equal(positions[1].x, positions[0].x);
+  assert.equal(positions[1].y, positions[0].y);
+  assert.equal(positions[1].z, result.carton.height);
+  assert.equal(positions[2].x, positions[0].x);
+  assert.equal(positions[2].y, positions[0].y);
+  assert.equal(positions[2].z, result.carton.height * 2);
+}
+
 assert.deepEqual(Packing.CONTAINERS["20GP"], {
   id: "20GP",
   name: "20GP",
@@ -93,6 +116,32 @@ assert.deepEqual(Packing.CONTAINERS["20GP"], {
       [0, 110, 0],
     ],
   );
+}
+
+{
+  const result = Packing.calculatePacking(
+    Packing.CONTAINERS["40HQ"],
+    carton(488, 380, 291),
+  );
+
+  assert.equal(result.totalBoxes, 1340);
+  assert.equal(result.container.id, "40HQ");
+  assert.equal(result.usedHeight, 2619);
+  assertStartsBottomToTop(result);
+  assertNoCornerCollisions(result, Packing.generateBoxPositions(result, result.totalBoxes));
+}
+
+{
+  const result = Packing.calculatePacking(
+    Packing.CONTAINERS["40HQ"],
+    carton(488, 360, 291),
+  );
+
+  assert.equal(result.totalBoxes, 1403);
+  assert.equal(result.container.id, "40HQ");
+  assert.equal(result.usedHeight, 2619);
+  assertStartsBottomToTop(result);
+  assertNoCornerCollisions(result, Packing.generateBoxPositions(result, result.totalBoxes));
 }
 
 assert.throws(
