@@ -278,6 +278,15 @@
     ctx.strokeRect(0, (container.width - corner.width) * scale, corner.length * scale, corner.width * scale);
 
     const layerPositions = result.layerPositions;
+    const keyForPosition = (position) => `${position.x}:${position.y}:${position.dx}:${position.dy}`;
+    const visiblePositionKeys = Array.isArray(result.orderedPositions)
+      ? new Set(
+          result.orderedPositions
+            .slice(0, state.visibleCount)
+            .filter((position) => position.stackIndex === currentLayer.layer.index)
+            .map(keyForPosition),
+        )
+      : null;
     const visibleInLayer = Math.min(currentLayer.countInLayer, currentLayer.layer.boxCount || 0);
     let visibleDrawn = 0;
 
@@ -287,8 +296,10 @@
         result.container,
         result.cornerBlock,
       );
-      const isVisible = !blocked && visibleDrawn < visibleInLayer;
-      if (!blocked) visibleDrawn += 1;
+      const isVisible = visiblePositionKeys
+        ? !blocked && visiblePositionKeys.has(keyForPosition(box))
+        : !blocked && visibleDrawn < visibleInLayer;
+      if (!blocked && !visiblePositionKeys) visibleDrawn += 1;
 
       ctx.fillStyle = isVisible
         ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.82)`
