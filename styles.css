@@ -465,6 +465,7 @@ input[type="range"] {
 }
 
 .view-panel {
+  position: relative;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   min-height: 560px;
@@ -516,6 +517,36 @@ canvas {
 
 .three-d-panel canvas.panning {
   cursor: grabbing;
+}
+
+.view-marker {
+  position: absolute;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 28px;
+  padding: 5px 10px;
+  border: 1px solid rgba(87, 227, 188, 0.72);
+  border-radius: 8px;
+  background: rgba(3, 8, 14, 0.76);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+  pointer-events: none;
+}
+
+.view-marker::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--accent);
+  border-radius: 2px;
+}
+
+.door-marker {
+  right: 18px;
+  bottom: 18px;
 }
 
 @media (max-width: 1180px) {

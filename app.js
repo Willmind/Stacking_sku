@@ -736,23 +736,60 @@
     }
   }
 
-  function makeThreeLabel(text, color = "#f5f7fb") {
+  function makeThreeLabel(text, color = "#f5f7fb", scaleWidth = 1.5, scaleHeight = 0.38) {
     const canvas = document.createElement("canvas");
-    canvas.width = 256;
+    canvas.width = 320;
     canvas.height = 64;
     const ctx = canvas.getContext("2d");
     ctx.fillStyle = "rgba(3, 8, 14, 0.72)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = color;
-    ctx.font = "700 28px Inter, sans-serif";
+    ctx.font = "700 26px Inter, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(text, canvas.width / 2, canvas.height / 2);
     const texture = new THREE.CanvasTexture(canvas);
-    const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+    const material = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+    });
     const sprite = new THREE.Sprite(material);
-    sprite.scale.set(1.5, 0.38, 1);
+    sprite.scale.set(scaleWidth, scaleHeight, 1);
+    sprite.renderOrder = 30;
     return sprite;
+  }
+
+  function addThreeDoorMarker(length, height, width) {
+    const doorGeometry = new THREE.PlaneGeometry(width, height);
+    const doorPlane = new THREE.Mesh(
+      doorGeometry,
+      new THREE.MeshBasicMaterial({
+        color: 0x42d6a4,
+        transparent: true,
+        opacity: 0.12,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
+    );
+    doorPlane.rotation.y = Math.PI / 2;
+    doorPlane.position.x = length / 2 + 0.006;
+    doorPlane.renderOrder = 4;
+
+    const doorEdges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(doorGeometry),
+      new THREE.LineBasicMaterial({
+        color: 0x57e3bc,
+        transparent: true,
+        opacity: 0.98,
+        depthTest: false,
+      }),
+    );
+    doorEdges.rotation.copy(doorPlane.rotation);
+    doorEdges.position.copy(doorPlane.position);
+    doorEdges.renderOrder = 31;
+    state.three.model.add(doorPlane, doorEdges);
   }
 
   function addThreeContainer(result) {
@@ -820,10 +857,16 @@
       state.three.model.add(block, edges);
     }
 
-    const doorLabel = makeThreeLabel("柜门");
-    doorLabel.position.set(length / 2 + 0.45, -height / 2 + 0.18, 0);
-    const innerLabel = makeThreeLabel("柜内最里面 / 角件端", "#ffbe55");
-    innerLabel.position.set(-length / 2 - 0.65, height / 2 - 0.22, 0);
+    addThreeDoorMarker(length, height, width);
+
+    const labelWidth = Math.min(1.5, Math.max(0.54, length * 0.18));
+    const labelHeight = Math.min(0.38, Math.max(0.18, labelWidth * 0.26));
+    const labelOffset = Math.max(0.14, labelWidth * 0.34);
+    const labelY = height / 2 + labelHeight * 0.7;
+    const doorLabel = makeThreeLabel("柜门", "#f5f7fb", labelWidth, labelHeight);
+    doorLabel.position.set(length / 2 + labelOffset, labelY, 0);
+    const innerLabel = makeThreeLabel("角件端", "#ffbe55", labelWidth, labelHeight);
+    innerLabel.position.set(-length / 2 - labelOffset, labelY, 0);
     state.three.model.add(doorLabel, innerLabel);
   }
 
