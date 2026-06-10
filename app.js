@@ -95,6 +95,10 @@
     };
   }
 
+  function colorForBox(box) {
+    return box.skuColor || state.color;
+  }
+
   function shadeColor(rgb, factor) {
     const clamp = (value) => Math.max(0, Math.min(255, Math.round(value)));
     return `rgb(${clamp(rgb.r * factor)}, ${clamp(rgb.g * factor)}, ${clamp(rgb.b * factor)})`;
@@ -399,7 +403,6 @@
     const scale = Math.min((width - pad * 2) / container.length, (height - pad * 2) / container.width);
     const boxX = (width - container.length * scale) / 2;
     const boxY = (height - container.width * scale) / 2 + 10;
-    const rgb = hexToRgb(state.color);
     const currentLayer = findCurrentLayer(result, state.visibleCount);
 
     ctx.save();
@@ -422,13 +425,14 @@
 
     const layerPositions = result.layerPositions;
     const keyForPosition = (position) => `${position.x}:${position.y}:${position.dx}:${position.dy}`;
-    const visiblePositionKeys = Array.isArray(result.orderedPositions)
-      ? new Set(
-          result.orderedPositions
-            .slice(0, state.visibleCount)
-            .filter((position) => position.stackIndex === currentLayer.layer.index)
-            .map(keyForPosition),
-        )
+    const visiblePositionByKey = Array.isArray(result.orderedPositions)
+      ? result.orderedPositions
+          .slice(0, state.visibleCount)
+          .filter((position) => position.stackIndex === currentLayer.layer.index)
+          .reduce((positions, position) => {
+            positions.set(keyForPosition(position), position);
+            return positions;
+          }, new Map())
       : null;
     const visibleInLayer = Math.min(currentLayer.countInLayer, currentLayer.layer.boxCount || 0);
     let visibleDrawn = 0;
@@ -439,13 +443,15 @@
         result.container,
         result.cornerBlock,
       );
-      const isVisible = visiblePositionKeys
-        ? !blocked && visiblePositionKeys.has(keyForPosition(box))
+      const visibleBox = visiblePositionByKey ? visiblePositionByKey.get(keyForPosition(box)) : box;
+      const isVisible = visiblePositionByKey
+        ? !blocked && Boolean(visibleBox)
         : !blocked && visibleDrawn < visibleInLayer;
-      if (!blocked && !visiblePositionKeys) visibleDrawn += 1;
+      if (!blocked && !visiblePositionByKey) visibleDrawn += 1;
+      const boxRgb = hexToRgb(colorForBox(visibleBox || box));
 
       ctx.fillStyle = isVisible
-        ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.82)`
+        ? `rgba(${boxRgb.r}, ${boxRgb.g}, ${boxRgb.b}, 0.82)`
         : blocked
           ? "rgba(255, 112, 102, 0.08)"
           : "rgba(255, 255, 255, 0.06)";
@@ -708,9 +714,32 @@
     if (object.children) object.children.forEach(disposeThreeObject);
     if (object.geometry) object.geometry.dispose();
     if (object.material) {
-      if (Array.isArray(object.material)) object.material.forEach((material) => material.dispose());
-      else object.material.dispose();
+      const disposeMaterial = (material) => {
+        if (material.map) material.map.dispose();
+        material.dispose();
+      };
+      if (Array.isArray(object.material)) object.material.forEach(disposeMaterial);
+      else disposeMaterial(object.material);
     }
+  }
+
+  function makeThreeLabel(text, color = "#f5f7fb") {
+    const canvas = document.createElement("canvas");
+    canvas.width = 256;
+    canvas.height = 64;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "rgba(3, 8, 14, 0.72)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = color;
+    ctx.font = "700 28px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+    const texture = new THREE.CanvasTexture(canvas);
+    const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(1.5, 0.38, 1);
+    return sprite;
   }
 
   function addThreeContainer(result) {
@@ -777,6 +806,12 @@
       edges.position.copy(block.position);
       state.three.model.add(block, edges);
     }
+
+    const doorLabel = makeThreeLabel("柜门");
+    doorLabel.position.set(length / 2 + 0.45, -height / 2 + 0.18, 0);
+    const innerLabel = makeThreeLabel("柜内最里面 / 角件端", "#ffbe55");
+    innerLabel.position.set(-length / 2 - 0.65, height / 2 - 0.22, 0);
+    state.three.model.add(doorLabel, innerLabel);
   }
 
   function addThreeBoxes(result, positions) {
@@ -785,7 +820,7 @@
     const { container } = result;
     const geometry = new THREE.BoxGeometry(1, 1, 1);
     const material = new THREE.MeshLambertMaterial({
-      color: new THREE.Color(state.color),
+      vertexColors: true,
       transparent: true,
       opacity: 0.92,
     });
@@ -813,10 +848,12 @@
       );
       matrix.compose(position, quaternion, scale);
       boxes.setMatrixAt(index, matrix);
+      boxes.setColorAt(index, new THREE.Color(colorForBox(box)));
       wires.setMatrixAt(index, matrix);
     });
 
     boxes.instanceMatrix.needsUpdate = true;
+    if (boxes.instanceColor) boxes.instanceColor.needsUpdate = true;
     wires.instanceMatrix.needsUpdate = true;
     state.three.model.add(boxes, wires);
   }
