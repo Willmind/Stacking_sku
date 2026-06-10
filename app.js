@@ -10,6 +10,15 @@
     containerLength: $("#container-length"),
     containerWidth: $("#container-width"),
     containerHeight: $("#container-height"),
+    packingMode: document.querySelectorAll("input[name='packing-mode']"),
+    skuCountRow: $("#sku-count-row"),
+    skuCount: $("#sku-count"),
+    skuCountValue: $("#sku-count-value"),
+    skuStrategyRow: $("#sku-strategy-row"),
+    skuStrategy: $("#sku-strategy"),
+    singleSkuFields: $("#single-sku-fields"),
+    skuList: $("#sku-list"),
+    skuBreakdown: $("#sku-breakdown"),
     cartonLength: $("#carton-length"),
     cartonWidth: $("#carton-width"),
     cartonHeight: $("#carton-height"),
@@ -32,10 +41,23 @@
     calculateButton: $("#calculate-button"),
   };
 
+  function createSkuId() {
+    if (window.crypto && typeof window.crypto.randomUUID === "function") {
+      return window.crypto.randomUUID();
+    }
+    return `sku-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
   const state = {
     result: null,
     visibleCount: 0,
     color: elements.cartonColor.value,
+    mode: "single",
+    skus: [
+      { id: createSkuId(), length: 480, width: 320, height: 260, target: 100, color: "#d8923a" },
+      { id: createSkuId(), length: 480, width: 320, height: 260, target: 100, color: "#42d6a4" },
+    ],
+    draggedSkuId: null,
     camera: {
       yaw: -0.72,
       pitch: 0.72,
@@ -101,6 +123,68 @@
       width: numberValue(elements.cartonWidth),
       height: numberValue(elements.cartonHeight),
     };
+  }
+
+  function relabelSkus() {
+    state.skus = state.skus.map((sku, index) => ({
+      ...sku,
+      label: String.fromCharCode(65 + index),
+    }));
+  }
+
+  function renderSkuList() {
+    relabelSkus();
+    elements.skuList.innerHTML = state.skus
+      .map(
+        (sku) => `
+          <article class="sku-card" draggable="true" data-sku-id="${sku.id}">
+            <div class="sku-card-header">
+              <button class="drag-handle" type="button" aria-label="拖动 SKU ${sku.label}">☰</button>
+              <strong>SKU ${sku.label}</strong>
+              <input class="sku-color" type="color" value="${sku.color}" aria-label="SKU ${sku.label} 颜色" />
+            </div>
+            <div class="sku-fields">
+              <label>长 mm<input class="sku-length" type="number" min="1" step="1" value="${sku.length}" /></label>
+              <label>宽 mm<input class="sku-width" type="number" min="1" step="1" value="${sku.width}" /></label>
+              <label>高 mm<input class="sku-height" type="number" min="1" step="1" value="${sku.height}" /></label>
+              <label>目标量<input class="sku-target" type="number" min="1" step="1" value="${sku.target}" /></label>
+            </div>
+          </article>
+        `,
+      )
+      .join("");
+  }
+
+  function setPackingMode(mode) {
+    state.mode = mode;
+    const multi = mode === "multi";
+    elements.skuCountRow.classList.toggle("hidden", !multi);
+    elements.skuStrategyRow.classList.toggle("hidden", !multi);
+    elements.singleSkuFields.classList.toggle("hidden", multi);
+    elements.skuList.classList.toggle("hidden", !multi);
+    elements.skuBreakdown.classList.toggle("hidden", !multi);
+    if (multi) renderSkuList();
+    markNeedsCalculation();
+  }
+
+  function syncSkuCount() {
+    const count = Number(elements.skuCount.value);
+    elements.skuCountValue.textContent = String(count);
+    while (state.skus.length < count) {
+      const index = state.skus.length;
+      state.skus.push({
+        id: createSkuId(),
+        label: String.fromCharCode(65 + index),
+        length: 480,
+        width: 320,
+        height: 260,
+        target: 100,
+        color: ["#d8923a", "#42d6a4", "#6e8bff", "#ff7066", "#b7e35f"][index % 5],
+      });
+    }
+    state.skus = state.skus.slice(0, count);
+    renderSkuList();
+    markNeedsCalculation();
   }
 
   function resizeCanvas(canvas) {
@@ -835,12 +919,18 @@
       updateColorValue();
       drawAll();
     });
+    elements.packingMode.forEach((input) => {
+      input.addEventListener("change", () => setPackingMode(input.value));
+    });
+    elements.skuCount.addEventListener("input", syncSkuCount);
+    elements.skuStrategy.addEventListener("change", markNeedsCalculation);
     elements.progress.addEventListener("input", handleProgressInput);
     window.addEventListener("resize", drawAll);
     setupSceneControls();
   }
 
   setContainerPreset(elements.containerType.value);
+  renderSkuList();
   bindEvents();
   calculateAndRender();
 })();

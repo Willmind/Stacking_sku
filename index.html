@@ -45,8 +45,34 @@
           </fieldset>
 
           <fieldset>
+            <legend>码垛模式</legend>
+            <div class="segmented-control" role="radiogroup" aria-label="码垛模式">
+              <label>
+                <input type="radio" name="packing-mode" value="single" checked />
+                单 SKU
+              </label>
+              <label>
+                <input type="radio" name="packing-mode" value="multi" />
+                多 SKU
+              </label>
+            </div>
+            <label id="sku-count-row" class="range-row hidden">
+              SKU 个数
+              <input id="sku-count" type="range" min="2" max="10" value="2" />
+              <strong id="sku-count-value">2</strong>
+            </label>
+            <label id="sku-strategy-row" class="hidden">
+              装载策略
+              <select id="sku-strategy">
+                <option value="multi-destination">分客户/多卸货地</option>
+                <option value="same-destination">同客户/同卸货地</option>
+              </select>
+            </label>
+          </fieldset>
+
+          <fieldset>
             <legend>纸箱规格</legend>
-            <div class="triple-grid">
+            <div id="single-sku-fields" class="triple-grid">
               <label>
                 长 mm
                 <input id="carton-length" type="number" min="1" step="1" value="480" />
@@ -60,6 +86,7 @@
                 <input id="carton-height" type="number" min="1" step="1" value="260" />
               </label>
             </div>
+            <div id="sku-list" class="sku-list hidden" aria-label="SKU 列表"></div>
           </fieldset>
 
           <fieldset>
@@ -117,6 +144,7 @@
               <dd id="blocked-count">0 箱</dd>
             </div>
           </dl>
+          <section id="sku-breakdown" class="sku-breakdown hidden" aria-label="SKU 装载结果"></section>
         </section>
       </section>
 
