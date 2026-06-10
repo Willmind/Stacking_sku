@@ -216,8 +216,8 @@ assert.deepEqual(Packing.CONTAINERS["20GP"], {
   assert.equal(new Set(face0.map((position) => position.skuLabel)).size, 1);
   assert.equal(face0[0].skuLabel, "A");
 
-  const remainder = result.orderedPositions.slice(4, 9);
-  assert.deepEqual(remainder.map((position) => position.skuLabel), ["A", "B", "B", "B", "B"]);
+  const fullFacesThenTail = result.orderedPositions.slice(4, 9);
+  assert.deepEqual(fullFacesThenTail.map((position) => position.skuLabel), ["B", "B", "B", "B", "A"]);
 }
 
 assert.throws(
