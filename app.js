@@ -804,7 +804,7 @@
       new THREE.MeshBasicMaterial({
         color: 0x42d6a4,
         transparent: true,
-        opacity: 0.065,
+        opacity: 0.015,
         side: THREE.DoubleSide,
         depthWrite: false,
       }),
@@ -875,43 +875,55 @@
 
     const { container } = result;
     const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshLambertMaterial({
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.92,
-    });
     const edgeMaterial = new THREE.MeshBasicMaterial({
-      color: 0x020202,
+      color: 0xb8fff0,
       wireframe: true,
       transparent: true,
-      opacity: 0.88,
+      opacity: 0.08,
+      depthWrite: false,
     });
-    const boxes = new THREE.InstancedMesh(geometry, material, positions.length);
-    const wires = new THREE.InstancedMesh(geometry, edgeMaterial, positions.length);
+    const groups = new Map();
     const matrix = new THREE.Matrix4();
     const quaternion = new THREE.Quaternion();
 
-    positions.forEach((box, index) => {
+    positions.forEach((box) => {
+      const color = colorForBox(box);
+      if (!groups.has(color)) groups.set(color, []);
+      groups.get(color).push(box);
+    });
+
+    const applyBoxMatrix = (mesh, box, index) => {
       const position = new THREE.Vector3(
         (box.x + box.dx / 2 - container.length / 2) * 0.001,
         (box.z + box.dz / 2 - container.height / 2) * 0.001,
         (box.y + box.dy / 2 - container.width / 2) * 0.001,
       );
       const scale = new THREE.Vector3(
-        Math.max(box.dx * 0.001 * 0.965, 0.001),
-        Math.max(box.dz * 0.001 * 0.965, 0.001),
-        Math.max(box.dy * 0.001 * 0.965, 0.001),
+        Math.max(box.dx * 0.001 * 0.992, 0.001),
+        Math.max(box.dz * 0.001 * 0.992, 0.001),
+        Math.max(box.dy * 0.001 * 0.992, 0.001),
       );
       matrix.compose(position, quaternion, scale);
-      boxes.setMatrixAt(index, matrix);
-      boxes.setColorAt(index, new THREE.Color(colorForBox(box)));
-      wires.setMatrixAt(index, matrix);
-    });
+      mesh.setMatrixAt(index, matrix);
+    };
 
-    boxes.instanceMatrix.needsUpdate = true;
-    if (boxes.instanceColor) boxes.instanceColor.needsUpdate = true;
-    wires.instanceMatrix.needsUpdate = true;
-    state.three.model.add(boxes, wires);
+    groups.forEach((groupBoxes, color) => {
+      const material = new THREE.MeshBasicMaterial({
+        color: new THREE.Color(color),
+        side: THREE.DoubleSide,
+      });
+      const boxes = new THREE.InstancedMesh(geometry, material, groupBoxes.length);
+      const wires = new THREE.InstancedMesh(geometry, edgeMaterial.clone(), groupBoxes.length);
+
+      groupBoxes.forEach((box, index) => {
+        applyBoxMatrix(boxes, box, index);
+        applyBoxMatrix(wires, box, index);
+      });
+
+      boxes.instanceMatrix.needsUpdate = true;
+      wires.instanceMatrix.needsUpdate = true;
+      state.three.model.add(boxes, wires);
+    });
   }
 
   function updateThreeCamera(container) {
