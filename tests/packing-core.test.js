@@ -111,9 +111,28 @@ assert.deepEqual(Packing.CONTAINERS["20GP"], {
     positions.map((box) => [box.x, box.y, box.z]),
     [
       [0, 0, 0],
-      [100, 0, 0],
-      [200, 0, 0],
+      [0, 0, 100],
       [0, 110, 0],
+      [0, 110, 100],
+    ],
+  );
+}
+
+{
+  const result = Packing.calculatePacking(
+    customContainer(300, 220, 200),
+    carton(100, 110, 100),
+    { cornerBlock: { length: 0, width: 0, height: 0 } },
+  );
+  const positions = Packing.generateBoxPositions(result, 4);
+
+  assert.deepEqual(
+    positions.map((box) => [box.sequenceIndex, box.faceIndex, box.stackIndex]),
+    [
+      [0, 0, 0],
+      [1, 0, 1],
+      [2, 1, 0],
+      [3, 1, 1],
     ],
   );
 }

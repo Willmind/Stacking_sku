@@ -313,32 +313,72 @@
     return leftCorner || rightCorner;
   }
 
+  function assignSequenceIndexes(positions) {
+    return positions.map((position, sequenceIndex) => ({
+      ...position,
+      sequenceIndex,
+    }));
+  }
+
+  function createStackedFacePositions(basePosition, faceIndex, layerCount, container, cornerBlock) {
+    const positions = [];
+
+    for (let stackIndex = 0; stackIndex < layerCount; stackIndex += 1) {
+      const position = {
+        ...basePosition,
+        z: stackIndex * basePosition.dz,
+        faceIndex,
+        stackIndex,
+      };
+
+      if (!collidesCornerBlock(position, container, cornerBlock)) {
+        positions.push(position);
+      }
+    }
+
+    return positions;
+  }
+
+  function orderFloorPositionsForLoading(floorPositions) {
+    return floorPositions.slice().sort((a, b) => a.x - b.x || a.y - b.y);
+  }
+
+  function createOrderedPositionsFromFloor(container, carton, cornerBlock, floorPositions) {
+    const layerCount = Math.floor(container.height / carton.height);
+    const orderedFloor = orderFloorPositionsForLoading(floorPositions);
+    const positions = [];
+
+    orderedFloor.forEach((basePosition, faceIndex) => {
+      positions.push(
+        ...createStackedFacePositions(basePosition, faceIndex, layerCount, container, cornerBlock),
+      );
+    });
+
+    return assignSequenceIndexes(positions);
+  }
+
   function evaluateCandidate(container, carton, pattern, cornerBlock) {
     const basePositions = createLayerPositions(pattern, carton.height);
     const layerCount = Math.floor(container.height / carton.height);
+    const orderedPositions = createOrderedPositionsFromFloor(
+      container,
+      carton,
+      cornerBlock,
+      basePositions,
+    );
+    const totalBoxes = orderedPositions.length;
+    const blockedByCornerTotal = basePositions.length * layerCount - totalBoxes;
     const layers = [];
-    let totalBoxes = 0;
-    let blockedByCornerTotal = 0;
 
     for (let index = 0; index < layerCount; index += 1) {
       const z = index * carton.height;
-      let blockedByCorner = 0;
-
-      for (const position of basePositions) {
-        if (collidesCornerBlock({ ...position, z }, container, cornerBlock)) {
-          blockedByCorner += 1;
-        }
-      }
-
-      const boxCount = basePositions.length - blockedByCorner;
+      const boxCount = orderedPositions.filter((box) => box.stackIndex === index).length;
       layers.push({
         index,
         z,
         boxCount,
-        blockedByCorner,
+        blockedByCorner: basePositions.length - boxCount,
       });
-      totalBoxes += boxCount;
-      blockedByCornerTotal += blockedByCorner;
     }
 
     const volumeLoaded = totalBoxes * carton.length * carton.width * carton.height;
@@ -350,6 +390,7 @@
       cornerBlock,
       pattern,
       layerPositions: basePositions,
+      orderedPositions,
       perLayerBoxCount: basePositions.length,
       layers,
       totalBoxes,
@@ -398,6 +439,7 @@
         cornerBlock,
         pattern: null,
         layerPositions: [],
+        orderedPositions: [],
         perLayerBoxCount: 0,
         layers: [],
         totalBoxes: 0,
@@ -412,28 +454,11 @@
 
   function generateBoxPositions(result, visibleCount = result.totalBoxes) {
     const limit = Math.max(0, Math.min(result.totalBoxes, Math.floor(visibleCount)));
-    const positions = [];
-    if (!result.pattern || limit === 0) return positions;
-
-    for (const layer of result.layers) {
-      for (const basePosition of result.layerPositions) {
-        const position = {
-          ...basePosition,
-          z: layer.z,
-        };
-
-        if (collidesCornerBlock(position, result.container, result.cornerBlock)) {
-          continue;
-        }
-
-        positions.push(position);
-        if (positions.length >= limit) {
-          return positions;
-        }
-      }
+    if (!result.pattern || limit === 0) return [];
+    if (Array.isArray(result.orderedPositions)) {
+      return result.orderedPositions.slice(0, limit);
     }
-
-    return positions;
+    return [];
   }
 
   return {
