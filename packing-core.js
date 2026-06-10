@@ -87,6 +87,33 @@
     };
   }
 
+  function rectanglesOverlap(a, b) {
+    return intersects(a.x, a.dx, b.x, b.dx) && intersects(a.y, a.dy, b.y, b.dy);
+  }
+
+  function floorRectFromPosition(position) {
+    return {
+      x: position.x,
+      y: position.y,
+      dx: position.dx,
+      dy: position.dy,
+    };
+  }
+
+  function positionFitsFloor(position, container) {
+    return (
+      position.x >= 0 &&
+      position.y >= 0 &&
+      position.x + position.dx <= container.length &&
+      position.y + position.dy <= container.width
+    );
+  }
+
+  function overlapsAnyFloorRect(position, occupiedRects) {
+    const rect = floorRectFromPosition(position);
+    return occupiedRects.some((occupied) => rectanglesOverlap(rect, occupied));
+  }
+
   function makeSequence(lengthCount, widthCount, order, orientations) {
     const sequence = [];
     const pushUnits = (orientation, count) => {
@@ -217,6 +244,32 @@
     };
   }
 
+  function addWidthLaneCandidates(candidates, container, carton, orientations, lengthCount, widthCount, order) {
+    const baseCandidate = createWidthCandidate(container, orientations, lengthCount, widthCount, order);
+    candidates.push(baseCandidate);
+
+    for (let reduceWidthRows = 1; reduceWidthRows <= 2; reduceWidthRows += 1) {
+      const reduced = createWidthCandidate(container, orientations, lengthCount, widthCount, order);
+      const reducedUnits = reduced.units.map((unit) => {
+        if (unit.orientationId !== "width") return unit;
+        return {
+          ...unit,
+          acrossCount: Math.max(0, unit.acrossCount - reduceWidthRows),
+        };
+      });
+      const basePositions = createLayerPositions({ ...reduced, units: reducedUnits }, carton.height);
+      const extraPositions = createDoorSideRemainderPositions(container, carton, basePositions);
+
+      candidates.push({
+        ...reduced,
+        units: reducedUnits,
+        extraLayerPositions: extraPositions,
+        perLayerBoxCount: basePositions.length + extraPositions.length,
+        occupiedLength: container.length,
+      });
+    }
+  }
+
   function enumerateCandidates(container, carton) {
     const orientations = getOrientations(carton);
     const candidates = [];
@@ -240,9 +293,9 @@
       const remaining = container.width - lengthCount * orientations.length.y;
       const widthCount = Math.floor(remaining / orientations.width.y);
       if (lengthCount + widthCount > 0 && widthCount <= widthLaneWidthMax) {
-        candidates.push(createWidthCandidate(container, orientations, lengthCount, widthCount, "length-first"));
+        addWidthLaneCandidates(candidates, container, carton, orientations, lengthCount, widthCount, "length-first");
         if (lengthCount > 0 && widthCount > 0) {
-          candidates.push(createWidthCandidate(container, orientations, lengthCount, widthCount, "width-first"));
+          addWidthLaneCandidates(candidates, container, carton, orientations, lengthCount, widthCount, "width-first");
         }
       }
     }
@@ -284,6 +337,52 @@
     }
 
     return positions.sort((a, b) => a.y - b.y || a.x - b.x);
+  }
+
+  function createDoorSideRemainderPositions(container, carton, occupiedPositions) {
+    const orientations = Object.values(getOrientations(carton));
+    const occupiedRects = occupiedPositions.map(floorRectFromPosition);
+    const candidates = [];
+
+    for (const orientation of orientations) {
+      const xStarts = Array.from(
+        new Set(
+          occupiedRects
+            .map((rect) => rect.x + rect.dx)
+            .filter((x) => x >= 0 && x + orientation.x <= container.length),
+        ),
+      ).sort((a, b) => a - b);
+
+      for (const x of xStarts) {
+        for (let y = 0; y + orientation.y <= container.width; y += orientation.y) {
+          const position = {
+            x,
+            y,
+            z: 0,
+            dx: orientation.x,
+            dy: orientation.y,
+            dz: carton.height,
+            orientationId: orientation.id,
+            label: orientation.label,
+            source: "door-remainder",
+          };
+
+          if (positionFitsFloor(position, container) && !overlapsAnyFloorRect(position, occupiedRects)) {
+            candidates.push(position);
+          }
+        }
+      }
+    }
+
+    return candidates
+      .sort((a, b) => a.x - b.x || a.y - b.y)
+      .reduce((accepted, candidate) => {
+        const acceptedRects = accepted.map(floorRectFromPosition);
+        if (!overlapsAnyFloorRect(candidate, acceptedRects)) {
+          accepted.push(candidate);
+        }
+        return accepted;
+      }, []);
   }
 
   function intersects(aStart, aSize, bStart, bSize) {
@@ -358,7 +457,10 @@
   }
 
   function evaluateCandidate(container, carton, pattern, cornerBlock) {
-    const basePositions = createLayerPositions(pattern, carton.height);
+    const basePositions = [
+      ...createLayerPositions(pattern, carton.height),
+      ...(pattern.extraLayerPositions || []),
+    ].sort((a, b) => a.x - b.x || a.y - b.y);
     const layerCount = Math.floor(container.height / carton.height);
     const orderedPositions = createOrderedPositionsFromFloor(
       container,
