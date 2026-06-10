@@ -37,6 +37,11 @@
     height: 80,
   };
 
+  const LOADING_STRATEGIES = {
+    MULTI_DESTINATION: "multi-destination",
+    SAME_DESTINATION: "same-destination",
+  };
+
   const MIN_DOOR_SIDE_REMAINDER_CLEARANCE = DEFAULT_CORNER_BLOCK.length;
 
   function positiveNumber(value, name) {
@@ -68,6 +73,25 @@
       width: positiveNumber(input.width, "carton width"),
       height: positiveNumber(input.height, "carton height"),
     };
+  }
+
+  function normalizeSku(input, index) {
+    const label = input.label || String.fromCharCode(65 + index);
+    return {
+      label,
+      length: positiveNumber(input.length, `${label} carton length`),
+      width: positiveNumber(input.width, `${label} carton width`),
+      height: positiveNumber(input.height, `${label} carton height`),
+      target: Math.floor(positiveNumber(input.target, `${label} target quantity`)),
+      color: input.color || "#d8923a",
+    };
+  }
+
+  function normalizeSkus(inputs) {
+    if (!Array.isArray(inputs) || inputs.length < 2 || inputs.length > 10) {
+      throw new Error("multi-SKU mode requires 2 to 10 SKUs");
+    }
+    return inputs.map(normalizeSku);
   }
 
   function getOrientations(carton) {
@@ -482,6 +506,81 @@
     }));
   }
 
+  function groupPositionsByFace(positions) {
+    const groups = new Map();
+    for (const position of positions) {
+      if (!groups.has(position.faceIndex)) groups.set(position.faceIndex, []);
+      groups.get(position.faceIndex).push(position);
+    }
+    return Array.from(groups.values()).map((group) =>
+      group.slice().sort((a, b) => a.stackIndex - b.stackIndex || a.y - b.y),
+    );
+  }
+
+  function assignMultiDestinationSkus(positions, skus) {
+    const assigned = positions.map((position) => ({ ...position }));
+    let cursor = 0;
+
+    for (const sku of skus) {
+      let loaded = 0;
+      while (cursor < assigned.length && loaded < sku.target) {
+        assigned[cursor] = {
+          ...assigned[cursor],
+          skuLabel: sku.label,
+          skuColor: sku.color,
+        };
+        cursor += 1;
+        loaded += 1;
+      }
+    }
+
+    return assigned.filter((position) => position.skuLabel);
+  }
+
+  function assignSameDestinationSkus(positions, skus) {
+    const faces = groupPositionsByFace(positions);
+    const fullFaceAssignments = [];
+    const remainderPositions = [];
+    const remainingBySku = skus.map((sku) => ({ ...sku, remaining: sku.target }));
+
+    for (const skuState of remainingBySku) {
+      for (const face of faces) {
+        if (face.assigned) continue;
+        if (skuState.remaining >= face.length) {
+          face.assigned = true;
+          skuState.remaining -= face.length;
+          fullFaceAssignments.push(
+            ...face.map((position) => ({
+              ...position,
+              skuLabel: skuState.label,
+              skuColor: skuState.color,
+            })),
+          );
+        }
+      }
+    }
+
+    for (const face of faces) {
+      if (!face.assigned) remainderPositions.push(...face);
+    }
+
+    const assignedRemainders = [];
+    let cursor = 0;
+    for (const skuState of remainingBySku) {
+      while (cursor < remainderPositions.length && skuState.remaining > 0) {
+        assignedRemainders.push({
+          ...remainderPositions[cursor],
+          skuLabel: skuState.label,
+          skuColor: skuState.color,
+        });
+        cursor += 1;
+        skuState.remaining -= 1;
+      }
+    }
+
+    return assignSequenceIndexes([...fullFaceAssignments, ...assignedRemainders]);
+  }
+
   function createCornerAvoidanceNudges(box, container, cornerBlock) {
     const candidates = [box];
     const yStarts = [
@@ -672,6 +771,19 @@
     return false;
   }
 
+  function summarizeSkuAllocation(skus, positions) {
+    return skus.map((sku) => {
+      const loaded = positions.filter((position) => position.skuLabel === sku.label).length;
+      return {
+        label: sku.label,
+        color: sku.color,
+        target: sku.target,
+        loaded,
+        shortfall: Math.max(0, sku.target - loaded),
+      };
+    });
+  }
+
   function calculatePacking(containerInput, cartonInput, options = {}) {
     const container = normalizeContainer(containerInput);
     const carton = normalizeCarton(cartonInput);
@@ -710,6 +822,37 @@
     return best;
   }
 
+  function calculateMultiSkuPacking(containerInput, skuInputs, options = {}) {
+    const skus = normalizeSkus(skuInputs);
+    const strategy = options.strategy || LOADING_STRATEGIES.MULTI_DESTINATION;
+    if (!Object.values(LOADING_STRATEGIES).includes(strategy)) {
+      throw new Error("strategy must be multi-destination or same-destination");
+    }
+
+    const firstSku = skus[0];
+    const baseResult = calculatePacking(
+      containerInput,
+      { length: firstSku.length, width: firstSku.width, height: firstSku.height },
+      options,
+    );
+    const sourcePositions = baseResult.orderedPositions || [];
+    const assignedPositions =
+      strategy === LOADING_STRATEGIES.SAME_DESTINATION
+        ? assignSameDestinationSkus(sourcePositions, skus)
+        : assignMultiDestinationSkus(sourcePositions, skus);
+    const skuSummary = summarizeSkuAllocation(skus, assignedPositions);
+
+    return {
+      ...baseResult,
+      mode: "multi",
+      strategy,
+      skus,
+      orderedPositions: assignedPositions,
+      totalBoxes: assignedPositions.length,
+      skuSummary,
+    };
+  }
+
   function generateBoxPositions(result, visibleCount = result.totalBoxes) {
     const limit = Math.max(0, Math.min(result.totalBoxes, Math.floor(visibleCount)));
     if (!result.pattern || limit === 0) return [];
@@ -722,7 +865,9 @@
   return {
     CONTAINERS,
     DEFAULT_CORNER_BLOCK,
+    LOADING_STRATEGIES,
     calculatePacking,
+    calculateMultiSkuPacking,
     generateBoxPositions,
     collidesCornerBlock,
   };
