@@ -290,6 +290,15 @@
     elements.progressText.textContent = `${formatNumber(state.visibleCount)} / ${formatNumber(result.totalBoxes)}`;
   }
 
+  function clearCalculationState() {
+    state.result = null;
+    state.visibleCount = 0;
+    elements.progress.max = "0";
+    elements.progress.value = "0";
+    elements.progressText.textContent = "0 / 0";
+    updateSkuBreakdown({});
+  }
+
   function calculateAndRender(options = {}) {
     try {
       updateColorValue();
@@ -305,8 +314,8 @@
       updateProgress(result, options.keepProgress);
       drawAll();
     } catch (error) {
+      clearCalculationState();
       elements.statusChip.textContent = "参数错误";
-      elements.progressText.textContent = "0 / 0";
       elements.totalBoxes.textContent = "0";
       drawError(error.message);
     }
@@ -1000,6 +1009,9 @@
       state.draggedSkuId = null;
       renderSkuList();
       markNeedsCalculation();
+    });
+    elements.skuList.addEventListener("dragend", () => {
+      state.draggedSkuId = null;
     });
     elements.progress.addEventListener("input", handleProgressInput);
     window.addEventListener("resize", drawAll);
