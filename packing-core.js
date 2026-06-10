@@ -482,7 +482,83 @@
     }));
   }
 
-  function createStackedFacePositions(basePosition, faceIndex, layerCount, container, cornerBlock) {
+  function createCornerAvoidanceNudges(box, container, cornerBlock) {
+    const candidates = [box];
+    const yStarts = [
+      0,
+      cornerBlock.width,
+      container.width - cornerBlock.width - box.dy,
+      container.width - box.dy,
+    ];
+
+    for (const y of yStarts) {
+      candidates.push({
+        ...box,
+        y,
+        adjustedForCorner: y !== box.y,
+      });
+    }
+
+    return candidates.filter((candidate, index, list) => {
+      const key = `${candidate.x}:${candidate.y}:${candidate.z}:${candidate.dx}:${candidate.dy}`;
+      return (
+        positionFitsFloor(candidate, container) &&
+        list.findIndex((item) => `${item.x}:${item.y}:${item.z}:${item.dx}:${item.dy}` === key) === index
+      );
+    });
+  }
+
+  function findCornerSafePosition(position, acceptedInStackBand, container, cornerBlock) {
+    const acceptedRects = acceptedInStackBand.map(floorRectFromPosition);
+
+    for (const candidate of createCornerAvoidanceNudges(position, container, cornerBlock)) {
+      if (collidesCornerBlock(candidate, container, cornerBlock)) continue;
+      if (overlapsAnyFloorRect(candidate, acceptedRects)) continue;
+      return candidate;
+    }
+
+    return null;
+  }
+
+  function matchesPositionFootprint(a, b) {
+    return a.x === b.x && a.y === b.y && a.z === b.z && a.dx === b.dx && a.dy === b.dy;
+  }
+
+  function findCornerDisplacedPosition(position, acceptedInStackBand, container, cornerBlock) {
+    let candidate = position;
+    let adjusted = false;
+
+    while (positionFitsFloor(candidate, container) && !collidesCornerBlock(candidate, container, cornerBlock)) {
+      const overlapping = acceptedInStackBand.filter((accepted) =>
+        rectanglesOverlap(floorRectFromPosition(candidate), floorRectFromPosition(accepted)),
+      );
+
+      if (overlapping.length === 0) {
+        return adjusted
+          ? {
+              ...candidate,
+              adjustedForCorner: candidate.y !== position.y,
+            }
+          : candidate;
+      }
+
+      if (!overlapping.some((accepted) => accepted.adjustedForCorner)) {
+        return null;
+      }
+
+      const y = Math.max(...overlapping.map((accepted) => accepted.y + accepted.dy));
+      if (y === candidate.y) return null;
+      candidate = {
+        ...candidate,
+        y,
+      };
+      adjusted = true;
+    }
+
+    return null;
+  }
+
+  function createStackedFacePositions(basePosition, faceIndex, layerCount, container, cornerBlock, acceptedByStack) {
     const positions = [];
 
     for (let stackIndex = 0; stackIndex < layerCount; stackIndex += 1) {
@@ -493,8 +569,24 @@
         stackIndex,
       };
 
-      if (!collidesCornerBlock(position, container, cornerBlock)) {
-        positions.push(position);
+      const acceptedInStackBand = acceptedByStack.get(stackIndex) || [];
+      const acceptedRects = acceptedInStackBand.map(floorRectFromPosition);
+      let acceptedPosition = null;
+
+      if (collidesCornerBlock(position, container, cornerBlock)) {
+        acceptedPosition = findCornerSafePosition(position, acceptedInStackBand, container, cornerBlock);
+      } else if (acceptedInStackBand.some((accepted) => matchesPositionFootprint(position, accepted))) {
+        acceptedPosition = findCornerDisplacedPosition(position, acceptedInStackBand, container, cornerBlock);
+      } else if (overlapsAnyFloorRect(position, acceptedRects)) {
+        acceptedPosition = findCornerDisplacedPosition(position, acceptedInStackBand, container, cornerBlock);
+      } else {
+        acceptedPosition = position;
+      }
+
+      if (acceptedPosition) {
+        positions.push(acceptedPosition);
+        acceptedInStackBand.push(acceptedPosition);
+        acceptedByStack.set(stackIndex, acceptedInStackBand);
       }
     }
 
@@ -509,10 +601,11 @@
     const layerCount = Math.floor(container.height / carton.height);
     const orderedFloor = orderFloorPositionsForLoading(floorPositions);
     const positions = [];
+    const acceptedByStack = new Map();
 
     orderedFloor.forEach((basePosition, faceIndex) => {
       positions.push(
-        ...createStackedFacePositions(basePosition, faceIndex, layerCount, container, cornerBlock),
+        ...createStackedFacePositions(basePosition, faceIndex, layerCount, container, cornerBlock, acceptedByStack),
       );
     });
 
