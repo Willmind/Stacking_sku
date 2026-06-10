@@ -220,18 +220,20 @@ assert.deepEqual(Packing.CONTAINERS["20GP"], {
   assert.deepEqual(fullFacesThenTail.map((position) => position.skuLabel), ["B", "B", "B", "B", "A"]);
 }
 
-assert.throws(
-  () =>
-    Packing.calculateMultiSkuPacking(
-      customContainer(600, 200, 200),
-      [
-        sku("A", 100, 100, 100, 0.5, "#d8923a"),
-        sku("B", 100, 100, 100, 1, "#42d6a4"),
-      ],
-      { cornerBlock: { length: 0, width: 0, height: 0 } },
-    ),
-  /positive number|target quantity/,
-);
+for (const target of [0.5, 1.5]) {
+  assert.throws(
+    () =>
+      Packing.calculateMultiSkuPacking(
+        customContainer(600, 200, 200),
+        [
+          sku("A", 100, 100, 100, target, "#d8923a"),
+          sku("B", 100, 100, 100, 1, "#42d6a4"),
+        ],
+        { cornerBlock: { length: 0, width: 0, height: 0 } },
+      ),
+    /target quantity|integer/,
+  );
+}
 
 assert.throws(
   () =>

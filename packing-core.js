@@ -77,9 +77,9 @@
 
   function normalizeSku(input, index) {
     const label = input.label || String.fromCharCode(65 + index);
-    const target = Math.floor(positiveNumber(input.target, `${label} target quantity`));
-    if (target < 1) {
-      throw new Error(`${label} target quantity must be a positive number`);
+    const target = positiveNumber(input.target, `${label} target quantity`);
+    if (!Number.isInteger(target)) {
+      throw new Error(`${label} target quantity must be an integer`);
     }
     return {
       label,
