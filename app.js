@@ -425,7 +425,12 @@
 
     const layerPositions = result.layerPositions;
     const keyForPosition = (position) => `${position.x}:${position.y}:${position.dx}:${position.dy}`;
-    const visiblePositionByKey = Array.isArray(result.orderedPositions)
+    const hasOrderedPositions = Array.isArray(result.orderedPositions);
+    const orderedLayerPositions = hasOrderedPositions
+      ? result.orderedPositions.filter((position) => position.stackIndex === currentLayer.layer.index)
+      : [];
+    const orderedLayerKeys = new Set(orderedLayerPositions.map(keyForPosition));
+    const visiblePositionByKey = hasOrderedPositions
       ? result.orderedPositions
           .slice(0, state.visibleCount)
           .filter((position) => position.stackIndex === currentLayer.layer.index)
@@ -434,10 +439,18 @@
             return positions;
           }, new Map())
       : null;
+    const drawingPositions = hasOrderedPositions
+      ? [
+          ...layerPositions
+            .filter((position) => !orderedLayerKeys.has(keyForPosition(position)))
+            .map((position) => ({ box: position, baseMarker: true })),
+          ...orderedLayerPositions.map((position) => ({ box: position, baseMarker: false })),
+        ]
+      : layerPositions.map((position) => ({ box: position, baseMarker: false }));
     const visibleInLayer = Math.min(currentLayer.countInLayer, currentLayer.layer.boxCount || 0);
     let visibleDrawn = 0;
 
-    for (const box of layerPositions) {
+    for (const { box, baseMarker } of drawingPositions) {
       const blocked = Packing.collidesCornerBlock(
         { ...box, z: currentLayer.layer.z || 0 },
         result.container,
@@ -445,7 +458,7 @@
       );
       const visibleBox = visiblePositionByKey ? visiblePositionByKey.get(keyForPosition(box)) : box;
       const isVisible = visiblePositionByKey
-        ? !blocked && Boolean(visibleBox)
+        ? !baseMarker && !blocked && Boolean(visibleBox)
         : !blocked && visibleDrawn < visibleInLayer;
       if (!blocked && !visiblePositionByKey) visibleDrawn += 1;
       const boxRgb = hexToRgb(colorForBox(visibleBox || box));
