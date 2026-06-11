@@ -81,6 +81,11 @@ export const usePackingStore = defineStore("packing", () => {
     markDirty();
   }
 
+  function setMode(nextMode: PackingMode) {
+    mode.value = nextMode;
+    markDirty();
+  }
+
   function setSkuCount(nextCount: number) {
     const count = Math.max(2, Math.min(10, Math.round(nextCount)));
     skuCount.value = count;
@@ -88,6 +93,26 @@ export const usePackingStore = defineStore("packing", () => {
       skus.value.push(createSku(skus.value.length));
     }
     skus.value = skus.value.slice(0, count);
+    relabelSkus();
+    markDirty();
+  }
+
+  function updateSku(index: number, patch: Partial<SkuInput>) {
+    const current = skus.value[index];
+    if (!current) return;
+    skus.value[index] = { ...current, ...patch };
+    relabelSkus();
+    markDirty();
+  }
+
+  function moveSku(fromIndex: number, toIndex: number) {
+    if (fromIndex === toIndex) return;
+    if (fromIndex < 0 || fromIndex >= skus.value.length) return;
+    if (toIndex < 0 || toIndex >= skus.value.length) return;
+    const next = skus.value.slice();
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    skus.value = next;
     relabelSkus();
     markDirty();
   }
@@ -127,8 +152,11 @@ export const usePackingStore = defineStore("packing", () => {
     totalBoxesText,
     calculate,
     markDirty,
+    moveSku,
     relabelSkus,
     setContainerType,
+    setMode,
     setSkuCount,
+    updateSku,
   };
 });
