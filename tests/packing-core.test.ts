@@ -1,5 +1,7 @@
-const assert = require("node:assert/strict");
-const Packing = require("../packing-core.js");
+// @ts-nocheck
+import assert from "node:assert/strict";
+import { describe, it } from "vitest";
+import * as Packing from "../src/core/packing";
 
 function carton(length, width, height) {
   return { length, width, height };
@@ -47,13 +49,15 @@ function assertStartsBottomToTop(result) {
   assert.equal(positions[2].z, result.carton.height * 2);
 }
 
-assert.deepEqual(Packing.CONTAINERS["20GP"], {
-  id: "20GP",
-  name: "20GP",
-  length: 5898,
-  width: 2352,
-  height: 2393,
-});
+describe("packing core", () => {
+  it("matches the static implementation regressions", () => {
+    assert.deepEqual(Packing.CONTAINERS["20GP"], {
+      id: "20GP",
+      name: "20GP",
+      length: 5898,
+      width: 2352,
+      height: 2393,
+    });
 
 {
   const result = Packing.calculatePacking(
@@ -295,4 +299,5 @@ assert.throws(
   /positive number/,
 );
 
-console.log("packing-core tests passed");
+  });
+});

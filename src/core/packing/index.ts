@@ -1,11 +1,17 @@
-(function attachPackingCore(root, factory) {
-  if (typeof module === "object" && module.exports) {
-    module.exports = factory();
-  } else {
-    root.ContainerPacking = factory();
-  }
-})(typeof globalThis !== "undefined" ? globalThis : this, function packingFactory() {
-  "use strict";
+// @ts-nocheck
+export type {
+  BoxPosition,
+  CartonSpec,
+  ContainerSpec,
+  CornerBlockSpec,
+  LoadingStrategy,
+  PackingLayer,
+  PackingOptions,
+  PackingPattern,
+  PackingResult,
+  SkuInput,
+  SkuSummary,
+} from "./types";
 
   const CONTAINERS = {
     "20GP": {
@@ -890,13 +896,12 @@
     return [];
   }
 
-  return {
-    CONTAINERS,
-    DEFAULT_CORNER_BLOCK,
-    LOADING_STRATEGIES,
-    calculatePacking,
-    calculateMultiSkuPacking,
-    generateBoxPositions,
-    collidesCornerBlock,
-  };
-});
+export {
+  CONTAINERS,
+  DEFAULT_CORNER_BLOCK,
+  LOADING_STRATEGIES,
+  calculatePacking,
+  calculateMultiSkuPacking,
+  generateBoxPositions,
+  collidesCornerBlock,
+};

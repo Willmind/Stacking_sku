@@ -10,6 +10,15 @@
     containerLength: $("#container-length"),
     containerWidth: $("#container-width"),
     containerHeight: $("#container-height"),
+    packingMode: document.querySelectorAll("input[name='packing-mode']"),
+    skuCountRow: $("#sku-count-row"),
+    skuCount: $("#sku-count"),
+    skuCountValue: $("#sku-count-value"),
+    skuStrategyRow: $("#sku-strategy-row"),
+    skuStrategy: $("#sku-strategy"),
+    singleSkuFields: $("#single-sku-fields"),
+    skuList: $("#sku-list"),
+    skuBreakdown: $("#sku-breakdown"),
     cartonLength: $("#carton-length"),
     cartonWidth: $("#carton-width"),
     cartonHeight: $("#carton-height"),
@@ -32,10 +41,23 @@
     calculateButton: $("#calculate-button"),
   };
 
+  function createSkuId() {
+    if (window.crypto && typeof window.crypto.randomUUID === "function") {
+      return window.crypto.randomUUID();
+    }
+    return `sku-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
   const state = {
     result: null,
     visibleCount: 0,
     color: elements.cartonColor.value,
+    mode: "single",
+    skus: [
+      { id: createSkuId(), length: 480, width: 320, height: 260, target: 100, color: "#d8923a" },
+      { id: createSkuId(), length: 480, width: 320, height: 260, target: 100, color: "#42d6a4" },
+    ],
+    draggedSkuId: null,
     camera: {
       yaw: -0.72,
       pitch: 0.72,
@@ -73,6 +95,10 @@
     };
   }
 
+  function colorForBox(box) {
+    return box.skuColor || state.color;
+  }
+
   function shadeColor(rgb, factor) {
     const clamp = (value) => Math.max(0, Math.min(255, Math.round(value)));
     return `rgb(${clamp(rgb.r * factor)}, ${clamp(rgb.g * factor)}, ${clamp(rgb.b * factor)})`;
@@ -101,6 +127,91 @@
       width: numberValue(elements.cartonWidth),
       height: numberValue(elements.cartonHeight),
     };
+  }
+
+  function updateSkuFromCard(card) {
+    const sku = state.skus.find((item) => item.id === card.dataset.skuId);
+    if (!sku) return;
+    sku.length = Number(card.querySelector(".sku-length").value);
+    sku.width = Number(card.querySelector(".sku-width").value);
+    sku.height = Number(card.querySelector(".sku-height").value);
+    sku.target = Number(card.querySelector(".sku-target").value);
+    sku.color = card.querySelector(".sku-color").value;
+  }
+
+  function getSkuInputs() {
+    elements.skuList.querySelectorAll(".sku-card").forEach(updateSkuFromCard);
+    relabelSkus();
+    return state.skus.map((sku) => ({
+      label: sku.label,
+      length: sku.length,
+      width: sku.width,
+      height: sku.height,
+      target: sku.target,
+      color: sku.color,
+    }));
+  }
+
+  function relabelSkus() {
+    state.skus = state.skus.map((sku, index) => ({
+      ...sku,
+      label: String.fromCharCode(65 + index),
+    }));
+  }
+
+  function renderSkuList() {
+    relabelSkus();
+    elements.skuList.innerHTML = state.skus
+      .map(
+        (sku) => `
+          <article class="sku-card" draggable="true" data-sku-id="${sku.id}">
+            <div class="sku-card-header">
+              <button class="drag-handle" type="button" aria-label="拖动 SKU ${sku.label}">☰</button>
+              <strong>SKU ${sku.label}</strong>
+              <input class="sku-color" type="color" value="${sku.color}" aria-label="SKU ${sku.label} 颜色" />
+            </div>
+            <div class="sku-fields">
+              <label>长 mm<input class="sku-length" type="number" min="1" step="1" value="${sku.length}" /></label>
+              <label>宽 mm<input class="sku-width" type="number" min="1" step="1" value="${sku.width}" /></label>
+              <label>高 mm<input class="sku-height" type="number" min="1" step="1" value="${sku.height}" /></label>
+              <label>目标量<input class="sku-target" type="number" min="1" step="1" value="${sku.target}" /></label>
+            </div>
+          </article>
+        `,
+      )
+      .join("");
+  }
+
+  function setPackingMode(mode) {
+    state.mode = mode;
+    const multi = mode === "multi";
+    elements.skuCountRow.classList.toggle("hidden", !multi);
+    elements.skuStrategyRow.classList.toggle("hidden", !multi);
+    elements.singleSkuFields.classList.toggle("hidden", multi);
+    elements.skuList.classList.toggle("hidden", !multi);
+    elements.skuBreakdown.classList.toggle("hidden", !multi);
+    if (multi) renderSkuList();
+    markNeedsCalculation();
+  }
+
+  function syncSkuCount() {
+    const count = Number(elements.skuCount.value);
+    elements.skuCountValue.textContent = String(count);
+    while (state.skus.length < count) {
+      const index = state.skus.length;
+      state.skus.push({
+        id: createSkuId(),
+        label: String.fromCharCode(65 + index),
+        length: 480,
+        width: 320,
+        height: 260,
+        target: 100,
+        color: ["#d8923a", "#42d6a4", "#6e8bff", "#ff7066", "#b7e35f"][index % 5],
+      });
+    }
+    state.skus = state.skus.slice(0, count);
+    renderSkuList();
+    markNeedsCalculation();
   }
 
   function resizeCanvas(canvas) {
@@ -143,6 +254,27 @@
     elements.statusChip.textContent = result.totalBoxes > 0 ? "已完成计算" : "无法装载";
   }
 
+  function updateSkuBreakdown(result) {
+    if (state.mode !== "multi" || !result.skuSummary) {
+      elements.skuBreakdown.classList.add("hidden");
+      elements.skuBreakdown.innerHTML = "";
+      return;
+    }
+
+    elements.skuBreakdown.classList.remove("hidden");
+    elements.skuBreakdown.innerHTML = result.skuSummary
+      .map(
+        (sku) => `
+          <div class="sku-breakdown-row">
+            <span class="sku-swatch" style="background:${sku.color}"></span>
+            <strong>SKU ${sku.label}</strong>
+            <span>${formatNumber(sku.loaded)} / ${formatNumber(sku.target)}${sku.shortfall ? ` · 差 ${formatNumber(sku.shortfall)}` : ""}</span>
+          </div>
+        `,
+      )
+      .join("");
+  }
+
   function updateColorValue() {
     state.color = elements.cartonColor.value;
     const rgb = hexToRgb(state.color);
@@ -162,23 +294,53 @@
     elements.progressText.textContent = `${formatNumber(state.visibleCount)} / ${formatNumber(result.totalBoxes)}`;
   }
 
+  function clearCalculationState() {
+    state.result = null;
+    state.visibleCount = 0;
+    elements.progress.max = "0";
+    elements.progress.value = "0";
+    elements.progressText.textContent = "0 / 0";
+    updateSkuBreakdown({});
+  }
+
   function calculateAndRender(options = {}) {
     try {
       updateColorValue();
-      const result = Packing.calculatePacking(getContainerInput(), getCartonInput());
+      const result =
+        state.mode === "multi"
+          ? Packing.calculateMultiSkuPacking(getContainerInput(), getSkuInputs(), {
+              strategy: elements.skuStrategy.value,
+            })
+          : Packing.calculatePacking(getContainerInput(), getCartonInput());
       state.result = result;
       updateSummary(result);
+      updateSkuBreakdown(result);
       updateProgress(result, options.keepProgress);
       drawAll();
     } catch (error) {
+      clearCalculationState();
       elements.statusChip.textContent = "参数错误";
-      elements.progressText.textContent = "0 / 0";
       elements.totalBoxes.textContent = "0";
       drawError(error.message);
     }
   }
 
   function findCurrentLayer(result, visibleCount) {
+    if (Array.isArray(result.orderedPositions)) {
+      const visiblePositions = result.orderedPositions.slice(0, visibleCount);
+      const lastPosition = visiblePositions[visiblePositions.length - 1];
+      if (lastPosition) {
+        const layer =
+          result.layers.find((item) => item.index === lastPosition.stackIndex) ||
+          result.layers[lastPosition.stackIndex] ||
+          { index: 0, boxCount: 0, z: 0 };
+        return {
+          layer,
+          countInLayer: visiblePositions.filter((position) => position.stackIndex === lastPosition.stackIndex).length,
+        };
+      }
+    }
+
     let remaining = visibleCount;
     for (const layer of result.layers) {
       if (remaining <= layer.boxCount) {
@@ -241,7 +403,6 @@
     const scale = Math.min((width - pad * 2) / container.length, (height - pad * 2) / container.width);
     const boxX = (width - container.length * scale) / 2;
     const boxY = (height - container.width * scale) / 2 + 10;
-    const rgb = hexToRgb(state.color);
     const currentLayer = findCurrentLayer(result, state.visibleCount);
 
     ctx.save();
@@ -263,20 +424,47 @@
     ctx.strokeRect(0, (container.width - corner.width) * scale, corner.length * scale, corner.width * scale);
 
     const layerPositions = result.layerPositions;
+    const keyForPosition = (position) => `${position.x}:${position.y}:${position.dx}:${position.dy}`;
+    const hasOrderedPositions = Array.isArray(result.orderedPositions);
+    const orderedLayerPositions = hasOrderedPositions
+      ? result.orderedPositions.filter((position) => position.stackIndex === currentLayer.layer.index)
+      : [];
+    const orderedLayerKeys = new Set(orderedLayerPositions.map(keyForPosition));
+    const visiblePositionByKey = hasOrderedPositions
+      ? result.orderedPositions
+          .slice(0, state.visibleCount)
+          .filter((position) => position.stackIndex === currentLayer.layer.index)
+          .reduce((positions, position) => {
+            positions.set(keyForPosition(position), position);
+            return positions;
+          }, new Map())
+      : null;
+    const drawingPositions = hasOrderedPositions
+      ? [
+          ...layerPositions
+            .filter((position) => !orderedLayerKeys.has(keyForPosition(position)))
+            .map((position) => ({ box: position, baseMarker: true })),
+          ...orderedLayerPositions.map((position) => ({ box: position, baseMarker: false })),
+        ]
+      : layerPositions.map((position) => ({ box: position, baseMarker: false }));
     const visibleInLayer = Math.min(currentLayer.countInLayer, currentLayer.layer.boxCount || 0);
     let visibleDrawn = 0;
 
-    for (const box of layerPositions) {
+    for (const { box, baseMarker } of drawingPositions) {
       const blocked = Packing.collidesCornerBlock(
         { ...box, z: currentLayer.layer.z || 0 },
         result.container,
         result.cornerBlock,
       );
-      const isVisible = !blocked && visibleDrawn < visibleInLayer;
-      if (!blocked) visibleDrawn += 1;
+      const visibleBox = visiblePositionByKey ? visiblePositionByKey.get(keyForPosition(box)) : box;
+      const isVisible = visiblePositionByKey
+        ? !baseMarker && !blocked && Boolean(visibleBox)
+        : !blocked && visibleDrawn < visibleInLayer;
+      if (!blocked && !visiblePositionByKey) visibleDrawn += 1;
+      const boxRgb = hexToRgb(colorForBox(visibleBox || box));
 
       ctx.fillStyle = isVisible
-        ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.82)`
+        ? `rgba(${boxRgb.r}, ${boxRgb.g}, ${boxRgb.b}, 0.82)`
         : blocked
           ? "rgba(255, 112, 102, 0.08)"
           : "rgba(255, 255, 255, 0.06)";
@@ -539,9 +727,69 @@
     if (object.children) object.children.forEach(disposeThreeObject);
     if (object.geometry) object.geometry.dispose();
     if (object.material) {
-      if (Array.isArray(object.material)) object.material.forEach((material) => material.dispose());
-      else object.material.dispose();
+      const disposeMaterial = (material) => {
+        if (material.map) material.map.dispose();
+        material.dispose();
+      };
+      if (Array.isArray(object.material)) object.material.forEach(disposeMaterial);
+      else disposeMaterial(object.material);
     }
+  }
+
+  function makeThreeLabel(text, color = "#f5f7fb", scaleWidth = 1.5, scaleHeight = 0.38) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 320;
+    canvas.height = 64;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "rgba(3, 8, 14, 0.72)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = color;
+    ctx.font = "700 26px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+    const texture = new THREE.CanvasTexture(canvas);
+    const material = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(scaleWidth, scaleHeight, 1);
+    sprite.renderOrder = 30;
+    return sprite;
+  }
+
+  function addThreeDoorMarker(length, height, width) {
+    const doorGeometry = new THREE.PlaneGeometry(width, height);
+    const doorPlane = new THREE.Mesh(
+      doorGeometry,
+      new THREE.MeshBasicMaterial({
+        color: 0x42d6a4,
+        transparent: true,
+        opacity: 0.12,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
+    );
+    doorPlane.rotation.y = Math.PI / 2;
+    doorPlane.position.x = length / 2 + 0.006;
+    doorPlane.renderOrder = 4;
+
+    const doorEdges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(doorGeometry),
+      new THREE.LineBasicMaterial({
+        color: 0x57e3bc,
+        transparent: true,
+        opacity: 0.98,
+        depthTest: false,
+      }),
+    );
+    doorEdges.rotation.copy(doorPlane.rotation);
+    doorEdges.position.copy(doorPlane.position);
+    doorEdges.renderOrder = 31;
+    state.three.model.add(doorPlane, doorEdges);
   }
 
   function addThreeContainer(result) {
@@ -556,7 +804,7 @@
       new THREE.MeshBasicMaterial({
         color: 0x42d6a4,
         transparent: true,
-        opacity: 0.065,
+        opacity: 0.015,
         side: THREE.DoubleSide,
         depthWrite: false,
       }),
@@ -608,6 +856,18 @@
       edges.position.copy(block.position);
       state.three.model.add(block, edges);
     }
+
+    addThreeDoorMarker(length, height, width);
+
+    const labelWidth = Math.min(1.5, Math.max(0.54, length * 0.18));
+    const labelHeight = Math.min(0.38, Math.max(0.18, labelWidth * 0.26));
+    const labelOffset = Math.max(0.14, labelWidth * 0.34);
+    const labelY = height / 2 + labelHeight * 0.7;
+    const doorLabel = makeThreeLabel("柜门", "#f5f7fb", labelWidth, labelHeight);
+    doorLabel.position.set(length / 2 + labelOffset, labelY, 0);
+    const innerLabel = makeThreeLabel("角件端", "#ffbe55", labelWidth, labelHeight);
+    innerLabel.position.set(-length / 2 - labelOffset, labelY, 0);
+    state.three.model.add(doorLabel, innerLabel);
   }
 
   function addThreeBoxes(result, positions) {
@@ -615,41 +875,55 @@
 
     const { container } = result;
     const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshLambertMaterial({
-      color: new THREE.Color(state.color),
-      transparent: true,
-      opacity: 0.92,
-    });
     const edgeMaterial = new THREE.MeshBasicMaterial({
-      color: 0x020202,
+      color: 0xb8fff0,
       wireframe: true,
       transparent: true,
-      opacity: 0.88,
+      opacity: 0.08,
+      depthWrite: false,
     });
-    const boxes = new THREE.InstancedMesh(geometry, material, positions.length);
-    const wires = new THREE.InstancedMesh(geometry, edgeMaterial, positions.length);
+    const groups = new Map();
     const matrix = new THREE.Matrix4();
     const quaternion = new THREE.Quaternion();
 
-    positions.forEach((box, index) => {
+    positions.forEach((box) => {
+      const color = colorForBox(box);
+      if (!groups.has(color)) groups.set(color, []);
+      groups.get(color).push(box);
+    });
+
+    const applyBoxMatrix = (mesh, box, index) => {
       const position = new THREE.Vector3(
         (box.x + box.dx / 2 - container.length / 2) * 0.001,
         (box.z + box.dz / 2 - container.height / 2) * 0.001,
         (box.y + box.dy / 2 - container.width / 2) * 0.001,
       );
       const scale = new THREE.Vector3(
-        Math.max(box.dx * 0.001 * 0.965, 0.001),
-        Math.max(box.dz * 0.001 * 0.965, 0.001),
-        Math.max(box.dy * 0.001 * 0.965, 0.001),
+        Math.max(box.dx * 0.001 * 0.992, 0.001),
+        Math.max(box.dz * 0.001 * 0.992, 0.001),
+        Math.max(box.dy * 0.001 * 0.992, 0.001),
       );
       matrix.compose(position, quaternion, scale);
-      boxes.setMatrixAt(index, matrix);
-      wires.setMatrixAt(index, matrix);
-    });
+      mesh.setMatrixAt(index, matrix);
+    };
 
-    boxes.instanceMatrix.needsUpdate = true;
-    wires.instanceMatrix.needsUpdate = true;
-    state.three.model.add(boxes, wires);
+    groups.forEach((groupBoxes, color) => {
+      const material = new THREE.MeshBasicMaterial({
+        color: new THREE.Color(color),
+        side: THREE.DoubleSide,
+      });
+      const boxes = new THREE.InstancedMesh(geometry, material, groupBoxes.length);
+      const wires = new THREE.InstancedMesh(geometry, edgeMaterial.clone(), groupBoxes.length);
+
+      groupBoxes.forEach((box, index) => {
+        applyBoxMatrix(boxes, box, index);
+        applyBoxMatrix(wires, box, index);
+      });
+
+      boxes.instanceMatrix.needsUpdate = true;
+      wires.instanceMatrix.needsUpdate = true;
+      state.three.model.add(boxes, wires);
+    });
   }
 
   function updateThreeCamera(container) {
@@ -809,12 +1083,48 @@
       updateColorValue();
       drawAll();
     });
+    elements.packingMode.forEach((input) => {
+      input.addEventListener("change", () => setPackingMode(input.value));
+    });
+    elements.skuCount.addEventListener("input", syncSkuCount);
+    elements.skuStrategy.addEventListener("change", markNeedsCalculation);
+    elements.skuList.addEventListener("input", (event) => {
+      const card = event.target.closest(".sku-card");
+      if (card) updateSkuFromCard(card);
+      markNeedsCalculation();
+    });
+    elements.skuList.addEventListener("dragstart", (event) => {
+      const card = event.target.closest(".sku-card");
+      if (!card) return;
+      state.draggedSkuId = card.dataset.skuId;
+      event.dataTransfer.effectAllowed = "move";
+    });
+    elements.skuList.addEventListener("dragover", (event) => {
+      event.preventDefault();
+    });
+    elements.skuList.addEventListener("drop", (event) => {
+      event.preventDefault();
+      const targetCard = event.target.closest(".sku-card");
+      if (!targetCard || !state.draggedSkuId) return;
+      const fromIndex = state.skus.findIndex((sku) => sku.id === state.draggedSkuId);
+      const toIndex = state.skus.findIndex((sku) => sku.id === targetCard.dataset.skuId);
+      if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
+      const [moved] = state.skus.splice(fromIndex, 1);
+      state.skus.splice(toIndex, 0, moved);
+      state.draggedSkuId = null;
+      renderSkuList();
+      markNeedsCalculation();
+    });
+    elements.skuList.addEventListener("dragend", () => {
+      state.draggedSkuId = null;
+    });
     elements.progress.addEventListener("input", handleProgressInput);
     window.addEventListener("resize", drawAll);
     setupSceneControls();
   }
 
   setContainerPreset(elements.containerType.value);
+  renderSkuList();
   bindEvents();
   calculateAndRender();
 })();
