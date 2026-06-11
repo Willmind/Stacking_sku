@@ -21,11 +21,26 @@
 
 ## Git 提交规范
 
-- Commit 标题默认中文，简洁说明本次变更，例如：
-  - `文档：完善 agent 协作规范`
-  - `功能：新增多 SKU 装载策略`
-  - `修复：修正 3D 货物颜色渲染`
-  - `测试：补充实际码垛基准用例`
+- Commit 信息必须使用以下格式：
+
+  ```text
+  <type>(<scope>): <subject>
+
+  <body>
+
+  <footer>
+  ```
+
+- `type` 只能使用：`feat`、`fix`、`docs`、`style`、`refactor`、`perf`、`test`、`chore`、`revert`。
+- `scope` 使用简短英文标识，表示影响范围，例如：`packing`、`ui`、`render`、`test`、`docs`、`agent`、`build`、`release`。
+- `subject` 必须为中文，简短、明确，使用祈使句或动宾结构。
+- `body` 使用中文列表或段落简述本次改动要点；简单改动可以省略。
+- `footer` 可选，用于描述本次改动的背景、目的、影响、关联版本或破坏性变更。
+- Commit 标题示例：
+  - `feat(packing): 新增多 SKU 装载策略`
+  - `fix(render): 修正 3D 货物颜色渲染`
+  - `docs(agent): 完善 agent 协作规范`
+  - `test(packing): 补充实际码垛基准用例`
 - 一次提交只包含一个清晰主题；无关改动分开提交。
 - 如果需要提交正文，正文也使用中文，说明背景、影响范围和验证方式。
 - 不要把临时文件、测试产物、无关构建缓存加入提交。
