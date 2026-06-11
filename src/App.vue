@@ -4,6 +4,7 @@ import PackingModeSwitch from "./components/controls/PackingModeSwitch.vue";
 import ProgressControl from "./components/controls/ProgressControl.vue";
 import SingleSkuForm from "./components/controls/SingleSkuForm.vue";
 import SkuEditor from "./components/controls/SkuEditor.vue";
+import Plan2DView from "./components/visualizations/Plan2DView.vue";
 import ResultSummary from "./components/results/ResultSummary.vue";
 import SkuBreakdown from "./components/results/SkuBreakdown.vue";
 import { usePackingStore } from "./stores/packingStore";
@@ -43,12 +44,7 @@ const store = usePackingStore();
         <ProgressControl />
       </header>
       <div class="views-grid">
-        <article class="view-panel">
-          <header>
-            <h2>2D 平面排布</h2>
-            <span>待迁移</span>
-          </header>
-        </article>
+        <Plan2DView />
         <article class="view-panel">
           <header>
             <h2>3D 货柜渲染</h2>
