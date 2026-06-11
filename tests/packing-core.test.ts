@@ -180,6 +180,36 @@ describe("packing core", () => {
 }
 
 {
+  const result = Packing.calculatePacking(
+    Packing.CONTAINERS["20GP"],
+    carton(495, 395, 310),
+  );
+
+  assert.equal(result.totalBoxes, 455);
+  assert.equal(result.perLayerBoxCount, 65);
+  assert.equal(result.layers.length, 7);
+  assert.equal(result.pattern.family, "width-lanes");
+  assert.equal(result.pattern.lengthFacingCount, 2);
+  assert.equal(result.pattern.widthFacingCount, 3);
+
+  const positions = Packing.generateBoxPositions(result, result.totalBoxes);
+  assert.equal(positions.length, result.totalBoxes);
+  assertNoCornerCollisions(result, positions);
+
+  const tailHorizontalStack = positions.filter(
+    (position) =>
+      position.x === 495 * 11 &&
+      position.dx === 395 &&
+      position.dy === 495,
+  );
+  assert.equal(tailHorizontalStack.length, 7);
+  assert.deepEqual(
+    [...new Set(tailHorizontalStack.map((position) => position.stackIndex))],
+    [0, 1, 2, 3, 4, 5, 6],
+  );
+}
+
+{
   const result = Packing.calculateMultiSkuPacking(
     customContainer(1000, 500, 500),
     [
