@@ -1,0 +1,29 @@
+{
+  "name": "stacking-sku",
+  "version": "2.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test",
+    "test": "npm run test:unit"
+  },
+  "dependencies": {
+    "pinia": "latest",
+    "three": "latest",
+    "vue": "latest"
+  },
+  "devDependencies": {
+    "@playwright/test": "latest",
+    "@types/three": "latest",
+    "@vitejs/plugin-vue": "latest",
+    "jsdom": "latest",
+    "typescript": "latest",
+    "vite": "latest",
+    "vitest": "latest",
+    "vue-tsc": "latest"
+  }
+}
