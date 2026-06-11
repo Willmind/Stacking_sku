@@ -4,6 +4,7 @@ import PackingModeSwitch from "./components/controls/PackingModeSwitch.vue";
 import ProgressControl from "./components/controls/ProgressControl.vue";
 import SingleSkuForm from "./components/controls/SingleSkuForm.vue";
 import SkuEditor from "./components/controls/SkuEditor.vue";
+import Cargo3DView from "./components/visualizations/Cargo3DView.vue";
 import Plan2DView from "./components/visualizations/Plan2DView.vue";
 import ResultSummary from "./components/results/ResultSummary.vue";
 import SkuBreakdown from "./components/results/SkuBreakdown.vue";
@@ -45,12 +46,7 @@ const store = usePackingStore();
       </header>
       <div class="views-grid">
         <Plan2DView />
-        <article class="view-panel">
-          <header>
-            <h2>3D 货柜渲染</h2>
-            <span>待迁移</span>
-          </header>
-        </article>
+        <Cargo3DView />
       </div>
     </section>
   </main>
