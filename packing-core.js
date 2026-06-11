@@ -150,8 +150,8 @@
     );
   }
 
-  function hasDoorSideRemainderClearance(position, container) {
-    return container.length - (position.x + position.dx) >= MIN_DOOR_SIDE_REMAINDER_CLEARANCE;
+  function hasDoorSideRemainderClearance(position, container, minClearance) {
+    return container.length - (position.x + position.dx) >= minClearance;
   }
 
   function overlapsAnyFloorRect(position, occupiedRects) {
@@ -325,9 +325,46 @@
     return positions.reduce((maxLength, position) => Math.max(maxLength, position.x + position.dx), 0);
   }
 
+  function addWidthLaneCandidateVariants(
+    candidates,
+    container,
+    carton,
+    orientations,
+    candidate,
+    minDoorSideClearance = 0,
+  ) {
+    const basePositions = createLayerPositions(candidate, carton.height);
+    const normalizedCandidate = {
+      ...candidate,
+      groups: summarizeGroupsFromUnits(candidate.units, orientations),
+      perLayerBoxCount: basePositions.length,
+      occupiedLength: getFloorOccupiedLength(basePositions),
+    };
+    candidates.push(normalizedCandidate);
+
+    const extraPositions = createDoorSideRemainderPositions(
+      container,
+      carton,
+      basePositions,
+      minDoorSideClearance,
+    );
+    if (extraPositions.length === 0) {
+      return;
+    }
+
+    const layerPositions = [...basePositions, ...extraPositions];
+    candidates.push({
+      ...normalizedCandidate,
+      extraLayerPositions: extraPositions,
+      remainderCount: extraPositions.length,
+      perLayerBoxCount: layerPositions.length,
+      occupiedLength: getFloorOccupiedLength(layerPositions),
+    });
+  }
+
   function addWidthLaneCandidates(candidates, container, carton, orientations, lengthCount, widthCount, order) {
     const baseCandidate = createWidthCandidate(container, orientations, lengthCount, widthCount, order);
-    candidates.push(baseCandidate);
+    addWidthLaneCandidateVariants(candidates, container, carton, orientations, baseCandidate);
 
     if (!baseCandidate.units.some((unit) => unit.orientationId === "width" && unit.acrossCount > 0)) {
       return;
@@ -352,19 +389,10 @@
       if (seenReducedUnits.has(reducedUnitKey)) continue;
       seenReducedUnits.add(reducedUnitKey);
 
-      const basePositions = createLayerPositions({ ...reduced, units: reducedUnits }, carton.height);
-      const extraPositions = createDoorSideRemainderPositions(container, carton, basePositions);
-      const layerPositions = [...basePositions, ...extraPositions];
-
-      candidates.push({
+      addWidthLaneCandidateVariants(candidates, container, carton, orientations, {
         ...reduced,
         units: reducedUnits,
-        groups: summarizeGroupsFromUnits(reducedUnits, orientations),
-        extraLayerPositions: extraPositions,
-        remainderCount: extraPositions.length,
-        perLayerBoxCount: basePositions.length + extraPositions.length,
-        occupiedLength: getFloorOccupiedLength(layerPositions),
-      });
+      }, MIN_DOOR_SIDE_REMAINDER_CLEARANCE);
     }
   }
 
@@ -437,7 +465,7 @@
     return positions.sort((a, b) => a.y - b.y || a.x - b.x);
   }
 
-  function createDoorSideRemainderPositions(container, carton, occupiedPositions) {
+  function createDoorSideRemainderPositions(container, carton, occupiedPositions, minDoorSideClearance = 0) {
     const orientations = Object.values(getOrientations(carton));
     const occupiedRects = occupiedPositions.map(floorRectFromPosition);
     const candidates = [];
@@ -467,7 +495,7 @@
 
           if (
             positionFitsFloor(position, container) &&
-            hasDoorSideRemainderClearance(position, container) &&
+            hasDoorSideRemainderClearance(position, container, minDoorSideClearance) &&
             !overlapsAnyFloorRect(position, occupiedRects)
           ) {
             candidates.push(position);
