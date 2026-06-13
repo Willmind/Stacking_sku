@@ -28,3 +28,12 @@ test("calculates the 488 x 360 x 291 benchmark", async ({ page }) => {
   await expect(page.locator("#total-boxes")).toHaveText("1,403");
   await expect(page.locator("#blocked-count")).toHaveText("1 箱");
 });
+
+test("sets the progress slider to full after the initial calculation", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "计算装载" }).click();
+
+  await expect(page.locator("#total-boxes")).toHaveText("755");
+  await expect(page.locator("#progress-text")).toHaveText("755 / 755");
+  await expect(page.locator("#stack-progress")).toHaveValue("755");
+});
