@@ -104,40 +104,6 @@ function keyForPosition(position: BoxPosition) {
   return `${position.x}:${position.y}:${position.dx}:${position.dy}`;
 }
 
-function drawPlanGroupLabels(ctx: CanvasRenderingContext2D, result: PackingResult, scale: number) {
-  const groups = result.pattern?.groups || [];
-  if (!groups.length) return;
-  ctx.font = "700 12px Inter, sans-serif";
-  ctx.textBaseline = "middle";
-  ctx.textAlign = "center";
-
-  if (result.pattern.family === "length-segments") {
-    let x = 0;
-    for (const group of groups) {
-      const w = group.occupiedLength * scale;
-      ctx.fillStyle = "rgba(3, 8, 14, 0.72)";
-      ctx.fillRect(x * scale + 6, 7, Math.max(86, w - 12), 25);
-      ctx.fillStyle = "#f5f7fb";
-      ctx.fillText(`${group.label} ${group.count}列 · 占长 ${formatNumber(group.occupiedLength)}mm`, x * scale + w / 2, 20);
-      x += group.occupiedLength;
-    }
-  } else {
-    let y = 0;
-    for (const group of groups) {
-      const h = group.occupiedWidth * scale;
-      ctx.save();
-      ctx.translate(15, y * scale + h / 2);
-      ctx.rotate(-Math.PI / 2);
-      ctx.fillStyle = "rgba(3, 8, 14, 0.72)";
-      ctx.fillRect(-72, -13, 144, 25);
-      ctx.fillStyle = "#f5f7fb";
-      ctx.fillText(`${group.label} ${group.count}排 · 占宽 ${formatNumber(group.occupiedWidth)}mm`, 0, 0);
-      ctx.restore();
-      y += group.occupiedWidth;
-    }
-  }
-}
-
 function drawOuterPlanLabels(
   ctx: CanvasRenderingContext2D,
   result: PackingResult,
@@ -267,7 +233,6 @@ export function renderPlan2D({ canvas, result, visibleCount, devicePixelRatio }:
   ctx.strokeStyle = "rgba(66, 214, 164, 0.95)";
   ctx.lineWidth = 2;
   ctx.strokeRect(0, 0, result.pattern.occupiedLength * scale, result.pattern.occupiedWidth * scale);
-  drawPlanGroupLabels(ctx, result, scale);
   ctx.restore();
 
   drawOuterPlanLabels(ctx, result, boxX, boxY, scale, width, height, currentLayer);

@@ -1,11 +1,34 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { renderPlan2D } from "../../renderers/plan2d";
 import { usePackingStore } from "../../stores/packingStore";
 
 const store = usePackingStore();
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 let resizeObserver: ResizeObserver | null = null;
+
+interface PlanGroup {
+  label: string;
+  count: number;
+  occupiedLength: number;
+  occupiedWidth: number;
+}
+
+function formatNumber(value: number) {
+  return Math.round(value).toLocaleString("zh-CN");
+}
+
+const groupSummary = computed(() => {
+  const pattern = store.result?.pattern;
+  const groups = Array.isArray(pattern?.groups) ? (pattern.groups as PlanGroup[]) : [];
+  if (!pattern || !groups.length) return [];
+  return groups.map((group) => {
+    if (pattern.family === "length-segments") {
+      return `${group.label} ${group.count}列 · 占长 ${formatNumber(group.occupiedLength)}mm`;
+    }
+    return `${group.label} ${group.count}排 · 占宽 ${formatNumber(group.occupiedWidth)}mm`;
+  });
+});
 
 function draw() {
   if (!canvasRef.value) return;
@@ -43,13 +66,16 @@ watch(
       <span>俯视图</span>
     </header>
     <canvas id="plan-canvas" ref="canvasRef" width="980" height="620"></canvas>
+    <div v-if="groupSummary.length" class="plan-group-summary" aria-label="2D 排布分区说明">
+      <span v-for="item in groupSummary" :key="item">{{ item }}</span>
+    </div>
   </article>
 </template>
 
 <style scoped>
 .view-panel {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   min-height: 560px;
   overflow: hidden;
   border-radius: 8px;
@@ -85,5 +111,27 @@ canvas {
     linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
     rgba(3, 8, 14, 0.72);
   background-size: 28px 28px;
+}
+
+.plan-group-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(3, 8, 14, 0.48);
+}
+
+.plan-group-summary span {
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  padding: 4px 8px;
+  border: 1px solid rgba(174, 184, 201, 0.22);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
 }
 </style>

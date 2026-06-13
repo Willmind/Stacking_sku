@@ -4,6 +4,16 @@ const path = require("node:path");
 
 const appSource = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
 
+const legacyHtmlSource = fs.readFileSync(path.join(__dirname, "..", "legacy/index.static.html"), "utf8");
+
+assert.doesNotMatch(
+  appSource,
+  /ctx\.fillText\(`\$\{group\.label\}[^`]*(?:占长|占宽)/,
+  "2D group labels should not be drawn over cargo boxes",
+);
+assert.match(appSource, /planGroupSummary/);
+assert.match(legacyHtmlSource, /plan-group-summary/);
+
 const edgeMaterialMatch = appSource.match(
   /const edgeMaterial = new THREE\.MeshBasicMaterial\(\{([\s\S]*?)\n    \}\);/,
 );

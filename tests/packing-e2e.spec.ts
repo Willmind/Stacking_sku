@@ -16,6 +16,8 @@ test("calculates the 488 x 380 x 291 benchmark and renders both views", async ({
   await expect(page.locator("#total-boxes")).toHaveText("1,340");
   await expect(page.locator("#status-chip")).toHaveText("已完成计算");
   await expect(page.locator("#plan-canvas")).toHaveCount(1);
+  await expect(page.locator(".plan-group-summary")).toContainText("宽向 4排");
+  await expect(page.locator(".plan-group-summary")).toContainText("占宽");
   await expect(page.locator("#scene-canvas")).toHaveCount(1);
   await expect(page.locator(".door-marker")).toHaveText("柜门");
 });
