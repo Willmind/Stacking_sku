@@ -16,6 +16,13 @@ test("calculates the 488 x 380 x 291 benchmark and renders both views", async ({
   await expect(page.locator("#total-boxes")).toHaveText("1,340");
   await expect(page.locator("#status-chip")).toHaveText("已完成计算");
   await expect(page.locator("#plan-canvas")).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "俯视" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "侧视" }).click();
+  await expect(page.getByRole("button", { name: "侧视" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".two-d-panel header span")).toHaveText("侧视图");
+  await page.getByRole("button", { name: "端视" }).click();
+  await expect(page.getByRole("button", { name: "端视" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".two-d-panel header span")).toHaveText("端视图");
   await expect(page.locator(".plan-group-summary")).toContainText("宽向 4排");
   await expect(page.locator(".plan-group-summary")).toContainText("占宽");
   await expect(page.locator("#scene-canvas")).toHaveCount(1);
