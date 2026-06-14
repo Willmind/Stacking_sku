@@ -99,7 +99,8 @@ watch(
 .view-panel {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  min-height: 560px;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
   border-radius: 8px;
   background: var(--panel-strong);
