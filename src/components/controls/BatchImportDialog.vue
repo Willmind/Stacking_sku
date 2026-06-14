@@ -191,7 +191,12 @@ async function handleFileChange(event: Event) {
                   <td>{{ item.sizeText || "-" }}</td>
                   <td>{{ item.containerType || "-" }}</td>
                   <td>{{ formatNumber(item.totalBoxes) }}</td>
-                  <td>{{ formatNumber(item.difference) }}</td>
+                  <td>
+                    <span v-if="item.difference !== null && item.difference < 0" class="negative-difference-chip">
+                      {{ formatNumber(item.difference) }}
+                    </span>
+                    <template v-else>{{ formatNumber(item.difference) }}</template>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -530,6 +535,22 @@ tr:last-child td {
 
 tr.failed td {
   color: var(--danger);
+}
+
+.negative-difference-chip {
+  display: inline-flex;
+  min-width: 46px;
+  min-height: 24px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 112, 102, 0.38);
+  border-radius: 999px;
+  background: rgba(255, 112, 102, 0.1);
+  color: #ff8a80;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  padding: 0 9px;
 }
 
 .dialog-error {

@@ -91,6 +91,14 @@ describe("batch import UI source guards", () => {
     assert.match(batchImportDialogSource, /\.batch-dialog-content-enter-active/);
     assert.match(batchImportDialogSource, /\.batch-dialog-content-leave-active/);
   });
+
+  it("highlights only negative batch import differences as danger chips", () => {
+    assert.match(batchImportDialogSource, /item\.difference !== null && item\.difference < 0/);
+    assert.match(batchImportDialogSource, /negative-difference-chip/);
+    assert.match(batchImportDialogSource, /\.negative-difference-chip\s*\{/);
+    assert.match(batchImportDialogSource, /rgba\(255,\s*112,\s*102,\s*0\.1\)/);
+    assert.match(batchImportDialogSource, /#ff8a80/);
+  });
 });
 
 describe("select UI source guards", () => {
