@@ -37,6 +37,7 @@
     progressText: $("#progress-text"),
     statusChip: $("#status-chip"),
     planCanvas: $("#plan-canvas"),
+    planGroupSummary: $("#plan-group-summary"),
     sceneCanvas: $("#scene-canvas"),
     calculateButton: $("#calculate-button"),
   };
@@ -381,6 +382,7 @@
     const { ctx, width, height } = resizeCanvas(elements.planCanvas);
     ctx.clearRect(0, 0, width, height);
     drawCanvasMessage(ctx, width, height, message);
+    renderPlanGroupSummary(null);
     if (state.three) {
       clearThreeModel();
       state.three.renderer.render(state.three.scene, state.three.camera);
@@ -395,6 +397,7 @@
 
     if (!result || !result.pattern) {
       drawCanvasMessage(ctx, width, height, "请输入可装载的纸箱尺寸");
+      renderPlanGroupSummary(null);
       return;
     }
 
@@ -477,43 +480,32 @@
     ctx.strokeStyle = "rgba(66, 214, 164, 0.95)";
     ctx.lineWidth = 2;
     ctx.strokeRect(0, 0, result.pattern.occupiedLength * scale, result.pattern.occupiedWidth * scale);
-    drawPlanGroupLabels(ctx, result, scale);
     ctx.restore();
 
+    renderPlanGroupSummary(result);
     drawOuterPlanLabels(ctx, result, boxX, boxY, scale, width, height, currentLayer);
   }
 
-  function drawPlanGroupLabels(ctx, result, scale) {
-    if (!result.pattern.groups.length) return;
-    ctx.font = "700 12px Inter, sans-serif";
-    ctx.textBaseline = "middle";
-    ctx.textAlign = "center";
-
-    if (result.pattern.family === "length-segments") {
-      let x = 0;
-      for (const group of result.pattern.groups) {
-        const w = group.occupiedLength * scale;
-        ctx.fillStyle = "rgba(3, 8, 14, 0.72)";
-        ctx.fillRect(x * scale + 6, 7, Math.max(86, w - 12), 25);
-        ctx.fillStyle = "#f5f7fb";
-        ctx.fillText(`${group.label} ${group.count}列 · 占长 ${formatNumber(group.occupiedLength)}mm`, x * scale + w / 2, 20);
-        x += group.occupiedLength;
-      }
-    } else {
-      let y = 0;
-      for (const group of result.pattern.groups) {
-        const h = group.occupiedWidth * scale;
-        ctx.save();
-        ctx.translate(15, y * scale + h / 2);
-        ctx.rotate(-Math.PI / 2);
-        ctx.fillStyle = "rgba(3, 8, 14, 0.72)";
-        ctx.fillRect(-72, -13, 144, 25);
-        ctx.fillStyle = "#f5f7fb";
-        ctx.fillText(`${group.label} ${group.count}排 · 占宽 ${formatNumber(group.occupiedWidth)}mm`, 0, 0);
-        ctx.restore();
-        y += group.occupiedWidth;
-      }
+  function renderPlanGroupSummary(result) {
+    if (!elements.planGroupSummary) return;
+    const pattern = result && result.pattern;
+    const groups = pattern && Array.isArray(pattern.groups) ? pattern.groups : [];
+    if (!groups.length) {
+      elements.planGroupSummary.innerHTML = "";
+      elements.planGroupSummary.hidden = true;
+      return;
     }
+
+    elements.planGroupSummary.hidden = false;
+    elements.planGroupSummary.innerHTML = groups
+      .map((group) => {
+        const text =
+          pattern.family === "length-segments"
+            ? `${group.label} ${group.count}列 · 占长 ${formatNumber(group.occupiedLength)}mm`
+            : `${group.label} ${group.count}排 · 占宽 ${formatNumber(group.occupiedWidth)}mm`;
+        return `<span>${text}</span>`;
+      })
+      .join("");
   }
 
   function drawOuterPlanLabels(ctx, result, boxX, boxY, scale, width, height, currentLayer) {

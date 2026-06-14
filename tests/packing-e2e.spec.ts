@@ -16,6 +16,15 @@ test("calculates the 488 x 380 x 291 benchmark and renders both views", async ({
   await expect(page.locator("#total-boxes")).toHaveText("1,340");
   await expect(page.locator("#status-chip")).toHaveText("已完成计算");
   await expect(page.locator("#plan-canvas")).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "俯视" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "侧视" }).click();
+  await expect(page.getByRole("button", { name: "侧视" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".two-d-panel header span")).toHaveText("侧视图");
+  await page.getByRole("button", { name: "端视" }).click();
+  await expect(page.getByRole("button", { name: "端视" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".two-d-panel header span")).toHaveText("端视图");
+  await expect(page.locator(".plan-group-summary")).toContainText("宽向 4排");
+  await expect(page.locator(".plan-group-summary")).toContainText("占宽");
   await expect(page.locator("#scene-canvas")).toHaveCount(1);
   await expect(page.locator(".door-marker")).toHaveText("柜门");
 });
@@ -25,4 +34,13 @@ test("calculates the 488 x 360 x 291 benchmark", async ({ page }) => {
 
   await expect(page.locator("#total-boxes")).toHaveText("1,403");
   await expect(page.locator("#blocked-count")).toHaveText("1 箱");
+});
+
+test("sets the progress slider to full after the initial calculation", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "计算装载" }).click();
+
+  await expect(page.locator("#total-boxes")).toHaveText("755");
+  await expect(page.locator("#progress-text")).toHaveText("755 / 755");
+  await expect(page.locator("#stack-progress")).toHaveValue("755");
 });

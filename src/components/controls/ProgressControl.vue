@@ -8,11 +8,12 @@ const store = usePackingStore();
   <label class="progress-control">
     码垛进度
     <input
+      :key="store.result?.totalBoxes ?? 0"
       id="stack-progress"
+      :max="store.result?.totalBoxes ?? 0"
       v-model.number="store.visibleCount"
       type="range"
       min="0"
-      :max="store.result?.totalBoxes ?? 0"
       step="1"
     />
   </label>

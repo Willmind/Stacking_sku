@@ -4,6 +4,11 @@ import path from "node:path";
 import { describe, it } from "vitest";
 
 const rendererSource = fs.readFileSync(path.join(__dirname, "..", "src/renderers/cargo3d.ts"), "utf8");
+const plan2dSource = fs.readFileSync(path.join(__dirname, "..", "src/renderers/plan2d.ts"), "utf8");
+const plan2dViewSource = fs.readFileSync(
+  path.join(__dirname, "..", "src/components/visualizations/Plan2DView.vue"),
+  "utf8",
+);
 
 describe("3D visual rendering source guards", () => {
   it("keeps cargo colors visible in 3D", () => {
@@ -37,5 +42,21 @@ describe("3D visual rendering source guards", () => {
     assert.match(boxMaterialSource, /side:\s*THREE\.DoubleSide/);
     assert.doesNotMatch(boxMaterialSource, /vertexColors:\s*true/);
     assert.doesNotMatch(boxMaterialSource, /transparent:\s*true/);
+  });
+});
+
+describe("2D plan source guards", () => {
+  it("keeps group labels out of the cargo drawing area", () => {
+    assert.doesNotMatch(
+      plan2dSource,
+      /ctx\.fillText\(`\$\{group\.label\}[^`]*(?:占长|占宽)/,
+      "2D group labels should not be drawn over cargo boxes",
+    );
+  });
+
+  it("shows group labels in an external summary area", () => {
+    assert.match(plan2dViewSource, /plan-group-summary/);
+    assert.match(plan2dViewSource, /groupSummary/);
+    assert.match(plan2dViewSource, /占长|占宽/);
   });
 });
