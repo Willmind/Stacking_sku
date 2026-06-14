@@ -4,6 +4,7 @@ import {
   CONTAINERS,
   calculateMultiSkuPacking,
   calculatePacking,
+  type BoxPosition,
   type CartonSpec,
   type ContainerSpec,
   type LoadingStrategy,
@@ -39,6 +40,17 @@ function createSku(index: number): SkuInput {
     height: 260,
     target: 100,
     color: SKU_COLORS[index % SKU_COLORS.length],
+  };
+}
+
+function applySingleColor(result: PackingResult, color: string): PackingResult {
+  const withColor = (position: BoxPosition): BoxPosition => ({ ...position, skuColor: color });
+
+  return {
+    ...result,
+    mode: "single",
+    layerPositions: result.layerPositions.map(withColor),
+    orderedPositions: result.orderedPositions.map(withColor),
   };
 }
 
@@ -120,10 +132,10 @@ export const usePackingStore = defineStore("packing", () => {
   function calculate() {
     error.value = "";
     try {
-      const next =
+      const next: PackingResult =
         mode.value === "single"
-          ? calculatePacking(container.value, singleCarton.value)
-          : calculateMultiSkuPacking(container.value, skus.value, { strategy: strategy.value });
+          ? applySingleColor(calculatePacking(container.value, singleCarton.value), singleColor.value)
+          : (calculateMultiSkuPacking(container.value, skus.value, { strategy: strategy.value }) as PackingResult);
       result.value = next;
       visibleCount.value = next.totalBoxes;
       status.value = next.totalBoxes > 0 ? "已完成计算" : "无法装载";
