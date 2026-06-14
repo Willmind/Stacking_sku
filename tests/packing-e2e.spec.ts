@@ -139,9 +139,13 @@ test("uses styled dropdown popovers for container and strategy selection", async
   const compactContainerLabel = page.locator(".base-select-item-label", { hasText: "20GP" });
   const compactContainerBox = await compactContainerLabel.boundingBox();
   expect(compactContainerBox?.width).toBeGreaterThan(40);
+  await expect(page.locator(".base-select-item", { hasText: "20GP" })).toContainText("5898 × 2352 × 2393 mm");
+  await expect(page.locator(".base-select-item", { hasText: "40GP" })).toContainText("12032 × 2352 × 2393 mm");
+  await expect(page.locator(".base-select-item", { hasText: "40HQ" })).toContainText("12032 × 2352 × 2698 mm");
   await page.getByRole("option", { name: "40HQ" }).click();
-  await expect(page.getByRole("combobox", { name: "柜型" })).toContainText("40HQ");
-  await expect(page.locator("#container-length")).toHaveValue("12032");
+  const containerCombobox = page.getByRole("combobox", { name: "柜型" });
+  await expect(containerCombobox).toContainText("40HQ");
+  await expect(containerCombobox).toContainText("12032 × 2352 × 2698 mm");
 
   await page.getByRole("button", { name: "计算装载" }).click();
   await expect(page.locator("#total-boxes")).toHaveText("1,750");
@@ -196,6 +200,21 @@ test("imports an Excel batch and shows calculated packing results in a dialog", 
 
   await dialog.getByRole("button", { name: "关闭", exact: true }).click();
   await expect(dialog).toBeHidden();
+});
+
+test("downloads the batch import template workbook", async ({ page }) => {
+  await page.goto("/");
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("link", { name: "下载模版" }).click();
+  const download = await downloadPromise;
+
+  expect(download.suggestedFilename()).toBe("模版文件.xlsx");
+  const downloadedPath = await download.path();
+  if (!downloadedPath) throw new Error("Downloaded template file is missing");
+  const templateRows = await readSheet(downloadedPath);
+  expect(templateRows[0]).toEqual(["人工码垛数量（原始）", "尺寸（长宽高 mm）", "柜型"]);
+  expect(templateRows[1]).toEqual([1470, "465*360*291", "40HQ"]);
 });
 
 test("keeps the visualization workspace stable while the control panel scrolls", async ({ page }) => {

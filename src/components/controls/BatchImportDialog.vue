@@ -11,14 +11,17 @@ import {
 } from "reka-ui";
 import { readSheet } from "read-excel-file/browser";
 import { computed, ref } from "vue";
+import templateFileUrl from "../../assets/batch-import-template.xlsx?url";
 import { createBatchResultWorkbook } from "../../core/batchExport";
 import { calculateBatchPacking, type BatchPackingItem, type BatchPackingRow } from "../../core/batchImport";
 
 const inputRef = ref<HTMLInputElement | null>(null);
 const isOpen = ref(false);
+const isImporting = ref(false);
 const fileName = ref("");
 const results = ref<BatchPackingItem[]>([]);
 const importError = ref("");
+const MIN_IMPORT_LOADING_MS = 260;
 
 const successCount = computed(() => results.value.filter((item) => item.status === "成功").length);
 const failedCount = computed(() => results.value.filter((item) => item.status !== "成功").length);
@@ -32,6 +35,7 @@ function formatNumber(value: number | null) {
 }
 
 function openFilePicker() {
+  if (isImporting.value) return;
   inputRef.value?.click();
 }
 
@@ -59,6 +63,12 @@ function downloadResults() {
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
+function wait(ms: number) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
 async function handleFileChange(event: Event) {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
@@ -66,6 +76,8 @@ async function handleFileChange(event: Event) {
 
   fileName.value = file.name;
   importError.value = "";
+  isImporting.value = true;
+  const loadingStartedAt = performance.now();
 
   try {
     const sheetRows = await readSheet(file);
@@ -86,6 +98,11 @@ async function handleFileChange(event: Event) {
     results.value = [];
     importError.value = caught instanceof Error ? caught.message : "Excel 解析失败";
   } finally {
+    const loadingElapsed = performance.now() - loadingStartedAt;
+    if (loadingElapsed < MIN_IMPORT_LOADING_MS) {
+      await wait(MIN_IMPORT_LOADING_MS - loadingElapsed);
+    }
+    isImporting.value = false;
     input.value = "";
     isOpen.value = true;
   }
@@ -94,10 +111,21 @@ async function handleFileChange(event: Event) {
 
 <template>
   <section class="batch-import" aria-label="批量导入">
-    <button class="batch-import-button" type="button" @click="openFilePicker">
-      <Upload :size="16" :stroke-width="2.35" aria-hidden="true" />
-      批量导入 Excel
+    <button
+      class="batch-import-button"
+      type="button"
+      :disabled="isImporting"
+      :aria-busy="isImporting"
+      @click="openFilePicker"
+    >
+      <span v-if="isImporting" class="batch-import-spinner" aria-hidden="true"></span>
+      <Upload v-else :size="16" :stroke-width="2.35" aria-hidden="true" />
+      {{ isImporting ? "解析中..." : "批量导入 Excel" }}
     </button>
+    <a class="batch-import-button secondary" :href="templateFileUrl" download="模版文件.xlsx">
+      <Download :size="16" :stroke-width="2.35" aria-hidden="true" />
+      下载模版
+    </a>
     <input
       id="batch-excel-input"
       ref="inputRef"
@@ -108,60 +136,78 @@ async function handleFileChange(event: Event) {
     />
   </section>
 
+  <Teleport to="body">
+    <Transition name="batch-import-loading">
+      <div v-if="isImporting" class="batch-import-loading" role="status" aria-live="polite">
+        <div class="batch-import-loading-card">
+          <span class="batch-import-spinner batch-import-loading-spinner" aria-hidden="true"></span>
+          <div>
+            <strong>正在解析 Excel</strong>
+            <span>请稍候，正在批量计算装载结果</span>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
+
   <DialogRoot v-model:open="isOpen">
     <DialogPortal>
-      <DialogOverlay class="batch-dialog-overlay" />
-      <DialogContent class="batch-dialog-content" :aria-describedby="undefined">
-        <header>
-          <div class="dialog-title-row">
-            <span class="dialog-icon" aria-hidden="true">
-              <FileSpreadsheet :size="18" :stroke-width="2.3" />
-            </span>
-            <div>
-              <DialogTitle class="dialog-title">批量导入结果</DialogTitle>
-              <DialogDescription class="dialog-description">{{ summaryText }}</DialogDescription>
+      <Transition name="batch-dialog-overlay">
+        <DialogOverlay class="batch-dialog-overlay" />
+      </Transition>
+      <Transition name="batch-dialog-content">
+        <DialogContent class="batch-dialog-content" :aria-describedby="undefined">
+          <header>
+            <div class="dialog-title-row">
+              <span class="dialog-icon" aria-hidden="true">
+                <FileSpreadsheet :size="18" :stroke-width="2.3" />
+              </span>
+              <div>
+                <DialogTitle class="dialog-title">批量导入结果</DialogTitle>
+                <DialogDescription class="dialog-description">{{ summaryText }}</DialogDescription>
+              </div>
             </div>
+            <DialogClose class="dialog-close" aria-label="关闭弹框">
+              <X :size="17" :stroke-width="2.35" aria-hidden="true" />
+            </DialogClose>
+          </header>
+
+          <div v-if="fileName" class="file-line">文件：{{ fileName }}</div>
+
+          <div v-if="results.length" class="result-table-shell">
+            <table>
+              <thead>
+                <tr>
+                  <th>人工码垛数量（原始）</th>
+                  <th>尺寸（长宽高 mm）</th>
+                  <th>柜型</th>
+                  <th>最大装载量</th>
+                  <th>差值</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in results" :key="item.rowNumber" :class="{ failed: item.status !== '成功' }">
+                  <td>{{ formatNumber(item.manualCount) }}</td>
+                  <td>{{ item.sizeText || "-" }}</td>
+                  <td>{{ item.containerType || "-" }}</td>
+                  <td>{{ formatNumber(item.totalBoxes) }}</td>
+                  <td>{{ formatNumber(item.difference) }}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-          <DialogClose class="dialog-close" aria-label="关闭弹框">
-            <X :size="17" :stroke-width="2.35" aria-hidden="true" />
-          </DialogClose>
-        </header>
 
-        <div v-if="fileName" class="file-line">文件：{{ fileName }}</div>
+          <p v-else class="dialog-error">{{ importError || "没有读取到可计算的数据" }}</p>
 
-        <div v-if="results.length" class="result-table-shell">
-          <table>
-            <thead>
-              <tr>
-                <th>人工码垛数量（原始）</th>
-                <th>尺寸（长宽高 mm）</th>
-                <th>柜型</th>
-                <th>最大装载量</th>
-                <th>差值</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="item in results" :key="item.rowNumber" :class="{ failed: item.status !== '成功' }">
-                <td>{{ formatNumber(item.manualCount) }}</td>
-                <td>{{ item.sizeText || "-" }}</td>
-                <td>{{ item.containerType || "-" }}</td>
-                <td>{{ formatNumber(item.totalBoxes) }}</td>
-                <td>{{ formatNumber(item.difference) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <p v-else class="dialog-error">{{ importError || "没有读取到可计算的数据" }}</p>
-
-        <footer>
-          <button v-if="results.length" class="dialog-action primary" type="button" @click="downloadResults">
-            <Download :size="15" :stroke-width="2.35" aria-hidden="true" />
-            下载结果
-          </button>
-          <DialogClose class="dialog-action">关闭</DialogClose>
-        </footer>
-      </DialogContent>
+          <footer>
+            <button v-if="results.length" class="dialog-action primary" type="button" @click="downloadResults">
+              <Download :size="15" :stroke-width="2.35" aria-hidden="true" />
+              下载结果
+            </button>
+            <DialogClose class="dialog-action">关闭</DialogClose>
+          </footer>
+        </DialogContent>
+      </Transition>
     </DialogPortal>
   </DialogRoot>
 </template>
@@ -169,6 +215,7 @@ async function handleFileChange(event: Event) {
 <style scoped>
 .batch-import {
   display: grid;
+  gap: 10px;
 }
 
 .batch-import-button {
@@ -184,6 +231,7 @@ async function handleFileChange(event: Event) {
   font-size: 13px;
   font-weight: 900;
   box-shadow: var(--control-inner-shadow);
+  text-decoration: none;
 }
 
 .batch-import-button:hover {
@@ -192,12 +240,121 @@ async function handleFileChange(event: Event) {
   color: var(--accent);
 }
 
+.batch-import-button:disabled {
+  cursor: wait;
+  opacity: 0.86;
+}
+
+.batch-import-button:disabled:hover {
+  border-color: rgba(174, 184, 201, 0.22);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.032));
+  color: var(--text);
+}
+
 .batch-import-button:active {
   transform: translateY(1px);
 }
 
+.batch-import-button:disabled:active {
+  transform: none;
+}
+
+.batch-import-button.secondary {
+  border-color: rgba(66, 214, 164, 0.28);
+  background: rgba(66, 214, 164, 0.09);
+  color: var(--accent);
+}
+
+.batch-import-button.secondary:hover {
+  border-color: rgba(92, 237, 193, 0.58);
+  background: rgba(66, 214, 164, 0.14);
+}
+
 .batch-file-input {
   display: none;
+}
+
+.batch-import-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(66, 214, 164, 0.22);
+  border-top-color: var(--accent);
+  border-radius: 999px;
+  animation: batch-import-spin 760ms linear infinite;
+}
+
+@keyframes batch-import-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.batch-import-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(2, 6, 12, 0.68);
+  backdrop-filter: blur(10px);
+}
+
+.batch-import-loading-card {
+  display: inline-flex;
+  min-width: min(320px, calc(100vw - 48px));
+  align-items: center;
+  gap: 14px;
+  border: 1px solid rgba(174, 184, 201, 0.24);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(26, 36, 49, 0.98), rgba(18, 27, 38, 0.98));
+  box-shadow: 0 24px 72px rgba(0, 0, 0, 0.46), var(--panel-shadow);
+  padding: 16px 18px;
+}
+
+.batch-import-loading-card div {
+  display: grid;
+  gap: 3px;
+}
+
+.batch-import-loading-card strong {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.batch-import-loading-card span:not(.batch-import-spinner) {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.batch-import-loading-spinner {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border-width: 3px;
+}
+
+.batch-import-loading-enter-active,
+.batch-import-loading-leave-active {
+  transition: opacity 140ms ease;
+}
+
+.batch-import-loading-enter-active .batch-import-loading-card,
+.batch-import-loading-leave-active .batch-import-loading-card {
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.batch-import-loading-enter-from,
+.batch-import-loading-leave-to {
+  opacity: 0;
+}
+
+.batch-import-loading-enter-from .batch-import-loading-card,
+.batch-import-loading-leave-to .batch-import-loading-card {
+  opacity: 0;
+  transform: translateY(4px) scale(0.985);
 }
 
 .batch-dialog-overlay {
@@ -225,6 +382,36 @@ async function handleFileChange(event: Event) {
   background: var(--panel);
   box-shadow: 0 26px 80px rgba(0, 0, 0, 0.46), var(--panel-shadow);
   padding: 18px;
+}
+
+.batch-dialog-overlay-enter-active,
+.batch-dialog-overlay-leave-active {
+  transition: opacity 140ms ease;
+}
+
+.batch-dialog-overlay-enter-from,
+.batch-dialog-overlay-leave-to {
+  opacity: 0;
+}
+
+.batch-dialog-content-enter-active {
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.batch-dialog-content-leave-active {
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.batch-dialog-content-enter-from,
+.batch-dialog-content-leave-to {
+  opacity: 0;
+  transform: translate(-50%, calc(-50% + 6px)) scale(0.985);
+}
+
+.batch-dialog-content-enter-to,
+.batch-dialog-content-leave-from {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
 }
 
 .batch-dialog-content header {

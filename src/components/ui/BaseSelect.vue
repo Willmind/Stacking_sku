@@ -9,6 +9,7 @@ export interface SelectOption {
 
 <script setup lang="ts">
 import { Check, ChevronDown } from "@lucide/vue";
+import { computed } from "vue";
 import {
   SelectContent,
   SelectIcon,
@@ -29,15 +30,19 @@ const props = withDefaults(
     modelValue: string;
     options: SelectOption[];
     disabled?: boolean;
+    showSelectedDescription?: boolean;
   }>(),
   {
     disabled: false,
+    showSelectedDescription: false,
   },
 );
 
 const emit = defineEmits<{
   "update:modelValue": [value: string];
 }>();
+
+const selectedOption = computed(() => props.options.find((option) => option.value === props.modelValue));
 
 function updateValue(value: unknown) {
   if (typeof value === "string") emit("update:modelValue", value);
@@ -48,8 +53,21 @@ function updateValue(value: unknown) {
   <div class="base-select-field">
     <span :id="`${props.id}-label`" class="base-select-label">{{ props.label }}</span>
     <SelectRoot :model-value="props.modelValue" :name="props.id" :disabled="props.disabled" @update:model-value="updateValue">
-      <SelectTrigger class="base-select-trigger" :id="props.id" :aria-labelledby="`${props.id}-label`">
-        <SelectValue />
+      <SelectTrigger
+        class="base-select-trigger"
+        :class="{ 'base-select-trigger--with-description': props.showSelectedDescription }"
+        :id="props.id"
+        :aria-labelledby="`${props.id}-label`"
+      >
+        <span class="base-select-trigger-copy">
+          <SelectValue class="base-select-trigger-value" />
+          <span
+            v-if="props.showSelectedDescription && selectedOption?.description"
+            class="base-select-trigger-description"
+          >
+            {{ selectedOption.description }}
+          </span>
+        </span>
         <SelectIcon class="base-select-icon">
           <ChevronDown :size="15" :stroke-width="2.4" aria-hidden="true" />
         </SelectIcon>
@@ -114,8 +132,12 @@ function updateValue(value: unknown) {
   transition:
     border-color 140ms ease,
     background 140ms ease,
-    box-shadow 140ms ease,
-    transform 110ms ease;
+    box-shadow 140ms ease;
+}
+
+.base-select-trigger--with-description {
+  height: 58px;
+  padding-block: 8px;
 }
 
 .base-select-trigger:hover {
@@ -123,15 +145,21 @@ function updateValue(value: unknown) {
   background: linear-gradient(180deg, var(--control-bg-hover), var(--control-bg));
 }
 
-.base-select-trigger:focus-visible,
-.base-select-trigger[data-state="open"] {
+.base-select-trigger:focus-visible {
   border-color: var(--accent);
   box-shadow: var(--focus-ring), var(--control-inner-shadow);
   outline: 0;
 }
 
+.base-select-trigger[data-state="open"] {
+  border-color: rgba(66, 214, 164, 0.42);
+  background: linear-gradient(180deg, var(--control-bg-hover), var(--control-bg));
+  box-shadow: var(--control-inner-shadow);
+  outline: 0;
+}
+
 .base-select-trigger:active {
-  transform: translateY(1px);
+  border-color: var(--control-border-hover);
 }
 
 .base-select-trigger:disabled {
@@ -143,6 +171,34 @@ function updateValue(value: unknown) {
   display: inline-flex;
   color: var(--muted);
   transition: color 140ms ease, transform 160ms ease;
+}
+
+.base-select-trigger-copy {
+  display: grid;
+  min-width: 0;
+  align-content: center;
+  gap: 2px;
+}
+
+.base-select-trigger-value {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.base-select-trigger-description {
+  display: block;
+  min-width: 0;
+  min-height: 14px;
+  overflow: hidden;
+  color: var(--subtle);
+  font-size: 11px;
+  font-weight: 760;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .base-select-trigger:hover .base-select-icon,

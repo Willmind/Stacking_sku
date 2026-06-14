@@ -9,6 +9,11 @@ const plan2dViewSource = fs.readFileSync(
   path.join(__dirname, "..", "src/components/visualizations/Plan2DView.vue"),
   "utf8",
 );
+const batchImportDialogSource = fs.readFileSync(
+  path.join(__dirname, "..", "src/components/controls/BatchImportDialog.vue"),
+  "utf8",
+);
+const baseSelectSource = fs.readFileSync(path.join(__dirname, "..", "src/components/ui/BaseSelect.vue"), "utf8");
 
 describe("3D visual rendering source guards", () => {
   it("keeps cargo colors visible in 3D", () => {
@@ -58,5 +63,40 @@ describe("2D plan source guards", () => {
     assert.match(plan2dViewSource, /plan-group-summary/);
     assert.match(plan2dViewSource, /groupSummary/);
     assert.match(plan2dViewSource, /占长|占宽/);
+  });
+});
+
+describe("batch import UI source guards", () => {
+  it("keeps loading feedback and dialog motion on the batch import flow", () => {
+    assert.match(batchImportDialogSource, /const isImporting = ref\(false\)/);
+    assert.match(batchImportDialogSource, /:disabled="isImporting"/);
+    assert.match(batchImportDialogSource, /解析中\.\.\./);
+    assert.match(batchImportDialogSource, /batch-import-spinner/);
+    assert.match(batchImportDialogSource, /@keyframes batch-import-spin/);
+    assert.match(batchImportDialogSource, /<Transition name="batch-import-loading"/);
+    assert.match(batchImportDialogSource, /v-if="isImporting" class="batch-import-loading"/);
+    assert.match(batchImportDialogSource, /role="status"/);
+    assert.match(batchImportDialogSource, /正在解析 Excel/);
+    assert.match(batchImportDialogSource, /\.batch-import-loading\s*\{/);
+    assert.match(batchImportDialogSource, /position:\s*fixed/);
+    assert.match(batchImportDialogSource, /\.batch-import-loading-card/);
+    assert.match(batchImportDialogSource, /\.batch-import-loading-enter-active/);
+    assert.match(batchImportDialogSource, /<Transition name="batch-dialog-overlay"/);
+    assert.match(batchImportDialogSource, /<Transition name="batch-dialog-content"/);
+    assert.match(batchImportDialogSource, /\.batch-dialog-content-enter-active/);
+    assert.match(batchImportDialogSource, /\.batch-dialog-content-leave-active/);
+  });
+});
+
+describe("select UI source guards", () => {
+  it("keeps described select triggers visually stable while options are selected", () => {
+    assert.match(baseSelectSource, /base-select-trigger--with-description/);
+    assert.match(baseSelectSource, /\.base-select-trigger--with-description\s*\{[\s\S]*height:\s*58px/);
+    assert.match(baseSelectSource, /\.base-select-trigger-description\s*\{[\s\S]*min-height:\s*14px/);
+    assert.doesNotMatch(
+      baseSelectSource,
+      /\.base-select-trigger:active\s*\{[^}]*transform:\s*translateY/,
+      "Select trigger active state should not shift vertically during option selection",
+    );
   });
 });
