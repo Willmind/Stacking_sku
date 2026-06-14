@@ -11,7 +11,9 @@
     "test": "npm run test:unit"
   },
   "dependencies": {
+    "@lucide/vue": "^1.18.0",
     "pinia": "latest",
+    "reka-ui": "^2.9.10",
     "three": "latest",
     "vue": "latest"
   },

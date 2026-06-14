@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Boxes, Calculator } from "@lucide/vue";
 import ContainerForm from "./components/controls/ContainerForm.vue";
 import PackingModeSwitch from "./components/controls/PackingModeSwitch.vue";
 import ProgressControl from "./components/controls/ProgressControl.vue";
@@ -17,7 +18,9 @@ const store = usePackingStore();
   <main class="app-shell">
     <aside class="control-panel">
       <div class="brand-lockup">
-        <span class="brand-mark" aria-hidden="true">▣</span>
+        <span class="brand-mark" aria-hidden="true">
+          <Boxes :size="22" :stroke-width="2.25" />
+        </span>
         <div>
           <h1>智能装柜助手</h1>
           <p>纸箱装载量与排布可视化</p>
@@ -29,7 +32,10 @@ const store = usePackingStore();
       <SingleSkuForm v-if="store.mode === 'single'" />
       <SkuEditor v-else />
 
-      <button class="calculate-button" type="button" @click="store.calculate">计算装载</button>
+      <button class="calculate-button" type="button" @click="store.calculate">
+        <Calculator :size="17" :stroke-width="2.35" aria-hidden="true" />
+        计算装载
+      </button>
       <p v-if="store.error" class="error">{{ store.error }}</p>
 
       <ResultSummary />
@@ -70,6 +76,7 @@ const store = usePackingStore();
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
+  box-shadow: var(--panel-shadow);
 }
 
 .control-panel {
@@ -94,9 +101,10 @@ const store = usePackingStore();
   height: 42px;
   place-items: center;
   border-radius: 8px;
-  background: linear-gradient(135deg, var(--accent), var(--warning));
-  color: #071016;
-  font-weight: 900;
+  border: 1px solid rgba(66, 214, 164, 0.34);
+  background: linear-gradient(180deg, rgba(66, 214, 164, 0.18), rgba(104, 166, 255, 0.08));
+  color: var(--accent);
+  box-shadow: var(--control-inner-shadow);
 }
 
 h1,
@@ -114,12 +122,28 @@ p {
 }
 
 .calculate-button {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
   min-height: 48px;
-  border: 0;
+  border: 1px solid rgba(66, 214, 164, 0.54);
   border-radius: 8px;
-  background: linear-gradient(135deg, var(--accent), var(--warning));
-  color: #071016;
+  background: linear-gradient(180deg, #52e0b5, var(--accent-strong));
+  color: #04110d;
   font-weight: 900;
+  box-shadow: 0 16px 34px rgba(47, 189, 148, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.32);
+}
+
+.calculate-button:hover {
+  border-color: rgba(92, 237, 193, 0.82);
+  background: linear-gradient(180deg, #68e8c2, #35cba0);
+  box-shadow: 0 18px 40px rgba(47, 189, 148, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.36);
+}
+
+.calculate-button:active {
+  background: linear-gradient(180deg, #35cba0, #279e7d);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.24);
 }
 
 .error {

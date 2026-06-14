@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { usePackingStore } from "../../stores/packingStore";
+import BaseNumberField from "../ui/BaseNumberField.vue";
 
 const store = usePackingStore();
 const colorText = computed(() => store.singleColor.toUpperCase());
@@ -10,18 +11,9 @@ const colorText = computed(() => store.singleColor.toUpperCase());
   <section class="field-group" aria-label="纸箱规格">
     <h2>纸箱规格</h2>
     <div class="triple-grid">
-      <label>
-        长 mm
-        <input id="carton-length" v-model.number="store.singleCarton.length" type="number" min="1" step="1" @input="store.markDirty" />
-      </label>
-      <label>
-        宽 mm
-        <input id="carton-width" v-model.number="store.singleCarton.width" type="number" min="1" step="1" @input="store.markDirty" />
-      </label>
-      <label>
-        高 mm
-        <input id="carton-height" v-model.number="store.singleCarton.height" type="number" min="1" step="1" @input="store.markDirty" />
-      </label>
+      <BaseNumberField id="carton-length" label="长 mm" v-model="store.singleCarton.length" :min="1" @update:model-value="store.markDirty" />
+      <BaseNumberField id="carton-width" label="宽 mm" v-model="store.singleCarton.width" :min="1" @update:model-value="store.markDirty" />
+      <BaseNumberField id="carton-height" label="高 mm" v-model="store.singleCarton.height" :min="1" @update:model-value="store.markDirty" />
     </div>
     <label>
       箱体颜色
@@ -40,7 +32,8 @@ const colorText = computed(() => store.singleColor.toUpperCase());
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.035);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.042), rgba(255, 255, 255, 0.022));
+  box-shadow: var(--control-inner-shadow);
 }
 
 h2 {
@@ -57,20 +50,15 @@ label {
   font-weight: 700;
 }
 
-input {
-  width: 100%;
-  min-height: 40px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 6px;
-  background: var(--field);
-  color: var(--text);
-  font-weight: 800;
-  padding: 0 12px;
-}
-
 input[type="color"] {
   width: 48px;
+  min-height: 40px;
+  border: 1px solid var(--control-border);
+  border-radius: 7px;
+  background: linear-gradient(180deg, var(--control-bg), var(--control-bg-strong));
   padding: 4px;
+  box-shadow: var(--control-inner-shadow);
+  cursor: pointer;
 }
 
 .triple-grid {
