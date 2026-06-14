@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import type { LoadingStrategy } from "../../core/packing";
 import { usePackingStore } from "../../stores/packingStore";
 import SkuCard from "./SkuCard.vue";
@@ -7,6 +7,14 @@ import BaseSelect, { type SelectOption } from "../ui/BaseSelect.vue";
 
 const store = usePackingStore();
 const draggedIndex = ref<number | null>(null);
+const skuCountMin = 2;
+const skuCountMax = 10;
+const skuCountProgressPercent = computed(() => {
+  const range = skuCountMax - skuCountMin;
+  if (range <= 0) return "0%";
+  const percent = ((store.skuCount - skuCountMin) / range) * 100;
+  return `${Math.min(100, Math.max(0, percent))}%`;
+});
 
 const strategyOptions: SelectOption[] = [
   { value: "multi-destination", label: "分客户/多卸货地", description: "按卸货顺序分段" },
@@ -35,7 +43,23 @@ function updateStrategy(value: string) {
     <label>
       SKU 个数
       <span class="slider-row">
-        <input id="sku-count" type="range" min="2" max="10" :value="store.skuCount" @input="store.setSkuCount(Number(($event.target as HTMLInputElement).value))" />
+        <span class="range-control" :style="{ '--range-progress': skuCountProgressPercent }">
+          <span class="range-control__rail" aria-hidden="true">
+            <span class="range-control__track">
+              <span class="range-control__fill"></span>
+            </span>
+            <span class="range-control__thumb"></span>
+          </span>
+          <input
+            id="sku-count"
+            type="range"
+            :min="skuCountMin"
+            :max="skuCountMax"
+            :value="store.skuCount"
+            :style="{ '--range-progress': skuCountProgressPercent }"
+            @input="store.setSkuCount(Number(($event.target as HTMLInputElement).value))"
+          />
+        </span>
         <strong id="sku-count-value">{{ store.skuCount }}</strong>
       </span>
     </label>
@@ -62,7 +86,6 @@ function updateStrategy(value: string) {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.042), rgba(255, 255, 255, 0.022));
-  /* box-shadow: var(--control-inner-shadow); */
 }
 
 h2 {

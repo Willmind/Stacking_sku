@@ -133,7 +133,6 @@ function updateValue(value: unknown) {
   font-weight: 850;
   text-align: left;
   padding: 0 11px;
-  /* box-shadow: var(--control-inner-shadow); */
   transition:
     border-color 140ms ease,
     background 140ms ease,
@@ -152,14 +151,13 @@ function updateValue(value: unknown) {
 
 .base-select-trigger:focus-visible {
   border-color: var(--accent);
-  box-shadow: var(--focus-ring), var(--control-inner-shadow);
+  box-shadow: var(--focus-ring);
   outline: 0;
 }
 
 .base-select-trigger[data-state="open"] {
   border-color: rgba(66, 214, 164, 0.42);
   background: linear-gradient(180deg, var(--control-bg-hover), var(--control-bg));
-  /* box-shadow: var(--control-inner-shadow); */
   outline: 0;
 }
 

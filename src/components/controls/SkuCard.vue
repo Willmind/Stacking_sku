@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { GripVertical } from "@lucide/vue";
 import type { SkuInput } from "../../core/packing";
+import BaseColorPicker from "../ui/BaseColorPicker.vue";
 import BaseNumberField from "../ui/BaseNumberField.vue";
 
 const props = defineProps<{
@@ -32,7 +33,13 @@ function updateSkuNumber(key: "length" | "width" | "height" | "target", value: n
         <GripVertical :size="16" :stroke-width="2.35" aria-hidden="true" />
       </button>
       <strong>SKU {{ sku.label }}</strong>
-      <input class="carton-color" type="color" :value="sku.color" @input="emit('update', index, { color: ($event.target as HTMLInputElement).value })" />
+      <BaseColorPicker
+        :id="`sku-${sku.label}-color`"
+        :model-value="sku.color"
+        :aria-label="`SKU ${sku.label} 箱体颜色`"
+        compact
+        @update:model-value="emit('update', props.index, { color: $event })"
+      />
     </div>
     <div class="sku-fields">
       <BaseNumberField :id="`sku-${sku.label}-length`" label="长 mm" class="sku-length" :model-value="sku.length" :min="1" @update:model-value="updateSkuNumber('length', $event)" />
@@ -51,7 +58,6 @@ function updateSkuNumber(key: "length" | "width" | "height" | "target", value: n
   border: 1px solid var(--line);
   border-radius: 8px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.048), rgba(255, 255, 255, 0.022));
-  /* box-shadow: var(--control-inner-shadow); */
 }
 
 .sku-card-header {
@@ -71,23 +77,12 @@ function updateSkuNumber(key: "length" | "width" | "height" | "target", value: n
   background: linear-gradient(180deg, var(--control-bg), var(--control-bg-strong));
   color: var(--muted);
   font-weight: 900;
-  /* box-shadow: var(--control-inner-shadow); */
 }
 
 .drag-handle:hover {
   border-color: var(--control-border-hover);
   color: var(--text);
   background: linear-gradient(180deg, var(--control-bg-hover), var(--control-bg));
-}
-
-.carton-color {
-  width: 48px;
-  min-height: 40px;
-  border: 1px solid var(--control-border);
-  border-radius: 7px;
-  background: linear-gradient(180deg, var(--control-bg), var(--control-bg-strong));
-  padding: 4px;
-  cursor: pointer;
 }
 
 .sku-fields {

@@ -59,36 +59,47 @@ canvas {
 }
 
 input[type="range"] {
-  height: 20px;
-  min-height: 20px;
+  --range-progress: 0%;
+  --range-thumb-size: 19px;
+  --range-track-height: 7px;
+  height: var(--range-thumb-size);
+  min-height: var(--range-thumb-size);
+  padding-inline: calc(var(--range-thumb-size) / 2);
   appearance: none;
   background: transparent;
   cursor: pointer;
 }
 
 input[type="range"]::-webkit-slider-runnable-track {
-  height: 7px;
+  height: var(--range-track-height);
   border: 1px solid rgba(190, 205, 224, 0.18);
   border-radius: 999px;
-  background: linear-gradient(90deg, rgba(66, 214, 164, 0.55), rgba(104, 166, 255, 0.28));
+  background:
+    linear-gradient(
+      90deg,
+      var(--range-track-filled) 0%,
+      var(--range-track-filled) var(--range-progress, 0%),
+      var(--range-track-rest) var(--range-progress, 0%),
+      var(--range-track-rest) 100%
+    );
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28);
 }
 
 input[type="range"]::-webkit-slider-thumb {
-  width: 19px;
-  height: 19px;
-  margin-top: -7px;
+  width: var(--range-thumb-size);
+  height: var(--range-thumb-size);
+  margin-top: calc((var(--range-track-height) - var(--range-thumb-size)) / 2);
   appearance: none;
   border: 2px solid rgba(255, 255, 255, 0.86);
   border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 8px 18px rgba(66, 214, 164, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.32);
+  box-shadow: 0 8px 18px rgba(66, 214, 164, 0.34);
   transition: transform 130ms ease, box-shadow 130ms ease;
 }
 
 input[type="range"]:hover::-webkit-slider-thumb {
   transform: scale(1.08);
-  box-shadow: 0 10px 22px rgba(66, 214, 164, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  box-shadow: 0 10px 22px rgba(66, 214, 164, 0.42);
 }
 
 input[type="range"]:active::-webkit-slider-thumb {
@@ -96,19 +107,110 @@ input[type="range"]:active::-webkit-slider-thumb {
 }
 
 input[type="range"]::-moz-range-track {
-  height: 7px;
+  height: var(--range-track-height);
   border: 1px solid rgba(190, 205, 224, 0.18);
   border-radius: 999px;
-  background: linear-gradient(90deg, rgba(66, 214, 164, 0.55), rgba(104, 166, 255, 0.28));
+  background:
+    linear-gradient(
+      90deg,
+      var(--range-track-filled) 0%,
+      var(--range-track-filled) var(--range-progress, 0%),
+      var(--range-track-rest) var(--range-progress, 0%),
+      var(--range-track-rest) 100%
+    );
 }
 
 input[type="range"]::-moz-range-thumb {
-  width: 17px;
-  height: 17px;
+  width: calc(var(--range-thumb-size) - 2px);
+  height: calc(var(--range-thumb-size) - 2px);
   border: 2px solid rgba(255, 255, 255, 0.86);
   border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 8px 18px rgba(66, 214, 164, 0.34);
+}
+
+.range-control {
+  --range-progress: 0%;
+  --range-thumb-size: 19px;
+  --range-track-height: 7px;
+  position: relative;
+  display: block;
+  width: 100%;
+  height: var(--range-thumb-size);
+  min-width: 0;
+}
+
+.range-control__rail {
+  position: absolute;
+  top: 50%;
+  right: calc(var(--range-thumb-size) / 2);
+  left: calc(var(--range-thumb-size) / 2);
+  height: var(--range-track-height);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.range-control__track {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border: 1px solid rgba(190, 205, 224, 0.18);
+  border-radius: 999px;
+  background: var(--range-track-rest);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28);
+}
+
+.range-control__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--range-progress, 0%);
+  border-radius: inherit;
+  background: var(--range-track-filled);
+}
+
+.range-control__thumb {
+  position: absolute;
+  top: 50%;
+  left: var(--range-progress, 0%);
+  z-index: 1;
+  width: var(--range-thumb-size);
+  height: var(--range-thumb-size);
+  border: 2px solid rgba(255, 255, 255, 0.86);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 8px 18px rgba(66, 214, 164, 0.34);
+  transform: translate(-50%, -50%);
+  transition: transform 130ms ease, box-shadow 130ms ease;
+}
+
+.range-control input[type="range"] {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+}
+
+.range-control input[type="range"]:focus-visible {
+  box-shadow: none;
+}
+
+.range-control:has(input[type="range"]:focus-visible) {
+  border-radius: 999px;
+  box-shadow: var(--focus-ring);
+}
+
+.range-control:hover .range-control__thumb {
+  box-shadow: 0 10px 22px rgba(66, 214, 164, 0.42);
+  transform: translate(-50%, -50%) scale(1.08);
+}
+
+.range-control:active .range-control__thumb {
+  transform: translate(-50%, -50%) scale(0.94);
 }
 
 @media (max-width: 1180px) {

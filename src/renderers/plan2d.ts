@@ -12,6 +12,7 @@ export interface Plan2DRenderOptions {
   visibleCount: number;
   viewMode?: Plan2DViewMode;
   devicePixelRatio?: number;
+  showLabels?: boolean;
 }
 
 export type Plan2DViewMode = "top" | "side" | "front";
@@ -107,6 +108,10 @@ function keyForPosition(position: BoxPosition) {
   return `${position.x}:${position.y}:${position.dx}:${position.dy}`;
 }
 
+function isCompactCanvas(width: number, height: number) {
+  return height < 320 || width < 520;
+}
+
 function drawOuterPlanLabels(
   ctx: CanvasRenderingContext2D,
   result: PackingResult,
@@ -119,10 +124,13 @@ function drawOuterPlanLabels(
   viewMode: Plan2DViewMode,
   visibleCount: number,
 ) {
-  const container = result.container;
-  const plane = getPlaneConfig(result, viewMode);
+  const plane = getPlan2DPlaneConfig(result, viewMode);
   const planWidth = plane.width * scale;
   const planHeight = plane.height * scale;
+  const compactCanvas = isCompactCanvas(width, height);
+  const showMeasurementLabels = !compactCanvas;
+  const showDirectionLabel = !compactCanvas || width >= 560;
+  const showCornerLegend = !compactCanvas;
   ctx.save();
   ctx.font = "700 12px Inter, sans-serif";
   ctx.fillStyle = "rgba(245, 247, 251, 0.92)";
@@ -134,21 +142,25 @@ function drawOuterPlanLabels(
   ctx.lineTo(boxX + planWidth, boxY + planHeight + 22);
   ctx.stroke();
   ctx.textAlign = "center";
-  ctx.fillText(
-    `${plane.xLabel} ${formatNumber(plane.width)}mm · 占用 ${formatNumber(plane.occupiedWidth)}mm`,
-    boxX + planWidth / 2,
-    boxY + planHeight + 42,
-  );
+  if (showMeasurementLabels) {
+    ctx.fillText(
+      `${plane.xLabel} ${formatNumber(plane.width)}mm · 占用 ${formatNumber(plane.occupiedWidth)}mm`,
+      boxX + planWidth / 2,
+      boxY + planHeight + 42,
+    );
+  }
 
   ctx.beginPath();
   ctx.moveTo(boxX - 22, boxY);
   ctx.lineTo(boxX - 22, boxY + planHeight);
   ctx.stroke();
-  ctx.save();
-  ctx.translate(Math.max(16, boxX - 38), boxY + planHeight / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText(`${plane.yLabel} ${formatNumber(plane.height)}mm · 占用 ${formatNumber(plane.occupiedHeight)}mm`, 0, 0);
-  ctx.restore();
+  if (showMeasurementLabels) {
+    ctx.save();
+    ctx.translate(Math.max(16, boxX - 38), boxY + planHeight / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText(`${plane.yLabel} ${formatNumber(plane.height)}mm · 占用 ${formatNumber(plane.occupiedHeight)}mm`, 0, 0);
+    ctx.restore();
+  }
 
   ctx.textAlign = "left";
   ctx.fillStyle = "rgba(66, 214, 164, 0.96)";
@@ -157,15 +169,19 @@ function drawOuterPlanLabels(
       ? `第 ${(currentLayer.layer.index || 0) + 1} 层：${formatNumber(currentLayer.countInLayer)} / ${formatNumber(currentLayer.layer.boxCount || 0)} 箱`
       : `当前显示：${formatNumber(Math.min(result.totalBoxes, visibleCount))} / ${formatNumber(result.totalBoxes)} 箱`;
   ctx.fillText(statusText, 18, 24);
-  ctx.fillStyle = "rgba(255, 112, 102, 0.9)";
-  ctx.fillText("红色区域为顶部角件避让区", 18, height - 20);
-  ctx.fillStyle = "rgba(174, 184, 201, 0.9)";
-  ctx.textAlign = "right";
-  ctx.fillText(plane.directionLabel, width - 18, 24);
+  if (showCornerLegend) {
+    ctx.fillStyle = "rgba(255, 112, 102, 0.9)";
+    ctx.fillText("红色区域为顶部角件避让区", 18, height - 20);
+  }
+  if (showDirectionLabel) {
+    ctx.fillStyle = "rgba(174, 184, 201, 0.9)";
+    ctx.textAlign = "right";
+    ctx.fillText(plane.directionLabel, width - 18, 24);
+  }
   ctx.restore();
 }
 
-function getPlaneConfig(result: PackingResult, viewMode: Plan2DViewMode) {
+export function getPlan2DPlaneConfig(result: PackingResult, viewMode: Plan2DViewMode) {
   const { container, pattern } = result;
   if (viewMode === "side") {
     return {
@@ -303,7 +319,14 @@ function getElevationDrawingPositions(result: PackingResult, visibleCount: numbe
   ];
 }
 
-export function renderPlan2D({ canvas, result, visibleCount, viewMode = "top", devicePixelRatio }: Plan2DRenderOptions): void {
+export function renderPlan2D({
+  canvas,
+  result,
+  visibleCount,
+  viewMode = "top",
+  devicePixelRatio,
+  showLabels = true,
+}: Plan2DRenderOptions): void {
   const { ctx, width, height } = resizeCanvas(canvas, devicePixelRatio);
   ctx.clearRect(0, 0, width, height);
 
@@ -312,12 +335,13 @@ export function renderPlan2D({ canvas, result, visibleCount, viewMode = "top", d
     return;
   }
 
-  const pad = 48;
+  const compactCanvas = isCompactCanvas(width, height);
+  const pad = showLabels ? (compactCanvas ? 34 : 48) : 18;
   const container = result.container;
-  const plane = getPlaneConfig(result, viewMode);
+  const plane = getPlan2DPlaneConfig(result, viewMode);
   const scale = Math.min((width - pad * 2) / plane.width, (height - pad * 2) / plane.height);
   const boxX = (width - plane.width * scale) / 2;
-  const boxY = (height - plane.height * scale) / 2 + 10;
+  const boxY = (height - plane.height * scale) / 2 + (showLabels ? (compactCanvas ? 4 : 10) : 0);
   const currentLayer = findCurrentLayer(result, visibleCount);
 
   ctx.save();
@@ -369,5 +393,7 @@ export function renderPlan2D({ canvas, result, visibleCount, viewMode = "top", d
   ctx.strokeRect(0, 0, plane.occupiedWidth * scale, plane.occupiedHeight * scale);
   ctx.restore();
 
-  drawOuterPlanLabels(ctx, result, boxX, boxY, scale, width, height, currentLayer, viewMode, visibleCount);
+  if (showLabels) {
+    drawOuterPlanLabels(ctx, result, boxX, boxY, scale, width, height, currentLayer, viewMode, visibleCount);
+  }
 }

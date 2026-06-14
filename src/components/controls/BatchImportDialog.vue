@@ -235,7 +235,6 @@ async function handleFileChange(event: Event) {
   color: var(--text);
   font-size: 13px;
   font-weight: 900;
-  /* box-shadow: var(--control-inner-shadow); */
   text-decoration: none;
 }
 
@@ -583,7 +582,7 @@ footer {
   border-color: rgba(66, 214, 164, 0.48);
   background: linear-gradient(180deg, #52e0b5, var(--accent-strong));
   color: #04110d;
-  box-shadow: 0 12px 28px rgba(47, 189, 148, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  box-shadow: 0 12px 28px rgba(47, 189, 148, 0.18);
 }
 
 .dialog-action.primary:hover {

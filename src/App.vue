@@ -106,7 +106,6 @@ const store = usePackingStore();
   border: 1px solid rgba(66, 214, 164, 0.34);
   background: linear-gradient(180deg, rgba(66, 214, 164, 0.18), rgba(104, 166, 255, 0.08));
   color: var(--accent);
-  /* box-shadow: var(--control-inner-shadow); */
 }
 
 h1,
@@ -134,13 +133,13 @@ p {
   background: linear-gradient(180deg, #52e0b5, var(--accent-strong));
   color: #04110d;
   font-weight: 900;
-  box-shadow: 0 16px 34px rgba(47, 189, 148, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.32);
+  box-shadow: 0 16px 34px rgba(47, 189, 148, 0.2);
 }
 
 .calculate-button:hover {
   border-color: rgba(92, 237, 193, 0.82);
   background: linear-gradient(180deg, #68e8c2, #35cba0);
-  box-shadow: 0 18px 40px rgba(47, 189, 148, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.36);
+  box-shadow: 0 18px 40px rgba(47, 189, 148, 0.26);
 }
 
 .calculate-button:active {
@@ -188,10 +187,15 @@ p {
 
 .views-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: 1fr;
+  grid-template-rows: minmax(620px, 1.22fr) minmax(380px, 0.78fr);
   gap: 14px;
   height: 100%;
   min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+  scrollbar-gutter: stable;
 }
 
 .view-panel {
@@ -235,12 +239,12 @@ p {
   }
 
   .workbench {
-    min-height: 760px;
+    min-height: 1180px;
   }
 
   .views-grid {
     grid-template-columns: 1fr;
-    grid-auto-rows: minmax(520px, 1fr);
+    grid-template-rows: minmax(640px, auto) minmax(520px, auto);
   }
 }
 </style>

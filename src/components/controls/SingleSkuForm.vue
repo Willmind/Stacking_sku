@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { computed } from "vue";
 import { usePackingStore } from "../../stores/packingStore";
+import BaseColorPicker from "../ui/BaseColorPicker.vue";
 import BaseNumberField from "../ui/BaseNumberField.vue";
 
 const store = usePackingStore();
-const colorText = computed(() => store.singleColor.toUpperCase());
 </script>
 
 <template>
@@ -18,15 +17,13 @@ const colorText = computed(() => store.singleColor.toUpperCase());
     <div class="color-field">
       <span id="carton-color-label" class="field-label">箱体颜色</span>
       <span class="color-row">
-        <input
+        <BaseColorPicker
           id="carton-color"
-          class="carton-color"
           v-model="store.singleColor"
-          type="color"
           aria-labelledby="carton-color-label"
-          @input="store.markDirty"
+          show-value
+          @change="store.markDirty"
         />
-        <strong>{{ colorText }}</strong>
       </span>
     </div>
   </section>
@@ -40,7 +37,6 @@ const colorText = computed(() => store.singleColor.toUpperCase());
   border: 1px solid var(--line);
   border-radius: 8px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.042), rgba(255, 255, 255, 0.022));
-  /* box-shadow: var(--control-inner-shadow); */
 }
 
 h2 {
@@ -58,17 +54,6 @@ h2 {
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
-}
-
-.carton-color {
-  width: 48px;
-  min-height: 40px;
-  border: 1px solid var(--control-border);
-  border-radius: 7px;
-  background: linear-gradient(180deg, var(--control-bg), var(--control-bg-strong));
-  padding: 4px;
-  /* box-shadow: var(--control-inner-shadow); */
-  cursor: pointer;
 }
 
 .triple-grid {
