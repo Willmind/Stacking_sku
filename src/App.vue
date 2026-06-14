@@ -54,15 +54,19 @@ const store = usePackingStore();
 
 <style scoped>
 .app-shell {
-  min-height: 100vh;
   display: grid;
-  grid-template-columns: 420px minmax(0, 1fr);
+  grid-template-columns: minmax(360px, 420px) minmax(0, 1fr);
   gap: 18px;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
   padding: 18px;
 }
 
 .control-panel,
 .workbench {
+  min-width: 0;
+  min-height: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
@@ -72,7 +76,10 @@ const store = usePackingStore();
   display: flex;
   flex-direction: column;
   gap: 18px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 18px;
+  scrollbar-gutter: stable;
 }
 
 .brand-lockup {
@@ -124,6 +131,7 @@ p {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 14px;
+  overflow: hidden;
   padding: 14px;
 }
 
@@ -138,6 +146,7 @@ p {
   display: flex;
   gap: 14px;
   align-items: center;
+  min-width: 0;
 }
 
 #status-chip {
@@ -155,11 +164,13 @@ p {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 14px;
+  height: 100%;
   min-height: 0;
 }
 
 .view-panel {
-  min-height: 560px;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
   border-radius: 8px;
   background: var(--panel-strong);
@@ -188,6 +199,22 @@ p {
 @media (max-width: 1180px) {
   .app-shell {
     grid-template-columns: 1fr;
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .control-panel {
+    overflow: visible;
+  }
+
+  .workbench {
+    min-height: 760px;
+  }
+
+  .views-grid {
+    grid-template-columns: 1fr;
+    grid-auto-rows: minmax(520px, 1fr);
   }
 }
 </style>

@@ -44,3 +44,41 @@ test("sets the progress slider to full after the initial calculation", async ({ 
   await expect(page.locator("#progress-text")).toHaveText("755 / 755");
   await expect(page.locator("#stack-progress")).toHaveValue("755");
 });
+
+test("keeps the visualization workspace stable while the control panel scrolls", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("多 SKU").check();
+  await page.locator("#sku-count").evaluate((element) => {
+    const input = element as HTMLInputElement;
+    input.value = input.max;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+
+  await expect(page.locator("#sku-count-value")).toHaveText("10");
+
+  const layout = await page.evaluate(() => {
+    const controlPanel = document.querySelector(".control-panel") as HTMLElement | null;
+    const workbench = document.querySelector(".workbench") as HTMLElement | null;
+    const planPanel = document.querySelector(".two-d-panel") as HTMLElement | null;
+    const scenePanel = document.querySelector(".three-d-panel") as HTMLElement | null;
+    if (!controlPanel || !workbench || !planPanel || !scenePanel) {
+      throw new Error("Layout elements are missing");
+    }
+    return {
+      viewportHeight: window.innerHeight,
+      documentScrollHeight: document.documentElement.scrollHeight,
+      bodyScrollHeight: document.body.scrollHeight,
+      controlClientHeight: controlPanel.clientHeight,
+      controlScrollHeight: controlPanel.scrollHeight,
+      workbenchBottom: workbench.getBoundingClientRect().bottom,
+      planHeight: Math.round(planPanel.getBoundingClientRect().height),
+      sceneHeight: Math.round(scenePanel.getBoundingClientRect().height),
+    };
+  });
+
+  expect(layout.documentScrollHeight).toBeLessThanOrEqual(layout.viewportHeight + 2);
+  expect(layout.bodyScrollHeight).toBeLessThanOrEqual(layout.viewportHeight + 2);
+  expect(layout.controlScrollHeight).toBeGreaterThan(layout.controlClientHeight + 20);
+  expect(layout.workbenchBottom).toBeLessThanOrEqual(layout.viewportHeight - 18 + 2);
+  expect(Math.abs(layout.planHeight - layout.sceneHeight)).toBeLessThanOrEqual(2);
+});
