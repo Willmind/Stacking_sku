@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import { readSheet } from "read-excel-file/node";
 
 declare global {
   interface Window {
@@ -157,6 +158,44 @@ test("uses styled dropdown popovers for container and strategy selection", async
   expect(sameDestinationLabelBox?.width).toBeGreaterThan(150);
   await page.getByRole("option", { name: "同卸货地/完整面优先" }).click();
   await expect(page.getByRole("combobox", { name: "装载策略" })).toContainText("同卸货地/完整面优先");
+});
+
+test("imports an Excel batch and shows calculated packing results in a dialog", async ({ page }) => {
+  await page.goto("/");
+
+  await page.setInputFiles("#batch-excel-input", "tests/fixtures/batch-import-sample.xlsx");
+
+  const dialog = page.getByRole("dialog", { name: "批量导入结果" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator("tbody tr")).toHaveCount(4);
+  await expect(dialog).toContainText("共 4 条");
+  await expect(dialog).toContainText("465*360*291");
+  await expect(dialog).toContainText("40HQ");
+  await expect(dialog).toContainText("1,740");
+  await expect(dialog).toContainText("1,493");
+  await expect(dialog).toContainText("1,200");
+  await expect(dialog).toContainText("-247");
+  await expect(dialog).toContainText("2");
+  await expect(dialog).not.toContainText("每层数量");
+  await expect(dialog).not.toContainText("占用高度");
+
+  const downloadPromise = page.waitForEvent("download");
+  await dialog.getByRole("button", { name: "下载结果" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("batch-import-sample-装载结果.xlsx");
+  const downloadedPath = await download.path();
+  if (!downloadedPath) throw new Error("Downloaded batch result file is missing");
+  const downloadedRows = await readSheet(downloadedPath);
+  expect(downloadedRows[0]?.[0]).toBe("批量导入结果");
+  expect(downloadedRows[1]).toEqual(["人工码垛数量（原始）", "尺寸（长宽高 mm）", "柜型", "最大装载量", "差值"]);
+  expect(downloadedRows[2]?.[0]).toBe(1740);
+  expect(downloadedRows[2]?.[1]).toBe("465*360*291");
+  expect(downloadedRows[2]?.[3]).toBe(1493);
+  expect(downloadedRows[2]?.[4]).toBe(-247);
+  expect(downloadedRows[4]?.[4]).toBe(2);
+
+  await dialog.getByRole("button", { name: "关闭", exact: true }).click();
+  await expect(dialog).toBeHidden();
 });
 
 test("keeps the visualization workspace stable while the control panel scrolls", async ({ page }) => {
