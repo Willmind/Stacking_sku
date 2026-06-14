@@ -27,7 +27,7 @@ const store = usePackingStore();
   align-items: center;
   color: var(--muted);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 850;
 }
 
 input {

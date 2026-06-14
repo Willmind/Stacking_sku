@@ -1,37 +1,25 @@
 <script setup lang="ts">
+import BaseNumberField from "../ui/BaseNumberField.vue";
+import BaseSelect, { type SelectOption } from "../ui/BaseSelect.vue";
 import { usePackingStore } from "../../stores/packingStore";
 
 const store = usePackingStore();
+
+const containerOptions: SelectOption[] = [
+  { value: "20GP", label: "20GP", description: "标准小柜" },
+  { value: "40GP", label: "40GP", description: "标准大柜" },
+  { value: "40HQ", label: "40HQ", description: "高柜" },
+];
 </script>
 
 <template>
   <section class="field-group" aria-label="集装箱规格">
     <h2>集装箱规格</h2>
-    <label>
-      柜型
-      <select
-        id="container-type"
-        :value="store.containerType"
-        @change="store.setContainerType(($event.target as HTMLSelectElement).value)"
-      >
-        <option value="20GP">20GP</option>
-        <option value="40GP">40GP</option>
-        <option value="40HQ">40HQ</option>
-      </select>
-    </label>
+    <BaseSelect id="container-type" label="柜型" :model-value="store.containerType" :options="containerOptions" @update:model-value="store.setContainerType" />
     <div class="triple-grid">
-      <label>
-        长 mm
-        <input id="container-length" v-model.number="store.container.length" type="number" min="1" step="1" @input="store.markDirty" />
-      </label>
-      <label>
-        宽 mm
-        <input id="container-width" v-model.number="store.container.width" type="number" min="1" step="1" @input="store.markDirty" />
-      </label>
-      <label>
-        高 mm
-        <input id="container-height" v-model.number="store.container.height" type="number" min="1" step="1" @input="store.markDirty" />
-      </label>
+      <BaseNumberField id="container-length" label="长 mm" v-model="store.container.length" :min="1" @update:model-value="store.markDirty" />
+      <BaseNumberField id="container-width" label="宽 mm" v-model="store.container.width" :min="1" @update:model-value="store.markDirty" />
+      <BaseNumberField id="container-height" label="高 mm" v-model="store.container.height" :min="1" @update:model-value="store.markDirty" />
     </div>
   </section>
 </template>
@@ -43,33 +31,14 @@ const store = usePackingStore();
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.035);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.042), rgba(255, 255, 255, 0.022));
+  box-shadow: var(--control-inner-shadow);
 }
 
 h2 {
   margin: 0;
   color: var(--accent);
   font-size: 14px;
-}
-
-label {
-  display: grid;
-  gap: 7px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-input,
-select {
-  width: 100%;
-  min-height: 40px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 6px;
-  background: var(--field);
-  color: var(--text);
-  font-weight: 800;
-  padding: 0 12px;
 }
 
 .triple-grid {

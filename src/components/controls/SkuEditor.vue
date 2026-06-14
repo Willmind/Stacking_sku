@@ -1,10 +1,17 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import type { LoadingStrategy } from "../../core/packing";
 import { usePackingStore } from "../../stores/packingStore";
 import SkuCard from "./SkuCard.vue";
+import BaseSelect, { type SelectOption } from "../ui/BaseSelect.vue";
 
 const store = usePackingStore();
 const draggedIndex = ref<number | null>(null);
+
+const strategyOptions: SelectOption[] = [
+  { value: "multi-destination", label: "分客户/多卸货地", description: "按卸货顺序分段" },
+  { value: "same-destination", label: "同卸货地/完整面优先", description: "优先铺满可视面" },
+];
 
 function onDragStart(index: number) {
   draggedIndex.value = index;
@@ -14,6 +21,11 @@ function onDrop(index: number) {
   if (draggedIndex.value === null) return;
   store.moveSku(draggedIndex.value, index);
   draggedIndex.value = null;
+}
+
+function updateStrategy(value: string) {
+  store.strategy = value as LoadingStrategy;
+  store.markDirty();
 }
 </script>
 
@@ -27,13 +39,7 @@ function onDrop(index: number) {
         <strong id="sku-count-value">{{ store.skuCount }}</strong>
       </span>
     </label>
-    <label>
-      装载策略
-      <select id="sku-strategy" v-model="store.strategy" @change="store.markDirty">
-        <option value="multi-destination">分客户/多卸货地</option>
-        <option value="same-destination">同卸货地/完整面优先</option>
-      </select>
-    </label>
+    <BaseSelect id="sku-strategy" label="装载策略" :model-value="store.strategy" :options="strategyOptions" @update:model-value="updateStrategy" />
     <div id="sku-list" class="sku-list">
       <SkuCard
         v-for="(skuItem, index) in store.skus"
@@ -55,7 +61,8 @@ function onDrop(index: number) {
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.035);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.042), rgba(255, 255, 255, 0.022));
+  box-shadow: var(--control-inner-shadow);
 }
 
 h2 {
@@ -72,26 +79,28 @@ label {
   font-weight: 700;
 }
 
-select,
 input[type="range"] {
   width: 100%;
 }
 
-select {
-  min-height: 40px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 6px;
-  background: var(--field);
-  color: var(--text);
-  font-weight: 800;
-  padding: 0 12px;
-}
-
 .slider-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 28px;
+  grid-template-columns: minmax(0, 1fr) 34px;
   gap: 10px;
   align-items: center;
+}
+
+#sku-count-value {
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(66, 214, 164, 0.32);
+  border-radius: 7px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .sku-list {

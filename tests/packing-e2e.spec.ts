@@ -1,9 +1,14 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
+async function selectDropdownOption(page: Page, label: string, option: string) {
+  await page.getByRole("combobox", { name: label }).click();
+  await page.getByRole("option", { name: option }).click();
+}
+
 async function calculateSingleSku(page: Page, length: string, width: string, height: string) {
   await page.goto("/");
-  await page.selectOption("#container-type", "40HQ");
+  await selectDropdownOption(page, "柜型", "40HQ");
   await page.fill("#carton-length", length);
   await page.fill("#carton-width", width);
   await page.fill("#carton-height", height);
@@ -43,6 +48,62 @@ test("sets the progress slider to full after the initial calculation", async ({ 
   await expect(page.locator("#total-boxes")).toHaveText("755");
   await expect(page.locator("#progress-text")).toHaveText("755 / 755");
   await expect(page.locator("#stack-progress")).toHaveValue("755");
+});
+
+test("adjusts number fields with styled steppers", async ({ page }) => {
+  await page.goto("/");
+  const cartonSection = page.locator('section[aria-label="纸箱规格"]');
+  const cartonLength = page.locator("#carton-length");
+
+  await expect(cartonLength).toHaveValue("480");
+  const cartonLengthBox = await cartonLength.boundingBox();
+  const cartonLengthStepperBox = await cartonSection.locator(".base-number-actions").first().boundingBox();
+  expect(cartonLengthBox?.width).toBeGreaterThan(80);
+  expect(cartonLengthStepperBox?.width).toBeLessThanOrEqual(32);
+
+  await cartonSection.getByRole("button", { name: "增加 长 mm" }).click();
+  await expect(cartonLength).toHaveValue("481");
+
+  await page.getByRole("button", { name: "计算装载" }).click();
+  await expect(page.locator("#status-chip")).toHaveText("已完成计算");
+
+  await cartonSection.getByRole("button", { name: "减少 长 mm" }).click();
+  await expect(cartonLength).toHaveValue("480");
+  await expect(page.locator("#status-chip")).toHaveText("待重新计算");
+
+  await cartonLength.fill("1");
+  await cartonLength.blur();
+  await expect(cartonSection.getByRole("button", { name: "减少 长 mm" })).toBeDisabled();
+  await expect(cartonLength).toHaveValue("1");
+});
+
+test("uses styled dropdown popovers for container and strategy selection", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByRole("combobox", { name: "柜型" }).click();
+  await expect(page.getByRole("listbox")).toBeVisible();
+  const compactContainerLabel = page.locator(".base-select-item-label", { hasText: "20GP" });
+  const compactContainerBox = await compactContainerLabel.boundingBox();
+  expect(compactContainerBox?.width).toBeGreaterThan(40);
+  await page.getByRole("option", { name: "40HQ" }).click();
+  await expect(page.getByRole("combobox", { name: "柜型" })).toContainText("40HQ");
+  await expect(page.locator("#container-length")).toHaveValue("12032");
+
+  await page.getByRole("button", { name: "计算装载" }).click();
+  await expect(page.locator("#total-boxes")).toHaveText("1,750");
+
+  await page.getByLabel("多 SKU").check();
+  await page.getByRole("combobox", { name: "装载策略" }).click();
+  await expect(page.getByRole("listbox")).toBeVisible();
+  const sameDestinationOption = page.getByRole("option", { name: "同卸货地/完整面优先" });
+  const sameDestinationLabel = page.locator(".base-select-item-label", { hasText: "同卸货地/完整面优先" });
+  const sameDestinationBox = await sameDestinationOption.boundingBox();
+  const sameDestinationLabelBox = await sameDestinationLabel.boundingBox();
+  expect(sameDestinationBox?.width).toBeGreaterThan(240);
+  expect(sameDestinationBox?.height).toBeLessThan(72);
+  expect(sameDestinationLabelBox?.width).toBeGreaterThan(150);
+  await page.getByRole("option", { name: "同卸货地/完整面优先" }).click();
+  await expect(page.getByRole("combobox", { name: "装载策略" })).toContainText("同卸货地/完整面优先");
 });
 
 test("keeps the visualization workspace stable while the control panel scrolls", async ({ page }) => {

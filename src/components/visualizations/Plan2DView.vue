@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { LayoutPanelTop, PanelBottom, PanelLeft } from "@lucide/vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import type { Component } from "vue";
 import { renderPlan2D, type Plan2DViewMode } from "../../renderers/plan2d";
 import { usePackingStore } from "../../stores/packingStore";
 
@@ -8,10 +10,10 @@ const canvasRef = ref<HTMLCanvasElement | null>(null);
 const viewMode = ref<Plan2DViewMode>("top");
 let resizeObserver: ResizeObserver | null = null;
 
-const viewModes: Array<{ id: Plan2DViewMode; label: string; title: string }> = [
-  { id: "top", label: "俯视", title: "俯视图" },
-  { id: "side", label: "侧视", title: "侧视图" },
-  { id: "front", label: "端视", title: "端视图" },
+const viewModes: Array<{ id: Plan2DViewMode; label: string; title: string; icon: Component }> = [
+  { id: "top", label: "俯视", title: "俯视图", icon: LayoutPanelTop },
+  { id: "side", label: "侧视", title: "侧视图", icon: PanelLeft },
+  { id: "front", label: "端视", title: "端视图", icon: PanelBottom },
 ];
 
 const currentViewTitle = computed(() => viewModes.find((item) => item.id === viewMode.value)?.title || "俯视图");
@@ -82,6 +84,7 @@ watch(
             :aria-pressed="viewMode === item.id"
             @click="viewMode = item.id"
           >
+            <component :is="item.icon" :size="13" :stroke-width="2.3" aria-hidden="true" />
             {{ item.label }}
           </button>
         </div>
@@ -135,7 +138,7 @@ span {
 
 .view-mode-switch {
   display: inline-grid;
-  grid-template-columns: repeat(3, 44px);
+  grid-template-columns: repeat(3, minmax(54px, 1fr));
   gap: 2px;
   padding: 2px;
   border: 1px solid rgba(174, 184, 201, 0.2);
@@ -144,17 +147,28 @@ span {
 }
 
 .view-mode-switch button {
-  height: 26px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
+  display: inline-flex;
+  gap: 4px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.01);
   color: var(--muted);
   font-size: 12px;
   font-weight: 900;
 }
 
+.view-mode-switch button:hover {
+  border-color: rgba(174, 184, 201, 0.16);
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--text);
+}
+
 .view-mode-switch button[aria-pressed="true"] {
-  background: rgba(66, 214, 164, 0.18);
+  border-color: rgba(66, 214, 164, 0.28);
+  background: rgba(66, 214, 164, 0.16);
   color: var(--accent);
 }
 

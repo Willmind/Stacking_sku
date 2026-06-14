@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { GripVertical } from "@lucide/vue";
 import type { SkuInput } from "../../core/packing";
+import BaseNumberField from "../ui/BaseNumberField.vue";
 
 const props = defineProps<{
   sku: SkuInput;
@@ -12,8 +14,8 @@ const emit = defineEmits<{
   dropOn: [index: number];
 }>();
 
-function numberValue(event: Event) {
-  return Number((event.target as HTMLInputElement).value);
+function updateSkuNumber(key: "length" | "width" | "height" | "target", value: number) {
+  emit("update", props.index, { [key]: value });
 }
 </script>
 
@@ -26,15 +28,17 @@ function numberValue(event: Event) {
     @drop="emit('dropOn', props.index)"
   >
     <div class="sku-card-header">
-      <button class="drag-handle" type="button" aria-label="拖动 SKU">☰</button>
+      <button class="drag-handle" type="button" aria-label="拖动 SKU">
+        <GripVertical :size="16" :stroke-width="2.35" aria-hidden="true" />
+      </button>
       <strong>SKU {{ sku.label }}</strong>
       <input class="sku-color" type="color" :value="sku.color" @input="emit('update', index, { color: ($event.target as HTMLInputElement).value })" />
     </div>
     <div class="sku-fields">
-      <label>长 mm<input class="sku-length" type="number" min="1" step="1" :value="sku.length" @input="emit('update', index, { length: numberValue($event) })" /></label>
-      <label>宽 mm<input class="sku-width" type="number" min="1" step="1" :value="sku.width" @input="emit('update', index, { width: numberValue($event) })" /></label>
-      <label>高 mm<input class="sku-height" type="number" min="1" step="1" :value="sku.height" @input="emit('update', index, { height: numberValue($event) })" /></label>
-      <label>目标<input class="sku-target" type="number" min="1" step="1" :value="sku.target" @input="emit('update', index, { target: numberValue($event) })" /></label>
+      <BaseNumberField :id="`sku-${sku.label}-length`" label="长 mm" class="sku-length" :model-value="sku.length" :min="1" @update:model-value="updateSkuNumber('length', $event)" />
+      <BaseNumberField :id="`sku-${sku.label}-width`" label="宽 mm" class="sku-width" :model-value="sku.width" :min="1" @update:model-value="updateSkuNumber('width', $event)" />
+      <BaseNumberField :id="`sku-${sku.label}-height`" label="高 mm" class="sku-height" :model-value="sku.height" :min="1" @update:model-value="updateSkuNumber('height', $event)" />
+      <BaseNumberField :id="`sku-${sku.label}-target`" label="目标" class="sku-target" :model-value="sku.target" :min="1" @update:model-value="updateSkuNumber('target', $event)" />
     </div>
   </article>
 </template>
@@ -44,9 +48,10 @@ function numberValue(event: Event) {
   display: grid;
   gap: 12px;
   padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.045);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.048), rgba(255, 255, 255, 0.022));
+  box-shadow: var(--control-inner-shadow);
 }
 
 .sku-card-header {
@@ -57,18 +62,29 @@ function numberValue(event: Event) {
 }
 
 .drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 34px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 6px;
-  background: var(--field);
-  color: var(--text);
+  border: 1px solid var(--control-border);
+  border-radius: 7px;
+  background: linear-gradient(180deg, var(--control-bg), var(--control-bg-strong));
+  color: var(--muted);
   font-weight: 900;
+  box-shadow: var(--control-inner-shadow);
+}
+
+.drag-handle:hover {
+  border-color: var(--control-border-hover);
+  color: var(--text);
+  background: linear-gradient(180deg, var(--control-bg-hover), var(--control-bg));
 }
 
 .sku-color {
   width: 48px;
   height: 36px;
   padding: 4px;
+  cursor: pointer;
 }
 
 .sku-fields {
@@ -77,22 +93,4 @@ function numberValue(event: Event) {
   gap: 8px;
 }
 
-label {
-  display: grid;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-input {
-  width: 100%;
-  min-height: 40px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 6px;
-  background: var(--field);
-  color: var(--text);
-  font-weight: 800;
-  padding: 0 10px;
-}
 </style>

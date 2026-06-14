@@ -1,0 +1,259 @@
+<script lang="ts">
+export interface SelectOption {
+  value: string;
+  label: string;
+  description?: string;
+  disabled?: boolean;
+}
+</script>
+
+<script setup lang="ts">
+import { Check, ChevronDown } from "@lucide/vue";
+import {
+  SelectContent,
+  SelectIcon,
+  SelectItem,
+  SelectItemIndicator,
+  SelectItemText,
+  SelectPortal,
+  SelectRoot,
+  SelectTrigger,
+  SelectValue,
+  SelectViewport,
+} from "reka-ui";
+
+const props = withDefaults(
+  defineProps<{
+    id: string;
+    label: string;
+    modelValue: string;
+    options: SelectOption[];
+    disabled?: boolean;
+  }>(),
+  {
+    disabled: false,
+  },
+);
+
+const emit = defineEmits<{
+  "update:modelValue": [value: string];
+}>();
+
+function updateValue(value: unknown) {
+  if (typeof value === "string") emit("update:modelValue", value);
+}
+</script>
+
+<template>
+  <div class="base-select-field">
+    <span :id="`${props.id}-label`" class="base-select-label">{{ props.label }}</span>
+    <SelectRoot :model-value="props.modelValue" :name="props.id" :disabled="props.disabled" @update:model-value="updateValue">
+      <SelectTrigger class="base-select-trigger" :id="props.id" :aria-labelledby="`${props.id}-label`">
+        <SelectValue />
+        <SelectIcon class="base-select-icon">
+          <ChevronDown :size="15" :stroke-width="2.4" aria-hidden="true" />
+        </SelectIcon>
+      </SelectTrigger>
+
+      <SelectPortal>
+        <SelectContent class="base-select-content" position="popper" :side-offset="7">
+          <SelectViewport class="base-select-viewport">
+            <SelectItem
+              v-for="option in props.options"
+              :key="option.value"
+              class="base-select-item"
+              :value="option.value"
+              :text-value="option.label"
+              :disabled="option.disabled"
+            >
+              <span class="base-select-item-check-slot" aria-hidden="true">
+                <SelectItemIndicator class="base-select-item-indicator">
+                  <Check :size="14" :stroke-width="2.7" />
+                </SelectItemIndicator>
+              </span>
+              <span class="base-select-item-copy">
+                <SelectItemText class="base-select-item-label">{{ option.label }}</SelectItemText>
+                <span v-if="option.description" class="base-select-item-description">{{ option.description }}</span>
+              </span>
+            </SelectItem>
+          </SelectViewport>
+        </SelectContent>
+      </SelectPortal>
+    </SelectRoot>
+  </div>
+</template>
+
+<style scoped>
+.base-select-field {
+  display: grid;
+  gap: 7px;
+}
+
+.base-select-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.base-select-trigger {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px;
+  gap: 8px;
+  width: 100%;
+  min-height: 42px;
+  align-items: center;
+  border: 1px solid var(--control-border);
+  border-radius: 7px;
+  background: linear-gradient(180deg, var(--control-bg), var(--control-bg-strong));
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 850;
+  text-align: left;
+  padding: 0 11px;
+  box-shadow: var(--control-inner-shadow);
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease,
+    transform 110ms ease;
+}
+
+.base-select-trigger:hover {
+  border-color: var(--control-border-hover);
+  background: linear-gradient(180deg, var(--control-bg-hover), var(--control-bg));
+}
+
+.base-select-trigger:focus-visible,
+.base-select-trigger[data-state="open"] {
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring), var(--control-inner-shadow);
+  outline: 0;
+}
+
+.base-select-trigger:active {
+  transform: translateY(1px);
+}
+
+.base-select-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.base-select-icon {
+  display: inline-flex;
+  color: var(--muted);
+  transition: color 140ms ease, transform 160ms ease;
+}
+
+.base-select-trigger:hover .base-select-icon,
+.base-select-trigger[data-state="open"] .base-select-icon {
+  color: var(--text);
+}
+
+.base-select-trigger[data-state="open"] .base-select-icon {
+  transform: rotate(180deg);
+}
+
+:global(.base-select-content) {
+  z-index: 50;
+  min-width: var(--reka-select-trigger-width);
+  overflow: hidden;
+  border: 1px solid var(--popover-border);
+  border-radius: 9px;
+  background: var(--popover-bg);
+  box-shadow: var(--popover-shadow);
+  backdrop-filter: blur(14px);
+  transform-origin: var(--reka-select-content-transform-origin);
+  animation: select-pop 130ms ease-out;
+}
+
+:global(.base-select-viewport) {
+  display: grid;
+  gap: 2px;
+  padding: 5px;
+}
+
+:global(.base-select-item) {
+  position: relative;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 9px;
+  min-height: 48px;
+  align-items: start;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 820;
+  padding: 8px 10px 8px 8px;
+  outline: 0;
+  user-select: none;
+}
+
+:global(.base-select-item[data-highlighted]) {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+:global(.base-select-item[data-state="checked"]) {
+  color: var(--text);
+}
+
+:global(.base-select-item[data-disabled]) {
+  color: var(--text-disabled);
+  pointer-events: none;
+}
+
+:global(.base-select-item-check-slot) {
+  display: inline-flex;
+  min-height: 20px;
+  align-items: center;
+  justify-content: center;
+}
+
+:global(.base-select-item-indicator) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+
+:global(.base-select-item-copy) {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  line-height: 1.28;
+}
+
+:global(.base-select-item-label) {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:global(.base-select-item-description) {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--subtle);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes select-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-3px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+</style>
