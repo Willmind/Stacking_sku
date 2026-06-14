@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Boxes, Calculator } from "@lucide/vue";
+import BatchImportDialog from "./components/controls/BatchImportDialog.vue";
 import ContainerForm from "./components/controls/ContainerForm.vue";
 import PackingModeSwitch from "./components/controls/PackingModeSwitch.vue";
 import ProgressControl from "./components/controls/ProgressControl.vue";
@@ -36,6 +37,7 @@ const store = usePackingStore();
         <Calculator :size="17" :stroke-width="2.35" aria-hidden="true" />
         计算装载
       </button>
+      <BatchImportDialog />
       <p v-if="store.error" class="error">{{ store.error }}</p>
 
       <ResultSummary />

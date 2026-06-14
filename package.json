@@ -12,7 +12,9 @@
   },
   "dependencies": {
     "@lucide/vue": "^1.18.0",
+    "fflate": "^0.8.3",
     "pinia": "latest",
+    "read-excel-file": "^9.2.0",
     "reka-ui": "^2.9.10",
     "three": "latest",
     "vue": "latest"
