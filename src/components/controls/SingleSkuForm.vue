@@ -15,13 +15,13 @@ const colorText = computed(() => store.singleColor.toUpperCase());
       <BaseNumberField id="carton-width" label="宽 mm" v-model="store.singleCarton.width" :min="1" @update:model-value="store.markDirty" />
       <BaseNumberField id="carton-height" label="高 mm" v-model="store.singleCarton.height" :min="1" @update:model-value="store.markDirty" />
     </div>
-    <label>
-      箱体颜色
+    <div class="color-field">
+      <span id="carton-color-label" class="field-label">箱体颜色</span>
       <span class="color-row">
-        <input id="carton-color" v-model="store.singleColor" type="color" @input="store.markDirty" />
+        <input id="carton-color" v-model="store.singleColor" type="color" aria-labelledby="carton-color-label" @input="store.markDirty" />
         <strong>{{ colorText }}</strong>
       </span>
-    </label>
+    </div>
   </section>
 </template>
 
@@ -42,9 +42,12 @@ h2 {
   font-size: 14px;
 }
 
-label {
+.color-field {
   display: grid;
   gap: 7px;
+}
+
+.field-label {
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;

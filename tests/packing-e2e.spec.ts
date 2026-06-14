@@ -1,6 +1,12 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
+declare global {
+  interface Window {
+    __cartonColorClickCount: number;
+  }
+}
+
 async function selectDropdownOption(page: Page, label: string, option: string) {
   await page.getByRole("combobox", { name: label }).click();
   await page.getByRole("option", { name: option }).click();
@@ -48,6 +54,53 @@ test("sets the progress slider to full after the initial calculation", async ({ 
   await expect(page.locator("#total-boxes")).toHaveText("755");
   await expect(page.locator("#progress-text")).toHaveText("755 / 755");
   await expect(page.locator("#stack-progress")).toHaveValue("755");
+});
+
+test("scopes the carton color picker trigger and redraws canvas with the selected color", async ({ page }) => {
+  await page.goto("/");
+
+  await page.evaluate(() => {
+    const input = document.querySelector("#carton-color");
+    if (!input) throw new Error("carton color input is missing");
+    window.__cartonColorClickCount = 0;
+    input.addEventListener("click", () => {
+      window.__cartonColorClickCount += 1;
+    });
+  });
+
+  await page.locator(".color-row strong").click();
+  await expect.poll(() => page.evaluate(() => window.__cartonColorClickCount)).toBe(0);
+
+  await page.locator("#carton-color").evaluate((element) => {
+    const input = element as HTMLInputElement;
+    input.value = "#6e8bff";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page.getByRole("button", { name: "计算装载" }).click();
+  await expect(page.locator("#status-chip")).toHaveText("已完成计算");
+
+  const pixelCounts = await page.locator("#plan-canvas").evaluate((element) => {
+    const canvas = element as HTMLCanvasElement;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("2D canvas context is missing");
+    const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+    let bluePixels = 0;
+    let orangePixels = 0;
+    for (let index = 0; index < data.length; index += 16) {
+      const red = data[index];
+      const green = data[index + 1];
+      const blue = data[index + 2];
+      const alpha = data[index + 3];
+      if (alpha < 180) continue;
+      if (blue > red + 30 && blue > green + 20 && blue > 110) bluePixels += 1;
+      if (red > green + 25 && green > blue + 15 && red > 120) orangePixels += 1;
+    }
+    return { bluePixels, orangePixels };
+  });
+
+  expect(pixelCounts.bluePixels).toBeGreaterThan(1000);
+  expect(pixelCounts.bluePixels).toBeGreaterThan(pixelCounts.orangePixels);
 });
 
 test("adjusts number fields with styled steppers", async ({ page }) => {
