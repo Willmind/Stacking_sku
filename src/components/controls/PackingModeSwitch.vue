@@ -35,7 +35,7 @@ function setMode(mode: PackingMode) {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.042), rgba(255, 255, 255, 0.022));
-  box-shadow: var(--control-inner-shadow);
+  /* box-shadow: var(--control-inner-shadow); */
 }
 
 h2 {
@@ -63,7 +63,7 @@ label {
   color: var(--muted);
   font-size: 13px;
   font-weight: 800;
-  box-shadow: var(--control-inner-shadow);
+  /* box-shadow: var(--control-inner-shadow); */
   cursor: pointer;
   transition: border-color 140ms ease, background 140ms ease, color 140ms ease, transform 110ms ease;
 }

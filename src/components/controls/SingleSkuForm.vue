@@ -18,7 +18,14 @@ const colorText = computed(() => store.singleColor.toUpperCase());
     <div class="color-field">
       <span id="carton-color-label" class="field-label">箱体颜色</span>
       <span class="color-row">
-        <input id="carton-color" v-model="store.singleColor" type="color" aria-labelledby="carton-color-label" @input="store.markDirty" />
+        <input
+          id="carton-color"
+          class="carton-color"
+          v-model="store.singleColor"
+          type="color"
+          aria-labelledby="carton-color-label"
+          @input="store.markDirty"
+        />
         <strong>{{ colorText }}</strong>
       </span>
     </div>
@@ -33,7 +40,7 @@ const colorText = computed(() => store.singleColor.toUpperCase());
   border: 1px solid var(--line);
   border-radius: 8px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.042), rgba(255, 255, 255, 0.022));
-  box-shadow: var(--control-inner-shadow);
+  /* box-shadow: var(--control-inner-shadow); */
 }
 
 h2 {
@@ -53,14 +60,14 @@ h2 {
   font-weight: 700;
 }
 
-input[type="color"] {
+.carton-color {
   width: 48px;
   min-height: 40px;
   border: 1px solid var(--control-border);
   border-radius: 7px;
   background: linear-gradient(180deg, var(--control-bg), var(--control-bg-strong));
   padding: 4px;
-  box-shadow: var(--control-inner-shadow);
+  /* box-shadow: var(--control-inner-shadow); */
   cursor: pointer;
 }
 

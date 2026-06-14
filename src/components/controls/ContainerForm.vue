@@ -38,7 +38,7 @@ const containerOptions: SelectOption[] = [
   border: 1px solid var(--line);
   border-radius: 8px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.042), rgba(255, 255, 255, 0.022));
-  box-shadow: var(--control-inner-shadow);
+  /* box-shadow: var(--control-inner-shadow); */
 }
 
 h2 {

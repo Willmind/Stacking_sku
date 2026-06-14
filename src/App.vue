@@ -106,7 +106,7 @@ const store = usePackingStore();
   border: 1px solid rgba(66, 214, 164, 0.34);
   background: linear-gradient(180deg, rgba(66, 214, 164, 0.18), rgba(104, 166, 255, 0.08));
   color: var(--accent);
-  box-shadow: var(--control-inner-shadow);
+  /* box-shadow: var(--control-inner-shadow); */
 }
 
 h1,

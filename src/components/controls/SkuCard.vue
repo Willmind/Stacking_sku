@@ -32,7 +32,7 @@ function updateSkuNumber(key: "length" | "width" | "height" | "target", value: n
         <GripVertical :size="16" :stroke-width="2.35" aria-hidden="true" />
       </button>
       <strong>SKU {{ sku.label }}</strong>
-      <input class="sku-color" type="color" :value="sku.color" @input="emit('update', index, { color: ($event.target as HTMLInputElement).value })" />
+      <input class="carton-color" type="color" :value="sku.color" @input="emit('update', index, { color: ($event.target as HTMLInputElement).value })" />
     </div>
     <div class="sku-fields">
       <BaseNumberField :id="`sku-${sku.label}-length`" label="长 mm" class="sku-length" :model-value="sku.length" :min="1" @update:model-value="updateSkuNumber('length', $event)" />
@@ -51,7 +51,7 @@ function updateSkuNumber(key: "length" | "width" | "height" | "target", value: n
   border: 1px solid var(--line);
   border-radius: 8px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.048), rgba(255, 255, 255, 0.022));
-  box-shadow: var(--control-inner-shadow);
+  /* box-shadow: var(--control-inner-shadow); */
 }
 
 .sku-card-header {
@@ -71,7 +71,7 @@ function updateSkuNumber(key: "length" | "width" | "height" | "target", value: n
   background: linear-gradient(180deg, var(--control-bg), var(--control-bg-strong));
   color: var(--muted);
   font-weight: 900;
-  box-shadow: var(--control-inner-shadow);
+  /* box-shadow: var(--control-inner-shadow); */
 }
 
 .drag-handle:hover {
@@ -80,9 +80,12 @@ function updateSkuNumber(key: "length" | "width" | "height" | "target", value: n
   background: linear-gradient(180deg, var(--control-bg-hover), var(--control-bg));
 }
 
-.sku-color {
+.carton-color {
   width: 48px;
-  height: 36px;
+  min-height: 40px;
+  border: 1px solid var(--control-border);
+  border-radius: 7px;
+  background: linear-gradient(180deg, var(--control-bg), var(--control-bg-strong));
   padding: 4px;
   cursor: pointer;
 }

@@ -230,7 +230,7 @@ async function handleFileChange(event: Event) {
   color: var(--text);
   font-size: 13px;
   font-weight: 900;
-  box-shadow: var(--control-inner-shadow);
+  /* box-shadow: var(--control-inner-shadow); */
   text-decoration: none;
 }
 

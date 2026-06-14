@@ -79,7 +79,7 @@ function updateValue(value: number) {
   border: 1px solid var(--control-border);
   border-radius: 7px;
   background: linear-gradient(180deg, var(--control-bg), var(--control-bg-strong));
-  box-shadow: var(--control-inner-shadow);
+  /* box-shadow: var(--control-inner-shadow); */
   transition:
     border-color 140ms ease,
     background 140ms ease,

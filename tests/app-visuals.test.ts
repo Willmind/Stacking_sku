@@ -14,6 +14,11 @@ const batchImportDialogSource = fs.readFileSync(
   "utf8",
 );
 const baseSelectSource = fs.readFileSync(path.join(__dirname, "..", "src/components/ui/BaseSelect.vue"), "utf8");
+const singleSkuFormSource = fs.readFileSync(
+  path.join(__dirname, "..", "src/components/controls/SingleSkuForm.vue"),
+  "utf8",
+);
+const skuCardSource = fs.readFileSync(path.join(__dirname, "..", "src/components/controls/SkuCard.vue"), "utf8");
 
 describe("3D visual rendering source guards", () => {
   it("keeps cargo colors visible in 3D", () => {
@@ -98,5 +103,23 @@ describe("select UI source guards", () => {
       /\.base-select-trigger:active\s*\{[^}]*transform:\s*translateY/,
       "Select trigger active state should not shift vertically during option selection",
     );
+    assert.doesNotMatch(
+      baseSelectSource,
+      /\bSelectValue\b/,
+      "Select trigger should render its own stable label instead of mirroring SelectItemText during close",
+    );
+    assert.match(baseSelectSource, /function deferValueUpdate/);
+    assert.match(baseSelectSource, /window\.setTimeout/);
+    assert.doesNotMatch(baseSelectSource, /animation:\s*select-pop/);
+  });
+});
+
+describe("color picker source guards", () => {
+  it("uses the same carton color picker class for single and multi SKU controls", () => {
+    assert.match(singleSkuFormSource, /class="carton-color"/);
+    assert.match(skuCardSource, /class="carton-color"/);
+    assert.match(singleSkuFormSource, /\.carton-color\s*\{/);
+    assert.match(skuCardSource, /\.carton-color\s*\{/);
+    assert.doesNotMatch(skuCardSource, /sku-color/);
   });
 });
