@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { LayoutPanelTop, PanelBottom, PanelLeft } from "@lucide/vue";
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { Component, ComponentPublicInstance } from "vue";
 import { getPlan2DPlaneConfig, renderPlan2D, type Plan2DViewMode } from "../../renderers/plan2d";
 import { usePackingStore } from "../../stores/packingStore";
@@ -8,20 +8,24 @@ import { usePackingStore } from "../../stores/packingStore";
 const store = usePackingStore();
 let resizeObserver: ResizeObserver | null = null;
 
-const planViews: Array<{
+type SwitchablePlanViewMode = "top" | "side";
+
+interface PlanViewItem {
   id: Plan2DViewMode;
   title: string;
   axisLabel: string;
   canvasId: string;
-  className: string;
+  switchLabel?: string;
   icon: Component;
-}> = [
+}
+
+const switchablePlanViews: Array<PlanViewItem & { id: SwitchablePlanViewMode; switchLabel: string }> = [
   {
     id: "top",
     title: "俯视图",
     axisLabel: "长 × 宽",
     canvasId: "plan-canvas-top",
-    className: "plan-view-card--top",
+    switchLabel: "俯视",
     icon: LayoutPanelTop,
   },
   {
@@ -29,24 +33,26 @@ const planViews: Array<{
     title: "侧视图",
     axisLabel: "长 × 高",
     canvasId: "plan-canvas-side",
-    className: "plan-view-card--side",
+    switchLabel: "侧视",
     icon: PanelLeft,
-  },
-  {
-    id: "front",
-    title: "端视图",
-    axisLabel: "宽 × 高",
-    canvasId: "plan-canvas-front",
-    className: "plan-view-card--front",
-    icon: PanelBottom,
   },
 ];
 
-const canvasRefs = ref<Record<Plan2DViewMode, HTMLCanvasElement | null>>({
-  top: null,
-  side: null,
-  front: null,
+const frontPlanView: PlanViewItem = {
+  id: "front",
+  title: "端视图",
+  axisLabel: "宽 × 高",
+  canvasId: "plan-canvas-front",
+  icon: PanelBottom,
+};
+
+const activePlanViewMode = ref<SwitchablePlanViewMode>("top");
+const activePlanView = computed(() => {
+  return switchablePlanViews.find((item) => item.id === activePlanViewMode.value) ?? switchablePlanViews[0];
 });
+
+const switchableCanvasRef = ref<HTMLCanvasElement | null>(null);
+const frontCanvasRef = ref<HTMLCanvasElement | null>(null);
 
 interface PlanGroup {
   label: string;
@@ -84,12 +90,19 @@ function getViewMeasure(mode: Plan2DViewMode) {
   return `${plane.xLabel} ${formatNumber(plane.width)}mm · 占用 ${formatNumber(plane.occupiedWidth)}mm`;
 }
 
-function setCanvasRef(mode: Plan2DViewMode, element: Element | ComponentPublicInstance | null) {
-  canvasRefs.value[mode] = element instanceof HTMLCanvasElement ? element : null;
+function setSwitchableCanvasRef(element: Element | ComponentPublicInstance | null) {
+  switchableCanvasRef.value = element instanceof HTMLCanvasElement ? element : null;
 }
 
-function drawView(mode: Plan2DViewMode) {
-  const canvas = canvasRefs.value[mode];
+function setFrontCanvasRef(element: Element | ComponentPublicInstance | null) {
+  frontCanvasRef.value = element instanceof HTMLCanvasElement ? element : null;
+}
+
+function setActivePlanView(mode: SwitchablePlanViewMode) {
+  activePlanViewMode.value = mode;
+}
+
+function drawView(mode: Plan2DViewMode, canvas: HTMLCanvasElement | null) {
   if (!canvas) return;
   renderPlan2D({
     canvas,
@@ -101,16 +114,15 @@ function drawView(mode: Plan2DViewMode) {
 }
 
 function draw() {
-  planViews.forEach((item) => drawView(item.id));
+  drawView(activePlanViewMode.value, switchableCanvasRef.value);
+  drawView(frontPlanView.id, frontCanvasRef.value);
 }
 
 onMounted(() => {
   draw();
   resizeObserver = new ResizeObserver(draw);
-  planViews.forEach((item) => {
-    const canvas = canvasRefs.value[item.id];
-    if (canvas) resizeObserver?.observe(canvas);
-  });
+  if (switchableCanvasRef.value) resizeObserver.observe(switchableCanvasRef.value);
+  if (frontCanvasRef.value) resizeObserver.observe(frontCanvasRef.value);
 });
 
 onBeforeUnmount(() => {
@@ -119,8 +131,10 @@ onBeforeUnmount(() => {
 });
 
 watch(
-  () => [store.result, store.visibleCount],
-  () => draw(),
+  () => [store.result, store.visibleCount, activePlanViewMode.value],
+  () => {
+    void nextTick(draw);
+  },
   { deep: true },
 );
 </script>
@@ -135,17 +149,57 @@ watch(
       <span>三视图</span>
     </header>
     <div class="plan-view-grid">
-      <section v-for="item in planViews" :key="item.id" class="plan-view-card" :class="item.className">
+      <section class="plan-view-card plan-view-card--switchable">
         <header class="plan-view-card-header">
-          <span class="plan-view-card-title">
-            <component :is="item.icon" :size="14" :stroke-width="2.35" aria-hidden="true" />
-            {{ item.title }}
-          </span>
-          <span class="plan-view-axis">{{ item.axisLabel }}</span>
+          <div class="plan-view-card-heading">
+            <span class="plan-view-card-title">
+              <component :is="activePlanView.icon" :size="14" :stroke-width="2.35" aria-hidden="true" />
+              {{ activePlanView.title }}
+            </span>
+            <span class="plan-view-axis">{{ activePlanView.axisLabel }}</span>
+          </div>
+          <div class="plan-view-switch" role="group" aria-label="切换俯视图和侧视图">
+            <button
+              v-for="item in switchablePlanViews"
+              :key="item.id"
+              class="plan-view-switch-button"
+              :class="{ 'is-active': activePlanViewMode === item.id }"
+              type="button"
+              :aria-pressed="activePlanViewMode === item.id"
+              @click="setActivePlanView(item.id)"
+            >
+              {{ item.switchLabel }}
+            </button>
+          </div>
           <span class="plan-view-status">{{ getViewStatus() }}</span>
-          <span class="plan-view-measure">{{ getViewMeasure(item.id) }}</span>
+          <span class="plan-view-measure">{{ getViewMeasure(activePlanView.id) }}</span>
         </header>
-        <canvas :id="item.canvasId" :ref="(element) => setCanvasRef(item.id, element)" width="980" height="620"></canvas>
+        <canvas
+          :id="activePlanView.canvasId"
+          :ref="(element) => setSwitchableCanvasRef(element)"
+          width="980"
+          height="620"
+        ></canvas>
+      </section>
+
+      <section class="plan-view-card plan-view-card--front">
+        <header class="plan-view-card-header">
+          <div class="plan-view-card-heading">
+            <span class="plan-view-card-title">
+              <component :is="frontPlanView.icon" :size="14" :stroke-width="2.35" aria-hidden="true" />
+              {{ frontPlanView.title }}
+            </span>
+            <span class="plan-view-axis">{{ frontPlanView.axisLabel }}</span>
+          </div>
+          <span class="plan-view-status">{{ getViewStatus() }}</span>
+          <span class="plan-view-measure">{{ getViewMeasure(frontPlanView.id) }}</span>
+        </header>
+        <canvas
+          :id="frontPlanView.canvasId"
+          :ref="(element) => setFrontCanvasRef(element)"
+          width="980"
+          height="620"
+        ></canvas>
       </section>
     </div>
     <div v-if="groupSummary.length" class="plan-group-summary" aria-label="2D 排布分区说明">
@@ -193,8 +247,8 @@ span {
 
 .plan-view-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(220px, 0.9fr);
-  grid-template-rows: minmax(0, 1.12fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.42fr) minmax(230px, 0.88fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 10px;
   min-height: 0;
   padding: 12px;
@@ -211,11 +265,7 @@ span {
   background: rgba(3, 8, 14, 0.52);
 }
 
-.plan-view-card--top {
-  grid-column: 1 / -1;
-}
-
-.plan-view-card--side {
+.plan-view-card--switchable {
   grid-column: 1;
 }
 
@@ -232,6 +282,13 @@ span {
   border-bottom: 1px solid rgba(174, 184, 201, 0.14);
 }
 
+.plan-view-card-heading {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
 .plan-view-card-title {
   display: inline-flex;
   gap: 6px;
@@ -244,6 +301,40 @@ span {
 .plan-view-axis {
   color: var(--muted);
   white-space: nowrap;
+}
+
+.plan-view-switch {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+  justify-self: end;
+  padding: 2px;
+  border: 1px solid rgba(66, 214, 164, 0.34);
+  border-radius: 999px;
+  background: rgba(66, 214, 164, 0.08);
+}
+
+.plan-view-switch-button {
+  min-height: 24px;
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.plan-view-switch-button:hover {
+  color: var(--text);
+}
+
+.plan-view-switch-button.is-active {
+  background: var(--accent);
+  color: #04110d;
+  box-shadow: 0 8px 18px rgba(66, 214, 164, 0.18);
 }
 
 .plan-view-status {
@@ -298,14 +389,13 @@ canvas {
   font-weight: 800;
 }
 
-@media (max-width: 980px) {
+@media (max-width: 720px) {
   .plan-view-grid {
     grid-template-columns: 1fr;
-    grid-template-rows: repeat(3, minmax(220px, 1fr));
+    grid-template-rows: repeat(2, minmax(220px, 1fr));
   }
 
-  .plan-view-card--top,
-  .plan-view-card--side,
+  .plan-view-card--switchable,
   .plan-view-card--front {
     grid-column: 1;
   }
