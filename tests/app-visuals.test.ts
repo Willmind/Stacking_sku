@@ -5,6 +5,8 @@ import { describe, it } from "vitest";
 
 const rendererSource = fs.readFileSync(path.join(__dirname, "..", "src/renderers/cargo3d.ts"), "utf8");
 const plan2dSource = fs.readFileSync(path.join(__dirname, "..", "src/renderers/plan2d.ts"), "utf8");
+const appSource = fs.readFileSync(path.join(__dirname, "..", "src/App.vue"), "utf8");
+const tokensSource = fs.readFileSync(path.join(__dirname, "..", "src/styles/tokens.css"), "utf8");
 const plan2dViewSource = fs.readFileSync(
   path.join(__dirname, "..", "src/components/visualizations/Plan2DView.vue"),
   "utf8",
@@ -13,7 +15,28 @@ const batchImportDialogSource = fs.readFileSync(
   path.join(__dirname, "..", "src/components/controls/BatchImportDialog.vue"),
   "utf8",
 );
+const progressControlSource = fs.readFileSync(
+  path.join(__dirname, "..", "src/components/controls/ProgressControl.vue"),
+  "utf8",
+);
+const skuEditorSource = fs.readFileSync(path.join(__dirname, "..", "src/components/controls/SkuEditor.vue"), "utf8");
 const baseSelectSource = fs.readFileSync(path.join(__dirname, "..", "src/components/ui/BaseSelect.vue"), "utf8");
+const baseColorPickerSource = fs.existsSync(path.join(__dirname, "..", "src/components/ui/BaseColorPicker.vue"))
+  ? fs.readFileSync(path.join(__dirname, "..", "src/components/ui/BaseColorPicker.vue"), "utf8")
+  : "";
+const singleSkuFormSource = fs.readFileSync(
+  path.join(__dirname, "..", "src/components/controls/SingleSkuForm.vue"),
+  "utf8",
+);
+const skuCardSource = fs.readFileSync(path.join(__dirname, "..", "src/components/controls/SkuCard.vue"), "utf8");
+const allVueAndCssSource = fs
+  .readdirSync(path.join(__dirname, "..", "src"), { recursive: true, withFileTypes: true })
+  .filter((entry) => entry.isFile() && /\.(vue|css)$/.test(entry.name))
+  .map((entry) => {
+    const parentPath = entry.parentPath || entry.path;
+    return fs.readFileSync(path.join(parentPath, entry.name), "utf8");
+  })
+  .join("\n");
 
 describe("3D visual rendering source guards", () => {
   it("keeps cargo colors visible in 3D", () => {
@@ -64,6 +87,68 @@ describe("2D plan source guards", () => {
     assert.match(plan2dViewSource, /groupSummary/);
     assert.match(plan2dViewSource, /占长|占宽/);
   });
+
+  it("keeps 2D tri-view canvases stacked above the 3D panel", () => {
+    assert.match(appSource, /\.views-grid\s*\{[\s\S]*grid-template-rows:/);
+    assert.match(plan2dViewSource, /plan-view-grid/);
+    assert.match(plan2dViewSource, /plan-view-card--top/);
+    assert.match(plan2dViewSource, /plan-canvas-top/);
+    assert.match(plan2dViewSource, /plan-canvas-side/);
+    assert.match(plan2dViewSource, /plan-canvas-front/);
+    assert.doesNotMatch(plan2dViewSource, /view-mode-switch/);
+  });
+
+  it("keeps auxiliary labels compact on short 2D canvases", () => {
+    assert.match(plan2dSource, /isCompactCanvas/);
+    assert.match(plan2dSource, /showMeasurementLabels/);
+    assert.match(plan2dSource, /if \(showMeasurementLabels\)/);
+  });
+
+  it("keeps 2D view status and dimensions outside canvas drawings", () => {
+    assert.match(plan2dViewSource, /plan-view-status/);
+    assert.match(plan2dViewSource, /plan-view-measure/);
+    assert.match(plan2dViewSource, /\.plan-view-status\s*\{[\s\S]*grid-column:\s*1 \/ -1/);
+    assert.match(plan2dViewSource, /\.plan-view-measure\s*\{[\s\S]*grid-column:\s*1 \/ -1/);
+    assert.match(plan2dViewSource, /showLabels:\s*false/);
+    assert.match(plan2dSource, /showLabels\?:\s*boolean/);
+    assert.match(plan2dSource, /if \(showLabels\)/);
+  });
+
+  it("keeps top-view status aligned to the current loading progress", () => {
+    assert.match(plan2dViewSource, /当前显示/);
+    assert.doesNotMatch(plan2dViewSource, /getTopViewLayerProgress/);
+    assert.doesNotMatch(plan2dViewSource, /lastPosition\.stackIndex/);
+    assert.doesNotMatch(plan2dViewSource, /visiblePositions\.filter\(\(position\) => position\.stackIndex ===/);
+  });
+
+  it("does not draw a separate occupied boundary over 2D cargo views", () => {
+    assert.doesNotMatch(plan2dSource, /function getOccupiedProjectionRect/);
+    assert.doesNotMatch(plan2dSource, /occupiedRect/);
+    assert.doesNotMatch(plan2dSource, /rgba\(66,\s*214,\s*164,\s*0\.95\)/);
+    assert.doesNotMatch(plan2dSource, /plane\.occupiedWidth \* scale,\s*plane\.occupiedHeight \* scale/);
+  });
+
+  it("draws the container outline after cargo boxes", () => {
+    const boxLoopIndex = plan2dSource.indexOf("for (const { box, visibleBox } of sortedDrawingPositions)");
+    const outlineIndex = plan2dSource.indexOf("drawContainerOutline(ctx, plane, scale)", boxLoopIndex);
+
+    assert.ok(boxLoopIndex > -1, "2D renderer should draw cargo boxes in one predictable loop");
+    assert.ok(outlineIndex > boxLoopIndex, "container outline should sit above cargo boxes");
+  });
+
+  it("uses straight container rectangles for technical 2D views", () => {
+    assert.match(plan2dSource, /ctx\.fillRect\(0,\s*0,\s*plane\.width \* scale,\s*plane\.height \* scale\)/);
+    assert.match(plan2dSource, /ctx\.strokeRect\(0,\s*0,\s*plane\.width \* scale,\s*plane\.height \* scale\)/);
+    assert.doesNotMatch(plan2dSource, /function drawRoundedRect/);
+    assert.doesNotMatch(plan2dSource, /drawRoundedRect\(ctx,\s*0,\s*0,\s*plane\.width \* scale/);
+  });
+
+  it("does not draw corner-block overlays in 2D views", () => {
+    assert.doesNotMatch(plan2dSource, /getCornerProjectionRects/);
+    assert.doesNotMatch(plan2dSource, /collidesCornerBlock/);
+    assert.doesNotMatch(plan2dSource, /255,\s*112,\s*102/);
+    assert.doesNotMatch(plan2dSource, /红色区域为顶部角件避让区/);
+  });
 });
 
 describe("batch import UI source guards", () => {
@@ -86,6 +171,14 @@ describe("batch import UI source guards", () => {
     assert.match(batchImportDialogSource, /\.batch-dialog-content-enter-active/);
     assert.match(batchImportDialogSource, /\.batch-dialog-content-leave-active/);
   });
+
+  it("highlights only negative batch import differences as danger chips", () => {
+    assert.match(batchImportDialogSource, /item\.difference !== null && item\.difference < 0/);
+    assert.match(batchImportDialogSource, /negative-difference-chip/);
+    assert.match(batchImportDialogSource, /\.negative-difference-chip\s*\{/);
+    assert.match(batchImportDialogSource, /rgba\(255,\s*112,\s*102,\s*0\.1\)/);
+    assert.match(batchImportDialogSource, /#ff8a80/);
+  });
 });
 
 describe("select UI source guards", () => {
@@ -98,5 +191,78 @@ describe("select UI source guards", () => {
       /\.base-select-trigger:active\s*\{[^}]*transform:\s*translateY/,
       "Select trigger active state should not shift vertically during option selection",
     );
+    assert.doesNotMatch(
+      baseSelectSource,
+      /\bSelectValue\b/,
+      "Select trigger should render its own stable label instead of mirroring SelectItemText during close",
+    );
+    assert.match(baseSelectSource, /function deferValueUpdate/);
+    assert.match(baseSelectSource, /window\.setTimeout/);
+    assert.doesNotMatch(baseSelectSource, /animation:\s*select-pop/);
+  });
+});
+
+describe("shadow token source guards", () => {
+  it("keeps controls free of top inset highlight lines", () => {
+    assert.match(tokensSource, /--control-inner-shadow:\s*0 0 0 0 transparent;/);
+    assert.doesNotMatch(tokensSource, /--popover-shadow:[^;]*inset\s+0\s+1px\s+0/);
+    assert.doesNotMatch(allVueAndCssSource, /box-shadow:\s*var\(--focus-ring\),\s*var\(--control-inner-shadow\)/);
+    assert.doesNotMatch(allVueAndCssSource, /\/\*\s*box-shadow:\s*var\(--control-inner-shadow\);\s*\*\//);
+  });
+});
+
+describe("range progress source guards", () => {
+  it("renders sliders with filled and remaining track colors", () => {
+    assert.match(tokensSource, /--range-track-filled:/);
+    assert.match(tokensSource, /--range-track-rest:/);
+    assert.match(allVueAndCssSource, /var\(--range-progress,\s*0%\)/);
+    assert.match(progressControlSource, /progressPercent/);
+    assert.match(progressControlSource, /--range-progress/);
+    assert.match(skuEditorSource, /skuCountProgressPercent/);
+    assert.match(skuEditorSource, /--range-progress/);
+  });
+
+  it("keeps range track endpoints aligned with the thumb", () => {
+    assert.match(progressControlSource, /class="range-control"/);
+    assert.match(skuEditorSource, /class="range-control"/);
+    assert.match(allVueAndCssSource, /range-control__rail/);
+    assert.match(allVueAndCssSource, /range-control__track/);
+    assert.match(allVueAndCssSource, /range-control__fill/);
+    assert.match(allVueAndCssSource, /range-control__thumb/);
+    assert.match(allVueAndCssSource, /\.range-control input\[type="range"\]\s*\{[\s\S]*opacity:\s*0/);
+    assert.match(allVueAndCssSource, /--range-thumb-size:\s*19px/);
+    assert.match(allVueAndCssSource, /--range-track-height:\s*7px/);
+    assert.match(allVueAndCssSource, /padding-inline:\s*calc\(var\(--range-thumb-size\) \/ 2\)/);
+    assert.match(
+      allVueAndCssSource,
+      /margin-top:\s*calc\(\(var\(--range-track-height\) - var\(--range-thumb-size\)\) \/ 2\)/,
+    );
+    assert.doesNotMatch(allVueAndCssSource, /margin-top:\s*-7px/);
+  });
+});
+
+describe("color picker source guards", () => {
+  it("uses the same carton color picker class for single and multi SKU controls", () => {
+    assert.match(singleSkuFormSource, /BaseColorPicker/);
+    assert.match(skuCardSource, /BaseColorPicker/);
+    assert.match(baseColorPickerSource, /class="carton-color"/);
+    assert.match(baseColorPickerSource, /carton-color__input/);
+    assert.match(baseColorPickerSource, /carton-color__swatch/);
+    assert.match(baseColorPickerSource, /carton-color__value/);
+    assert.match(baseColorPickerSource, /--carton-color-value/);
+    assert.match(baseColorPickerSource, /\.carton-color__input\s*\{[\s\S]*opacity:\s*0/);
+    assert.match(baseColorPickerSource, /PopoverRoot/);
+    assert.match(baseColorPickerSource, /PopoverTrigger/);
+    assert.match(baseColorPickerSource, /PopoverContent/);
+    assert.match(baseColorPickerSource, /carton-color-popover/);
+    assert.match(baseColorPickerSource, /carton-color-palette/);
+    assert.match(baseColorPickerSource, /carton-color-swatch-button/);
+    assert.match(baseColorPickerSource, /carton-color-hex-input/);
+    assert.match(baseColorPickerSource, /更多颜色/);
+    assert.match(baseColorPickerSource, /nativeInputRef/);
+    assert.match(baseColorPickerSource, /openNativePicker/);
+    assert.doesNotMatch(singleSkuFormSource, /\.carton-color\s*\{/);
+    assert.doesNotMatch(skuCardSource, /\.carton-color\s*\{/);
+    assert.doesNotMatch(skuCardSource, /sku-color/);
   });
 });

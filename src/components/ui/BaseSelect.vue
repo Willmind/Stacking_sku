@@ -19,7 +19,6 @@ import {
   SelectPortal,
   SelectRoot,
   SelectTrigger,
-  SelectValue,
   SelectViewport,
 } from "reka-ui";
 
@@ -43,9 +42,15 @@ const emit = defineEmits<{
 }>();
 
 const selectedOption = computed(() => props.options.find((option) => option.value === props.modelValue));
+const selectedLabel = computed(() => selectedOption.value?.label ?? props.modelValue);
+
+function deferValueUpdate(value: string) {
+  window.setTimeout(() => emit("update:modelValue", value), 0);
+}
 
 function updateValue(value: unknown) {
-  if (typeof value === "string") emit("update:modelValue", value);
+  if (typeof value !== "string" || value === props.modelValue) return;
+  deferValueUpdate(value);
 }
 </script>
 
@@ -60,7 +65,7 @@ function updateValue(value: unknown) {
         :aria-labelledby="`${props.id}-label`"
       >
         <span class="base-select-trigger-copy">
-          <SelectValue class="base-select-trigger-value" />
+          <span class="base-select-trigger-value">{{ selectedLabel }}</span>
           <span
             v-if="props.showSelectedDescription && selectedOption?.description"
             class="base-select-trigger-description"
@@ -128,7 +133,6 @@ function updateValue(value: unknown) {
   font-weight: 850;
   text-align: left;
   padding: 0 11px;
-  box-shadow: var(--control-inner-shadow);
   transition:
     border-color 140ms ease,
     background 140ms ease,
@@ -147,14 +151,13 @@ function updateValue(value: unknown) {
 
 .base-select-trigger:focus-visible {
   border-color: var(--accent);
-  box-shadow: var(--focus-ring), var(--control-inner-shadow);
+  box-shadow: var(--focus-ring);
   outline: 0;
 }
 
 .base-select-trigger[data-state="open"] {
   border-color: rgba(66, 214, 164, 0.42);
   background: linear-gradient(180deg, var(--control-bg-hover), var(--control-bg));
-  box-shadow: var(--control-inner-shadow);
   outline: 0;
 }
 
@@ -220,7 +223,6 @@ function updateValue(value: unknown) {
   box-shadow: var(--popover-shadow);
   backdrop-filter: blur(14px);
   transform-origin: var(--reka-select-content-transform-origin);
-  animation: select-pop 130ms ease-out;
 }
 
 :global(.base-select-viewport) {
@@ -301,15 +303,4 @@ function updateValue(value: unknown) {
   white-space: nowrap;
 }
 
-@keyframes select-pop {
-  from {
-    opacity: 0;
-    transform: translateY(-3px) scale(0.985);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
 </style>

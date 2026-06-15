@@ -191,7 +191,12 @@ async function handleFileChange(event: Event) {
                   <td>{{ item.sizeText || "-" }}</td>
                   <td>{{ item.containerType || "-" }}</td>
                   <td>{{ formatNumber(item.totalBoxes) }}</td>
-                  <td>{{ formatNumber(item.difference) }}</td>
+                  <td>
+                    <span v-if="item.difference !== null && item.difference < 0" class="negative-difference-chip">
+                      {{ formatNumber(item.difference) }}
+                    </span>
+                    <template v-else>{{ formatNumber(item.difference) }}</template>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -230,7 +235,6 @@ async function handleFileChange(event: Event) {
   color: var(--text);
   font-size: 13px;
   font-weight: 900;
-  box-shadow: var(--control-inner-shadow);
   text-decoration: none;
 }
 
@@ -532,6 +536,22 @@ tr.failed td {
   color: var(--danger);
 }
 
+.negative-difference-chip {
+  display: inline-flex;
+  min-width: 46px;
+  min-height: 24px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 112, 102, 0.38);
+  border-radius: 999px;
+  background: rgba(255, 112, 102, 0.1);
+  color: #ff8a80;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  padding: 0 9px;
+}
+
 .dialog-error {
   display: grid;
   min-height: 160px;
@@ -562,7 +582,7 @@ footer {
   border-color: rgba(66, 214, 164, 0.48);
   background: linear-gradient(180deg, #52e0b5, var(--accent-strong));
   color: #04110d;
-  box-shadow: 0 12px 28px rgba(47, 189, 148, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  box-shadow: 0 12px 28px rgba(47, 189, 148, 0.18);
 }
 
 .dialog-action.primary:hover {

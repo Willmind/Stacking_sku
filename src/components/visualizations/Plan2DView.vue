@@ -1,22 +1,52 @@
 <script setup lang="ts">
 import { LayoutPanelTop, PanelBottom, PanelLeft } from "@lucide/vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import type { Component } from "vue";
-import { renderPlan2D, type Plan2DViewMode } from "../../renderers/plan2d";
+import type { Component, ComponentPublicInstance } from "vue";
+import { getPlan2DPlaneConfig, renderPlan2D, type Plan2DViewMode } from "../../renderers/plan2d";
 import { usePackingStore } from "../../stores/packingStore";
 
 const store = usePackingStore();
-const canvasRef = ref<HTMLCanvasElement | null>(null);
-const viewMode = ref<Plan2DViewMode>("top");
 let resizeObserver: ResizeObserver | null = null;
 
-const viewModes: Array<{ id: Plan2DViewMode; label: string; title: string; icon: Component }> = [
-  { id: "top", label: "俯视", title: "俯视图", icon: LayoutPanelTop },
-  { id: "side", label: "侧视", title: "侧视图", icon: PanelLeft },
-  { id: "front", label: "端视", title: "端视图", icon: PanelBottom },
+const planViews: Array<{
+  id: Plan2DViewMode;
+  title: string;
+  axisLabel: string;
+  canvasId: string;
+  className: string;
+  icon: Component;
+}> = [
+  {
+    id: "top",
+    title: "俯视图",
+    axisLabel: "长 × 宽",
+    canvasId: "plan-canvas-top",
+    className: "plan-view-card--top",
+    icon: LayoutPanelTop,
+  },
+  {
+    id: "side",
+    title: "侧视图",
+    axisLabel: "长 × 高",
+    canvasId: "plan-canvas-side",
+    className: "plan-view-card--side",
+    icon: PanelLeft,
+  },
+  {
+    id: "front",
+    title: "端视图",
+    axisLabel: "宽 × 高",
+    canvasId: "plan-canvas-front",
+    className: "plan-view-card--front",
+    icon: PanelBottom,
+  },
 ];
 
-const currentViewTitle = computed(() => viewModes.find((item) => item.id === viewMode.value)?.title || "俯视图");
+const canvasRefs = ref<Record<Plan2DViewMode, HTMLCanvasElement | null>>({
+  top: null,
+  side: null,
+  front: null,
+});
 
 interface PlanGroup {
   label: string;
@@ -41,22 +71,46 @@ const groupSummary = computed(() => {
   });
 });
 
-function draw() {
-  if (!canvasRef.value) return;
+function getViewStatus() {
+  const result = store.result;
+  if (!result?.pattern) return "等待计算";
+  return `当前显示 · ${formatNumber(Math.min(result.totalBoxes, store.visibleCount))} / ${formatNumber(result.totalBoxes)} 箱`;
+}
+
+function getViewMeasure(mode: Plan2DViewMode) {
+  const result = store.result;
+  if (!result?.pattern) return "等待尺寸";
+  const plane = getPlan2DPlaneConfig(result, mode);
+  return `${plane.xLabel} ${formatNumber(plane.width)}mm · 占用 ${formatNumber(plane.occupiedWidth)}mm`;
+}
+
+function setCanvasRef(mode: Plan2DViewMode, element: Element | ComponentPublicInstance | null) {
+  canvasRefs.value[mode] = element instanceof HTMLCanvasElement ? element : null;
+}
+
+function drawView(mode: Plan2DViewMode) {
+  const canvas = canvasRefs.value[mode];
+  if (!canvas) return;
   renderPlan2D({
-    canvas: canvasRef.value,
+    canvas,
     result: store.result,
     visibleCount: store.visibleCount,
-    viewMode: viewMode.value,
+    viewMode: mode,
+    showLabels: false,
   });
+}
+
+function draw() {
+  planViews.forEach((item) => drawView(item.id));
 }
 
 onMounted(() => {
   draw();
-  if (canvasRef.value) {
-    resizeObserver = new ResizeObserver(draw);
-    resizeObserver.observe(canvasRef.value);
-  }
+  resizeObserver = new ResizeObserver(draw);
+  planViews.forEach((item) => {
+    const canvas = canvasRefs.value[item.id];
+    if (canvas) resizeObserver?.observe(canvas);
+  });
 });
 
 onBeforeUnmount(() => {
@@ -65,7 +119,7 @@ onBeforeUnmount(() => {
 });
 
 watch(
-  () => [store.result, store.visibleCount, viewMode.value],
+  () => [store.result, store.visibleCount],
   () => draw(),
   { deep: true },
 );
@@ -73,25 +127,27 @@ watch(
 
 <template>
   <article class="view-panel two-d-panel">
-    <header>
-      <h2>2D 平面排布</h2>
-      <div class="view-header-tools">
-        <div class="view-mode-switch" aria-label="2D 视图切换">
-          <button
-            v-for="item in viewModes"
-            :key="item.id"
-            type="button"
-            :aria-pressed="viewMode === item.id"
-            @click="viewMode = item.id"
-          >
-            <component :is="item.icon" :size="13" :stroke-width="2.3" aria-hidden="true" />
-            {{ item.label }}
-          </button>
-        </div>
-        <span>{{ currentViewTitle }}</span>
+    <header class="panel-header">
+      <div>
+        <h2>2D 平面排布</h2>
+        <span>俯视 / 侧视 / 端视</span>
       </div>
+      <span>三视图</span>
     </header>
-    <canvas id="plan-canvas" ref="canvasRef" width="980" height="620"></canvas>
+    <div class="plan-view-grid">
+      <section v-for="item in planViews" :key="item.id" class="plan-view-card" :class="item.className">
+        <header class="plan-view-card-header">
+          <span class="plan-view-card-title">
+            <component :is="item.icon" :size="14" :stroke-width="2.35" aria-hidden="true" />
+            {{ item.title }}
+          </span>
+          <span class="plan-view-axis">{{ item.axisLabel }}</span>
+          <span class="plan-view-status">{{ getViewStatus() }}</span>
+          <span class="plan-view-measure">{{ getViewMeasure(item.id) }}</span>
+        </header>
+        <canvas :id="item.canvasId" :ref="(element) => setCanvasRef(item.id, element)" width="980" height="620"></canvas>
+      </section>
+    </div>
     <div v-if="groupSummary.length" class="plan-group-summary" aria-label="2D 排布分区说明">
       <span v-for="item in groupSummary" :key="item">{{ item }}</span>
     </div>
@@ -109,13 +165,18 @@ watch(
   background: var(--panel-strong);
 }
 
-header {
+.panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 13px 14px;
   border-bottom: 1px solid var(--line);
+}
+
+.panel-header div {
+  display: grid;
+  gap: 4px;
 }
 
 h2 {
@@ -130,49 +191,81 @@ span {
   font-weight: 700;
 }
 
-.view-header-tools {
-  display: flex;
-  align-items: center;
+.plan-view-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(220px, 0.9fr);
+  grid-template-rows: minmax(0, 1.12fr) minmax(0, 1fr);
   gap: 10px;
+  min-height: 0;
+  padding: 12px;
 }
 
-.view-mode-switch {
-  display: inline-grid;
-  grid-template-columns: repeat(3, minmax(54px, 1fr));
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid rgba(174, 184, 201, 0.2);
-  border-radius: 6px;
-  background: rgba(3, 8, 14, 0.46);
+.plan-view-card {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid rgba(174, 184, 201, 0.16);
+  border-radius: 8px;
+  background: rgba(3, 8, 14, 0.52);
 }
 
-.view-mode-switch button {
-  display: inline-flex;
-  gap: 4px;
-  height: 28px;
+.plan-view-card--top {
+  grid-column: 1 / -1;
+}
+
+.plan-view-card--side {
+  grid-column: 1;
+}
+
+.plan-view-card--front {
+  grid-column: 2;
+}
+
+.plan-view-card-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: center;
-  border: 1px solid transparent;
-  border-radius: 5px;
-  background: rgba(255, 255, 255, 0.01);
-  color: var(--muted);
+  gap: 4px 10px;
+  padding: 8px 10px 7px;
+  border-bottom: 1px solid rgba(174, 184, 201, 0.14);
+}
+
+.plan-view-card-title {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--text);
   font-size: 12px;
   font-weight: 900;
 }
 
-.view-mode-switch button:hover {
-  border-color: rgba(174, 184, 201, 0.16);
-  background: rgba(255, 255, 255, 0.055);
-  color: var(--text);
+.plan-view-axis {
+  color: var(--muted);
+  white-space: nowrap;
 }
 
-.view-mode-switch button[aria-pressed="true"] {
-  border-color: rgba(66, 214, 164, 0.28);
-  background: rgba(66, 214, 164, 0.16);
+.plan-view-status {
+  grid-column: 1 / -1;
+  min-width: 0;
   color: var(--accent);
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.plan-view-measure {
+  grid-column: 1 / -1;
+  min-width: 0;
+  max-width: 100%;
+  color: rgba(245, 247, 251, 0.78);
+  font-size: 11px;
+  line-height: 1.2;
 }
 
 canvas {
+  display: block;
   width: 100%;
   height: 100%;
   min-height: 0;
@@ -203,5 +296,18 @@ canvas {
   color: var(--text);
   font-size: 12px;
   font-weight: 800;
+}
+
+@media (max-width: 980px) {
+  .plan-view-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(3, minmax(220px, 1fr));
+  }
+
+  .plan-view-card--top,
+  .plan-view-card--side,
+  .plan-view-card--front {
+    grid-column: 1;
+  }
 }
 </style>

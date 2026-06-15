@@ -27,14 +27,16 @@ test("calculates the 488 x 380 x 291 benchmark and renders both views", async ({
 
   await expect(page.locator("#total-boxes")).toHaveText("1,340");
   await expect(page.locator("#status-chip")).toHaveText("已完成计算");
-  await expect(page.locator("#plan-canvas")).toHaveCount(1);
-  await expect(page.getByRole("button", { name: "俯视" })).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: "侧视" }).click();
-  await expect(page.getByRole("button", { name: "侧视" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator(".two-d-panel header span")).toHaveText("侧视图");
-  await page.getByRole("button", { name: "端视" }).click();
-  await expect(page.getByRole("button", { name: "端视" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator(".two-d-panel header span")).toHaveText("端视图");
+  await expect(page.locator(".plan-view-card")).toHaveCount(3);
+  await expect(page.locator("#plan-canvas-top")).toHaveCount(1);
+  await expect(page.locator("#plan-canvas-side")).toHaveCount(1);
+  await expect(page.locator("#plan-canvas-front")).toHaveCount(1);
+  await expect(page.locator(".plan-view-card--top")).toContainText("俯视图");
+  await expect(page.locator(".plan-view-card--side")).toContainText("侧视图");
+  await expect(page.locator(".plan-view-card--front")).toContainText("端视图");
+  await expect(page.locator(".plan-view-card--top .plan-view-status")).toContainText("当前显示");
+  await expect(page.locator(".plan-view-card--side .plan-view-status")).toContainText("当前显示");
+  await expect(page.locator(".plan-view-card--front .plan-view-measure")).toContainText("柜宽");
   await expect(page.locator(".plan-group-summary")).toContainText("宽向 4排");
   await expect(page.locator(".plan-group-summary")).toContainText("占宽");
   await expect(page.locator("#scene-canvas")).toHaveCount(1);
@@ -55,6 +57,7 @@ test("sets the progress slider to full after the initial calculation", async ({ 
   await expect(page.locator("#total-boxes")).toHaveText("755");
   await expect(page.locator("#progress-text")).toHaveText("755 / 755");
   await expect(page.locator("#stack-progress")).toHaveValue("755");
+  await expect(page.locator("#stack-progress")).toHaveAttribute("style", /--range-progress:\s*100%/);
 });
 
 test("scopes the carton color picker trigger and redraws canvas with the selected color", async ({ page }) => {
@@ -81,7 +84,7 @@ test("scopes the carton color picker trigger and redraws canvas with the selecte
   await page.getByRole("button", { name: "计算装载" }).click();
   await expect(page.locator("#status-chip")).toHaveText("已完成计算");
 
-  const pixelCounts = await page.locator("#plan-canvas").evaluate((element) => {
+  const pixelCounts = await page.locator("#plan-canvas-top").evaluate((element) => {
     const canvas = element as HTMLCanvasElement;
     const context = canvas.getContext("2d");
     if (!context) throw new Error("2D canvas context is missing");
@@ -102,6 +105,18 @@ test("scopes the carton color picker trigger and redraws canvas with the selecte
 
   expect(pixelCounts.bluePixels).toBeGreaterThan(1000);
   expect(pixelCounts.bluePixels).toBeGreaterThan(pixelCounts.orangePixels);
+});
+
+test("opens the custom carton color popover and selects a swatch", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator(".color-row .carton-color").click();
+  await expect(page.locator(".carton-color-popover")).toBeVisible();
+
+  await page.getByRole("button", { name: "选择颜色 #6E8BFF" }).click();
+
+  await expect(page.locator(".color-row .carton-color__value")).toHaveText("#6E8BFF");
+  await expect(page.locator(".carton-color-popover")).toBeHidden();
 });
 
 test("adjusts number fields with styled steppers", async ({ page }) => {
@@ -227,6 +242,7 @@ test("keeps the visualization workspace stable while the control panel scrolls",
   });
 
   await expect(page.locator("#sku-count-value")).toHaveText("10");
+  await expect(page.locator("#sku-count")).toHaveAttribute("style", /--range-progress:\s*100%/);
 
   const layout = await page.evaluate(() => {
     const controlPanel = document.querySelector(".control-panel") as HTMLElement | null;
@@ -243,6 +259,8 @@ test("keeps the visualization workspace stable while the control panel scrolls",
       controlClientHeight: controlPanel.clientHeight,
       controlScrollHeight: controlPanel.scrollHeight,
       workbenchBottom: workbench.getBoundingClientRect().bottom,
+      planTop: Math.round(planPanel.getBoundingClientRect().top),
+      sceneTop: Math.round(scenePanel.getBoundingClientRect().top),
       planHeight: Math.round(planPanel.getBoundingClientRect().height),
       sceneHeight: Math.round(scenePanel.getBoundingClientRect().height),
     };
@@ -252,5 +270,8 @@ test("keeps the visualization workspace stable while the control panel scrolls",
   expect(layout.bodyScrollHeight).toBeLessThanOrEqual(layout.viewportHeight + 2);
   expect(layout.controlScrollHeight).toBeGreaterThan(layout.controlClientHeight + 20);
   expect(layout.workbenchBottom).toBeLessThanOrEqual(layout.viewportHeight - 18 + 2);
-  expect(Math.abs(layout.planHeight - layout.sceneHeight)).toBeLessThanOrEqual(2);
+  expect(layout.planTop).toBeLessThan(layout.sceneTop);
+  expect(layout.planHeight).toBeGreaterThanOrEqual(360);
+  expect(layout.sceneHeight).toBeGreaterThan(200);
+  expect(layout.planHeight).toBeGreaterThan(layout.sceneHeight);
 });
