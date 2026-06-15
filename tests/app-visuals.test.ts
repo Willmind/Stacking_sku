@@ -113,6 +113,42 @@ describe("2D plan source guards", () => {
     assert.match(plan2dSource, /showLabels\?:\s*boolean/);
     assert.match(plan2dSource, /if \(showLabels\)/);
   });
+
+  it("keeps top-view status aligned to the current loading progress", () => {
+    assert.match(plan2dViewSource, /当前显示/);
+    assert.doesNotMatch(plan2dViewSource, /getTopViewLayerProgress/);
+    assert.doesNotMatch(plan2dViewSource, /lastPosition\.stackIndex/);
+    assert.doesNotMatch(plan2dViewSource, /visiblePositions\.filter\(\(position\) => position\.stackIndex ===/);
+  });
+
+  it("does not draw a separate occupied boundary over 2D cargo views", () => {
+    assert.doesNotMatch(plan2dSource, /function getOccupiedProjectionRect/);
+    assert.doesNotMatch(plan2dSource, /occupiedRect/);
+    assert.doesNotMatch(plan2dSource, /rgba\(66,\s*214,\s*164,\s*0\.95\)/);
+    assert.doesNotMatch(plan2dSource, /plane\.occupiedWidth \* scale,\s*plane\.occupiedHeight \* scale/);
+  });
+
+  it("draws the container outline after cargo boxes", () => {
+    const boxLoopIndex = plan2dSource.indexOf("for (const { box, visibleBox } of sortedDrawingPositions)");
+    const outlineIndex = plan2dSource.indexOf("drawContainerOutline(ctx, plane, scale)", boxLoopIndex);
+
+    assert.ok(boxLoopIndex > -1, "2D renderer should draw cargo boxes in one predictable loop");
+    assert.ok(outlineIndex > boxLoopIndex, "container outline should sit above cargo boxes");
+  });
+
+  it("uses straight container rectangles for technical 2D views", () => {
+    assert.match(plan2dSource, /ctx\.fillRect\(0,\s*0,\s*plane\.width \* scale,\s*plane\.height \* scale\)/);
+    assert.match(plan2dSource, /ctx\.strokeRect\(0,\s*0,\s*plane\.width \* scale,\s*plane\.height \* scale\)/);
+    assert.doesNotMatch(plan2dSource, /function drawRoundedRect/);
+    assert.doesNotMatch(plan2dSource, /drawRoundedRect\(ctx,\s*0,\s*0,\s*plane\.width \* scale/);
+  });
+
+  it("does not draw corner-block overlays in 2D views", () => {
+    assert.doesNotMatch(plan2dSource, /getCornerProjectionRects/);
+    assert.doesNotMatch(plan2dSource, /collidesCornerBlock/);
+    assert.doesNotMatch(plan2dSource, /255,\s*112,\s*102/);
+    assert.doesNotMatch(plan2dSource, /红色区域为顶部角件避让区/);
+  });
 });
 
 describe("batch import UI source guards", () => {

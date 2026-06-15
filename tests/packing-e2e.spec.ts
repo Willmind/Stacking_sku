@@ -34,7 +34,7 @@ test("calculates the 488 x 380 x 291 benchmark and renders both views", async ({
   await expect(page.locator(".plan-view-card--top")).toContainText("俯视图");
   await expect(page.locator(".plan-view-card--side")).toContainText("侧视图");
   await expect(page.locator(".plan-view-card--front")).toContainText("端视图");
-  await expect(page.locator(".plan-view-card--top .plan-view-status")).toContainText("第 ");
+  await expect(page.locator(".plan-view-card--top .plan-view-status")).toContainText("当前显示");
   await expect(page.locator(".plan-view-card--side .plan-view-status")).toContainText("当前显示");
   await expect(page.locator(".plan-view-card--front .plan-view-measure")).toContainText("柜宽");
   await expect(page.locator(".plan-group-summary")).toContainText("宽向 4排");

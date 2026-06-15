@@ -2,7 +2,6 @@
 import { LayoutPanelTop, PanelBottom, PanelLeft } from "@lucide/vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { Component, ComponentPublicInstance } from "vue";
-import type { PackingResult } from "../../core/packing";
 import { getPlan2DPlaneConfig, renderPlan2D, type Plan2DViewMode } from "../../renderers/plan2d";
 import { usePackingStore } from "../../stores/packingStore";
 
@@ -72,31 +71,9 @@ const groupSummary = computed(() => {
   });
 });
 
-function getCurrentLayer(result: PackingResult) {
-  const visiblePositions = result.orderedPositions.slice(0, store.visibleCount);
-  const lastPosition = visiblePositions[visiblePositions.length - 1];
-  if (lastPosition) {
-    const layer =
-      result.layers.find((item) => item.index === lastPosition.stackIndex) ||
-      result.layers[lastPosition.stackIndex || 0] ||
-      { index: 0, boxCount: 0, z: 0 };
-    return {
-      layer,
-      countInLayer: visiblePositions.filter((position) => position.stackIndex === lastPosition.stackIndex).length,
-    };
-  }
-
-  const fallback = result.layers[0] || { index: 0, boxCount: 0, z: 0 };
-  return { layer: fallback, countInLayer: 0 };
-}
-
-function getViewStatus(mode: Plan2DViewMode) {
+function getViewStatus() {
   const result = store.result;
   if (!result?.pattern) return "等待计算";
-  if (mode === "top") {
-    const currentLayer = getCurrentLayer(result);
-    return `第 ${(currentLayer.layer.index || 0) + 1} 层 · ${formatNumber(currentLayer.countInLayer)} / ${formatNumber(currentLayer.layer.boxCount || 0)} 箱`;
-  }
   return `当前显示 · ${formatNumber(Math.min(result.totalBoxes, store.visibleCount))} / ${formatNumber(result.totalBoxes)} 箱`;
 }
 
@@ -165,7 +142,7 @@ watch(
             {{ item.title }}
           </span>
           <span class="plan-view-axis">{{ item.axisLabel }}</span>
-          <span class="plan-view-status">{{ getViewStatus(item.id) }}</span>
+          <span class="plan-view-status">{{ getViewStatus() }}</span>
           <span class="plan-view-measure">{{ getViewMeasure(item.id) }}</span>
         </header>
         <canvas :id="item.canvasId" :ref="(element) => setCanvasRef(item.id, element)" width="980" height="620"></canvas>

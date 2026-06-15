@@ -1,6 +1,5 @@
 // @ts-nocheck
 import {
-  collidesCornerBlock,
   generateBoxPositions,
   type BoxPosition,
   type PackingResult,
@@ -54,28 +53,6 @@ function resizeCanvas(canvas: HTMLCanvasElement, devicePixelRatio = window.devic
   };
 }
 
-function drawRoundedRect(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  radius: number,
-) {
-  const r = Math.min(radius, width / 2, height / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + width - r, y);
-  ctx.quadraticCurveTo(x + width, y, x + width, y + r);
-  ctx.lineTo(x + width, y + height - r);
-  ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
-  ctx.lineTo(x + r, y + height);
-  ctx.quadraticCurveTo(x, y + height, x, y + height - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
-  ctx.closePath();
-}
-
 function drawCanvasMessage(ctx: CanvasRenderingContext2D, width: number, height: number, message: string) {
   ctx.save();
   ctx.fillStyle = "rgba(245, 247, 251, 0.78)";
@@ -86,22 +63,37 @@ function drawCanvasMessage(ctx: CanvasRenderingContext2D, width: number, height:
   ctx.restore();
 }
 
-function findCurrentLayer(result: PackingResult, visibleCount: number) {
-  const visiblePositions = result.orderedPositions.slice(0, visibleCount);
-  const lastPosition = visiblePositions[visiblePositions.length - 1];
-  if (lastPosition) {
-    const layer =
-      result.layers.find((item) => item.index === lastPosition.stackIndex) ||
-      result.layers[lastPosition.stackIndex || 0] ||
-      { index: 0, boxCount: 0, z: 0 };
-    return {
-      layer,
-      countInLayer: visiblePositions.filter((position) => position.stackIndex === lastPosition.stackIndex).length,
-    };
-  }
+function drawContainerFill(
+  ctx: CanvasRenderingContext2D,
+  plane: ReturnType<typeof getPlan2DPlaneConfig>,
+  scale: number,
+) {
+  ctx.fillStyle = "rgba(20, 28, 37, 0.92)";
+  ctx.fillRect(0, 0, plane.width * scale, plane.height * scale);
+}
 
-  const fallback = result.layers[0] || { index: 0, boxCount: 0, z: 0 };
-  return { layer: fallback, countInLayer: 0 };
+function drawContainerOutline(
+  ctx: CanvasRenderingContext2D,
+  plane: ReturnType<typeof getPlan2DPlaneConfig>,
+  scale: number,
+) {
+  ctx.strokeStyle = "rgba(255,255,255,0.78)";
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(0, 0, plane.width * scale, plane.height * scale);
+}
+
+export function getTopViewFootprintProgress(result: PackingResult, visibleCount: number) {
+  const normalizedVisibleCount = Math.max(0, Math.min(result.totalBoxes, Math.floor(visibleCount)));
+  const visibleFaceIndexes = new Set(
+    generateBoxPositions(result, normalizedVisibleCount)
+      .map((position) => position.faceIndex)
+      .filter((faceIndex) => Number.isFinite(faceIndex)),
+  );
+
+  return {
+    visibleFootprints: visibleFaceIndexes.size,
+    totalFootprints: result.layerPositions.length,
+  };
 }
 
 function keyForPosition(position: BoxPosition) {
@@ -120,7 +112,6 @@ function drawOuterPlanLabels(
   scale: number,
   width: number,
   height: number,
-  currentLayer: ReturnType<typeof findCurrentLayer>,
   viewMode: Plan2DViewMode,
   visibleCount: number,
 ) {
@@ -130,7 +121,6 @@ function drawOuterPlanLabels(
   const compactCanvas = isCompactCanvas(width, height);
   const showMeasurementLabels = !compactCanvas;
   const showDirectionLabel = !compactCanvas || width >= 560;
-  const showCornerLegend = !compactCanvas;
   ctx.save();
   ctx.font = "700 12px Inter, sans-serif";
   ctx.fillStyle = "rgba(245, 247, 251, 0.92)";
@@ -164,15 +154,7 @@ function drawOuterPlanLabels(
 
   ctx.textAlign = "left";
   ctx.fillStyle = "rgba(66, 214, 164, 0.96)";
-  const statusText =
-    viewMode === "top"
-      ? `第 ${(currentLayer.layer.index || 0) + 1} 层：${formatNumber(currentLayer.countInLayer)} / ${formatNumber(currentLayer.layer.boxCount || 0)} 箱`
-      : `当前显示：${formatNumber(Math.min(result.totalBoxes, visibleCount))} / ${formatNumber(result.totalBoxes)} 箱`;
-  ctx.fillText(statusText, 18, 24);
-  if (showCornerLegend) {
-    ctx.fillStyle = "rgba(255, 112, 102, 0.9)";
-    ctx.fillText("红色区域为顶部角件避让区", 18, height - 20);
-  }
+  ctx.fillText(`当前显示：${formatNumber(Math.min(result.totalBoxes, visibleCount))} / ${formatNumber(result.totalBoxes)} 箱`, 18, 24);
   if (showDirectionLabel) {
     ctx.fillStyle = "rgba(174, 184, 201, 0.9)";
     ctx.textAlign = "right";
@@ -241,70 +223,19 @@ function projectBox(box: BoxPosition, container: PackingResult["container"], vie
   };
 }
 
-function getCornerProjectionRects(result: PackingResult, viewMode: Plan2DViewMode) {
-  const { container, cornerBlock } = result;
-  if (viewMode === "side") {
-    return [
-      {
-        x: 0,
-        y: container.height - cornerBlock.height,
-        dx: cornerBlock.length,
-        dy: cornerBlock.height,
-      },
-    ];
-  }
-  if (viewMode === "front") {
-    return [
-      {
-        x: 0,
-        y: container.height - cornerBlock.height,
-        dx: cornerBlock.width,
-        dy: cornerBlock.height,
-      },
-      {
-        x: container.width - cornerBlock.width,
-        y: container.height - cornerBlock.height,
-        dx: cornerBlock.width,
-        dy: cornerBlock.height,
-      },
-    ];
-  }
-  return [
-    {
-      x: 0,
-      y: 0,
-      dx: cornerBlock.length,
-      dy: cornerBlock.width,
-    },
-    {
-      x: 0,
-      y: container.width - cornerBlock.width,
-      dx: cornerBlock.length,
-      dy: cornerBlock.width,
-    },
-  ];
-}
-
-function getTopViewDrawingPositions(result: PackingResult, visibleCount: number, currentLayer: ReturnType<typeof findCurrentLayer>) {
-  const orderedLayerPositions = result.orderedPositions.filter((position) => position.stackIndex === currentLayer.layer.index);
-  const orderedLayerKeys = new Set(orderedLayerPositions.map(keyForPosition));
-  const visiblePositionByKey = generateBoxPositions(result, visibleCount)
-    .filter((position) => position.stackIndex === currentLayer.layer.index)
+function getTopViewDrawingPositions(result: PackingResult, visibleCount: number) {
+  const visiblePositionByFace = generateBoxPositions(result, visibleCount)
     .reduce((positions, position) => {
-      positions.set(keyForPosition(position), position);
+      if (Number.isFinite(position.faceIndex)) {
+        positions.set(position.faceIndex, position);
+      }
       return positions;
-    }, new Map<string, BoxPosition>());
+    }, new Map<number, BoxPosition>());
 
-  return [
-    ...result.layerPositions
-      .filter((position) => !orderedLayerKeys.has(keyForPosition(position)))
-      .map((position) => ({ box: position, visibleBox: null, baseMarker: true })),
-    ...orderedLayerPositions.map((position) => ({
+  return result.layerPositions.map((position, faceIndex) => ({
       box: position,
-      visibleBox: visiblePositionByKey.get(keyForPosition(position)) || null,
-      baseMarker: false,
-    })),
-  ];
+      visibleBox: visiblePositionByFace.get(faceIndex) || null,
+    }));
 }
 
 function getElevationDrawingPositions(result: PackingResult, visibleCount: number) {
@@ -342,58 +273,35 @@ export function renderPlan2D({
   const scale = Math.min((width - pad * 2) / plane.width, (height - pad * 2) / plane.height);
   const boxX = (width - plane.width * scale) / 2;
   const boxY = (height - plane.height * scale) / 2 + (showLabels ? (compactCanvas ? 4 : 10) : 0);
-  const currentLayer = findCurrentLayer(result, visibleCount);
 
   ctx.save();
   ctx.translate(boxX, boxY);
-  ctx.fillStyle = "rgba(20, 28, 37, 0.92)";
-  ctx.strokeStyle = "rgba(255,255,255,0.78)";
-  ctx.lineWidth = 1.5;
-  drawRoundedRect(ctx, 0, 0, plane.width * scale, plane.height * scale, 5);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.fillStyle = "rgba(255, 112, 102, 0.22)";
-  ctx.strokeStyle = "rgba(255, 112, 102, 0.8)";
-  ctx.lineWidth = 1;
-  for (const corner of getCornerProjectionRects(result, viewMode)) {
-    ctx.fillRect(corner.x * scale, corner.y * scale, corner.dx * scale, corner.dy * scale);
-    ctx.strokeRect(corner.x * scale, corner.y * scale, corner.dx * scale, corner.dy * scale);
-  }
+  drawContainerFill(ctx, plane, scale);
 
   const drawingPositions =
-    viewMode === "top" ? getTopViewDrawingPositions(result, visibleCount, currentLayer) : getElevationDrawingPositions(result, visibleCount);
+    viewMode === "top" ? getTopViewDrawingPositions(result, visibleCount) : getElevationDrawingPositions(result, visibleCount);
   const sortedDrawingPositions = drawingPositions
     .slice()
     .sort((a, b) => Number(Boolean(a.visibleBox)) - Number(Boolean(b.visibleBox)));
 
-  for (const { box, visibleBox, baseMarker } of sortedDrawingPositions) {
-    const blocked = collidesCornerBlock(
-      viewMode === "top" ? { ...box, z: currentLayer.layer.z || 0 } : box,
-      result.container,
-      result.cornerBlock,
-    );
-    const isVisible = viewMode === "top" ? !baseMarker && !blocked && Boolean(visibleBox) : Boolean(visibleBox);
+  for (const { box, visibleBox } of sortedDrawingPositions) {
+    const isVisible = Boolean(visibleBox);
     const boxRgb = hexToRgb(colorForBox(visibleBox || box));
     const rect = projectBox(box, container, viewMode);
 
     ctx.fillStyle = isVisible
       ? `rgba(${boxRgb.r}, ${boxRgb.g}, ${boxRgb.b}, 0.82)`
-      : blocked
-        ? "rgba(255, 112, 102, 0.08)"
-        : "rgba(255, 255, 255, 0.06)";
-    ctx.strokeStyle = blocked ? "rgba(255, 112, 102, 0.55)" : "rgba(0, 0, 0, 0.9)";
+      : "rgba(255, 255, 255, 0.06)";
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.9)";
     ctx.lineWidth = Math.max(0.65, Math.min(1.2, scale * 14));
     ctx.fillRect(rect.x * scale, rect.y * scale, rect.dx * scale, rect.dy * scale);
     ctx.strokeRect(rect.x * scale, rect.y * scale, rect.dx * scale, rect.dy * scale);
   }
 
-  ctx.strokeStyle = "rgba(66, 214, 164, 0.95)";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(0, 0, plane.occupiedWidth * scale, plane.occupiedHeight * scale);
+  drawContainerOutline(ctx, plane, scale);
   ctx.restore();
 
   if (showLabels) {
-    drawOuterPlanLabels(ctx, result, boxX, boxY, scale, width, height, currentLayer, viewMode, visibleCount);
+    drawOuterPlanLabels(ctx, result, boxX, boxY, scale, width, height, viewMode, visibleCount);
   }
 }
