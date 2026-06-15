@@ -9,7 +9,45 @@ export interface CargoScene {
   resize(): void;
 }
 
+export type CargoPointerDragMode = "pan" | "rotate";
+
+export type CargoCameraDragState = {
+  yaw: number;
+  pitch: number;
+  panX: number;
+  panY: number;
+};
+
 const MAX_3D_BOXES = 4200;
+const CARGO_YAW_DRAG_SPEED = 0.01;
+const CARGO_PITCH_DRAG_SPEED = 0.006;
+const CARGO_MIN_PITCH = -1.48;
+const CARGO_MAX_PITCH = 1.48;
+
+export function getCargoPointerDragMode(event: Pick<PointerEvent, "button" | "shiftKey">): CargoPointerDragMode {
+  if (event.button === 2 || (event.button === 0 && event.shiftKey)) return "pan";
+  return "rotate";
+}
+
+export function applyCargoCameraDrag(
+  state: CargoCameraDragState,
+  mode: CargoPointerDragMode,
+  dx: number,
+  dy: number,
+): CargoCameraDragState {
+  if (mode === "rotate") {
+    return {
+      ...state,
+      yaw: state.yaw - dx * CARGO_YAW_DRAG_SPEED,
+      pitch: Math.max(CARGO_MIN_PITCH, Math.min(CARGO_MAX_PITCH, state.pitch + dy * CARGO_PITCH_DRAG_SPEED)),
+    };
+  }
+  return {
+    ...state,
+    panX: state.panX + dx,
+    panY: state.panY + dy,
+  };
+}
 
 function colorForBox(box: BoxPosition) {
   return box.skuColor || "#d8923a";
@@ -240,7 +278,7 @@ export function createCargoScene(canvas: HTMLCanvasElement): CargoScene {
     zoom: 1,
     panX: 0,
     panY: 4,
-    mode: null as null | "pan" | "rotate",
+    mode: null as null | CargoPointerDragMode,
     lastX: 0,
     lastY: 0,
     container: null as PackingResult["container"] | null,
@@ -298,9 +336,11 @@ export function createCargoScene(canvas: HTMLCanvasElement): CargoScene {
     }
   };
   const onPointerDown = (event: PointerEvent) => {
-    cameraState.mode = event.button === 1 ? "rotate" : "pan";
+    event.preventDefault();
+    cameraState.mode = getCargoPointerDragMode(event);
     cameraState.lastX = event.clientX;
     cameraState.lastY = event.clientY;
+    canvas.style.cursor = cameraState.mode === "pan" ? "move" : "grabbing";
     canvas.setPointerCapture(event.pointerId);
   };
   const onPointerMove = (event: PointerEvent) => {
@@ -309,25 +349,25 @@ export function createCargoScene(canvas: HTMLCanvasElement): CargoScene {
     const dy = event.clientY - cameraState.lastY;
     cameraState.lastX = event.clientX;
     cameraState.lastY = event.clientY;
-    if (cameraState.mode === "rotate") {
-      cameraState.yaw += dx * 0.01;
-      cameraState.pitch = Math.max(0.18, Math.min(1.36, cameraState.pitch + dy * 0.006));
-    } else {
-      cameraState.panX += dx;
-      cameraState.panY += dy;
-    }
+    Object.assign(cameraState, applyCargoCameraDrag(cameraState, cameraState.mode, dx, dy));
     updateCamera(cameraState.container);
     draw();
   };
   const onPointerUp = (event: PointerEvent) => {
     cameraState.mode = null;
+    canvas.style.cursor = "";
     if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+  };
+  const onContextMenu = (event: MouseEvent) => {
+    event.preventDefault();
   };
 
   canvas.addEventListener("wheel", onWheel, { passive: false });
   canvas.addEventListener("pointerdown", onPointerDown);
   canvas.addEventListener("pointermove", onPointerMove);
   canvas.addEventListener("pointerup", onPointerUp);
+  canvas.addEventListener("pointercancel", onPointerUp);
+  canvas.addEventListener("contextmenu", onContextMenu);
   resize();
   draw();
 
@@ -337,6 +377,8 @@ export function createCargoScene(canvas: HTMLCanvasElement): CargoScene {
       canvas.removeEventListener("pointerdown", onPointerDown);
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerup", onPointerUp);
+      canvas.removeEventListener("pointercancel", onPointerUp);
+      canvas.removeEventListener("contextmenu", onContextMenu);
       clearGroup(model);
       renderer.dispose();
     },

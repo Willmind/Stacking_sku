@@ -83,6 +83,8 @@ canvas {
   min-height: 0;
   background: rgba(3, 8, 14, 0.72);
   cursor: grab;
+  touch-action: none;
+  user-select: none;
 }
 
 .door-marker {

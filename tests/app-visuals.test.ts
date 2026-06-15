@@ -88,14 +88,18 @@ describe("2D plan source guards", () => {
     assert.match(plan2dViewSource, /占长|占宽/);
   });
 
-  it("keeps 2D tri-view canvases stacked above the 3D panel", () => {
+  it("keeps top and side views switchable next to the persistent front view", () => {
     assert.match(appSource, /\.views-grid\s*\{[\s\S]*grid-template-rows:/);
     assert.match(plan2dViewSource, /plan-view-grid/);
-    assert.match(plan2dViewSource, /plan-view-card--top/);
+    assert.match(plan2dViewSource, /activePlanView/);
+    assert.match(plan2dViewSource, /frontPlanView/);
+    assert.match(plan2dViewSource, /plan-view-card--switchable/);
+    assert.match(plan2dViewSource, /plan-view-switch/);
     assert.match(plan2dViewSource, /plan-canvas-top/);
     assert.match(plan2dViewSource, /plan-canvas-side/);
     assert.match(plan2dViewSource, /plan-canvas-front/);
-    assert.doesNotMatch(plan2dViewSource, /view-mode-switch/);
+    assert.doesNotMatch(plan2dViewSource, /plan-view-card--top/);
+    assert.doesNotMatch(plan2dViewSource, /plan-view-card--side/);
   });
 
   it("keeps auxiliary labels compact on short 2D canvases", () => {
