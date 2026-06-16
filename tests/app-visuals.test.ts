@@ -28,6 +28,10 @@ const progressControlSource = fs.readFileSync(
   path.join(__dirname, "..", "src/components/controls/ProgressControl.vue"),
   "utf8",
 );
+const resultSummarySource = fs.readFileSync(
+  path.join(__dirname, "..", "src/components/results/ResultSummary.vue"),
+  "utf8",
+);
 const skuEditorSource = fs.readFileSync(path.join(__dirname, "..", "src/components/controls/SkuEditor.vue"), "utf8");
 const baseSelectSource = fs.readFileSync(path.join(__dirname, "..", "src/components/ui/BaseSelect.vue"), "utf8");
 const baseDialogSource = fs.existsSync(path.join(__dirname, "..", "src/components/ui/BaseDialog.vue"))
@@ -83,6 +87,28 @@ describe("3D visual rendering source guards", () => {
     assert.doesNotMatch(boxMaterialSource, /vertexColors:\s*true/);
     assert.doesNotMatch(boxMaterialSource, /transparent:\s*true/);
   });
+
+  it("uses deliberate default camera framing for notebook-height canvases", () => {
+    assert.match(rendererSource, /CARGO_CAMERA_DISTANCE_FACTOR/);
+    assert.match(rendererSource, /CARGO_DEFAULT_ZOOM = 0\.9/);
+    assert.match(rendererSource, /CARGO_DEFAULT_PAN_Y = -8/);
+    assert.match(rendererSource, /CARGO_DEFAULT_PITCH = 0\.66/);
+    assert.doesNotMatch(rendererSource, /panY:\s*4/);
+    assert.doesNotMatch(rendererSource, /maxDimension \* 1\.36/);
+  });
+});
+
+describe("control panel layout source guards", () => {
+  it("keeps the primary result summary above batch import actions", () => {
+    const resultIndex = appSource.indexOf("<ResultSummary />");
+    const batchIndex = appSource.indexOf("<BatchImportDialog />");
+
+    assert.ok(resultIndex > -1, "ResultSummary should be rendered in the control panel");
+    assert.ok(batchIndex > -1, "BatchImportDialog should be rendered in the control panel");
+    assert.ok(resultIndex < batchIndex, "Primary result summary should appear before batch import actions");
+    assert.match(resultSummarySource, /summary-card--primary/);
+    assert.match(resultSummarySource, /metric-grid--compact/);
+  });
 });
 
 describe("2D plan source guards", () => {
@@ -107,6 +133,8 @@ describe("2D plan source guards", () => {
     assert.match(appSource, /\.views-grid\s*\{[\s\S]*overflow:\s*hidden/);
     assert.doesNotMatch(appSource, /grid-template-rows:\s*minmax\(620px,\s*1\.22fr\)\s*minmax\(380px,\s*0\.78fr\)/);
     assert.doesNotMatch(appSource, /\.views-grid\s*\{[\s\S]*overflow-y:\s*auto/);
+    assert.match(appSource, /clamp\(420px,\s*58dvh,\s*640px\)\s*clamp\(300px,\s*38dvh,\s*420px\)/);
+    assert.doesNotMatch(appSource, /minmax\(640px,\s*auto\)\s*minmax\(520px,\s*auto\)/);
     assert.match(plan2dViewSource, /plan-view-grid/);
     assert.match(plan2dViewSource, /activePlanView/);
     assert.match(plan2dViewSource, /frontPlanView/);

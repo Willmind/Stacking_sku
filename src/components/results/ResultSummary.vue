@@ -22,12 +22,12 @@ function formatMm(value: number) {
 
 <template>
   <section class="result-stack" aria-label="装载结果">
-    <div class="summary-card">
+    <div class="summary-card summary-card--primary">
       <span>最大装载量</span>
       <strong id="total-boxes">{{ store.totalBoxesText }}</strong>
       <small>cartons</small>
     </div>
-    <dl class="metric-grid">
+    <dl class="metric-grid metric-grid--compact">
       <div>
         <dt>每层数量</dt>
         <dd id="per-layer-count">{{ formatNumber(store.result?.perLayerBoxCount ?? 0) }}</dd>
@@ -74,11 +74,16 @@ function formatMm(value: number) {
 
 .summary-card {
   display: grid;
-  gap: 4px;
-  padding: 16px;
+  gap: 2px;
+  padding: 14px 16px 13px;
   border: 1px solid rgba(66, 214, 164, 0.35);
   border-radius: 8px;
   background: rgba(66, 214, 164, 0.1);
+}
+
+.summary-card--primary {
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(66, 214, 164, 0.14), rgba(66, 214, 164, 0.075));
 }
 
 .summary-card span,
@@ -91,7 +96,7 @@ dt {
 
 .summary-card strong {
   color: var(--accent);
-  font-size: 58px;
+  font-size: 52px;
   line-height: 0.95;
 }
 
@@ -102,12 +107,16 @@ dt {
   margin: 0;
 }
 
+.metric-grid--compact {
+  gap: 8px;
+}
+
 .metric-grid div,
 .detail-list div {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px;
+  padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(16, 24, 33, 0.72);

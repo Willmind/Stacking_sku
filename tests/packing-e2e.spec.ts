@@ -22,6 +22,71 @@ async function calculateSingleSku(page: Page, length: string, width: string, hei
   await page.getByRole("button", { name: "计算装载" }).click();
 }
 
+async function readSceneCanvasScreenshotFrame(page: Page) {
+  const screenshot = await page.locator("#scene-canvas").screenshot();
+  const dataUrl = `data:image/png;base64,${screenshot.toString("base64")}`;
+  const frame = await page.evaluate(async (source) => {
+    const image = new Image();
+    image.src = source;
+    await image.decode();
+
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Screenshot canvas context is missing");
+    context.drawImage(image, 0, 0);
+
+    const width = canvas.width;
+    const height = canvas.height;
+    const { data: pixels } = context.getImageData(0, 0, width, height);
+    let litPixels = 0;
+    let cargoPixels = 0;
+    let minX = width;
+    let maxX = -1;
+    let minY = height;
+    let maxY = -1;
+    let cargoMinY = height;
+    let cargoMaxY = -1;
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const index = (y * width + x) * 4;
+        const red = pixels[index];
+        const green = pixels[index + 1];
+        const blue = pixels[index + 2];
+        const alpha = pixels[index + 3];
+        const isContent = alpha > 0 && (red > 30 || green > 34 || blue > 34);
+        if (!isContent) continue;
+        litPixels += 1;
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+
+        const isCargo = red > 120 && green > 70 && green < 190 && blue < 90;
+        if (!isCargo) continue;
+        cargoPixels += 1;
+        cargoMinY = Math.min(cargoMinY, y);
+        cargoMaxY = Math.max(cargoMaxY, y);
+      }
+    }
+
+    return {
+      width,
+      height,
+      litPixels,
+      cargoPixels,
+      leftMargin: minX,
+      rightMargin: width - 1 - maxX,
+      topMargin: minY,
+      bottomMargin: height - 1 - maxY,
+      cargoTopMargin: cargoMinY,
+      cargoBottomMargin: height - 1 - cargoMaxY,
+    };
+  }, dataUrl);
+  return { ...frame, screenshotBytes: screenshot.byteLength };
+}
+
 test("calculates the 488 x 380 x 291 benchmark and renders both views", async ({ page }) => {
   await calculateSingleSku(page, "488", "380", "291");
 
@@ -309,12 +374,19 @@ test("keeps 2D and 3D panels visible within a 14-inch notebook viewport", async 
     const viewsGrid = document.querySelector(".views-grid") as HTMLElement | null;
     const planPanel = document.querySelector(".two-d-panel") as HTMLElement | null;
     const scenePanel = document.querySelector(".three-d-panel") as HTMLElement | null;
+    const resultStack = document.querySelector(".result-stack") as HTMLElement | null;
+    const batchImport = document.querySelector(".batch-import") as HTMLElement | null;
     if (!viewsGrid || !planPanel || !scenePanel) {
       throw new Error("Visualization panels are missing");
+    }
+    if (!resultStack || !batchImport) {
+      throw new Error("Control panel result elements are missing");
     }
     const gridRect = viewsGrid.getBoundingClientRect();
     const planRect = planPanel.getBoundingClientRect();
     const sceneRect = scenePanel.getBoundingClientRect();
+    const resultRect = resultStack.getBoundingClientRect();
+    const batchRect = batchImport.getBoundingClientRect();
     return {
       gridClientHeight: viewsGrid.clientHeight,
       gridScrollHeight: viewsGrid.scrollHeight,
@@ -322,6 +394,8 @@ test("keeps 2D and 3D panels visible within a 14-inch notebook viewport", async 
       planHeight: Math.round(planRect.height),
       sceneHeight: Math.round(sceneRect.height),
       sceneBottom: Math.round(sceneRect.bottom),
+      resultTop: Math.round(resultRect.top),
+      batchTop: Math.round(batchRect.top),
     };
   });
 
@@ -330,4 +404,60 @@ test("keeps 2D and 3D panels visible within a 14-inch notebook viewport", async 
   expect(layout.planHeight).toBeGreaterThanOrEqual(360);
   expect(layout.sceneHeight).toBeGreaterThanOrEqual(280);
   expect(layout.planHeight).toBeGreaterThan(layout.sceneHeight);
+  expect(layout.resultTop).toBeLessThan(layout.batchTop);
+
+  const desktopFrame = await readSceneCanvasScreenshotFrame(page);
+  expect(desktopFrame.screenshotBytes).toBeGreaterThan(1000);
+  expect(desktopFrame.litPixels).toBeGreaterThan(1000);
+  expect(desktopFrame.cargoPixels).toBeGreaterThan(1000);
+  expect(desktopFrame.cargoBottomMargin).toBeGreaterThan(8);
+  expect(desktopFrame.topMargin).toBeGreaterThan(8);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "计算装载" }).click();
+  const mobileFrame = await readSceneCanvasScreenshotFrame(page);
+  expect(mobileFrame.screenshotBytes).toBeGreaterThan(1000);
+  expect(mobileFrame.litPixels).toBeGreaterThan(1000);
+  expect(mobileFrame.cargoPixels).toBeGreaterThan(1000);
+  expect(mobileFrame.cargoBottomMargin).toBeGreaterThan(8);
+});
+
+test("keeps small viewport page height bounded", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "计算装载" }).click();
+
+  const initial = await page.evaluate(() => ({
+    viewportHeight: window.innerHeight,
+    documentScrollHeight: document.documentElement.scrollHeight,
+    bodyScrollHeight: document.body.scrollHeight,
+    appHeight: Math.round(document.querySelector(".app-shell")?.getBoundingClientRect().height ?? 0),
+    workbenchHeight: Math.round(document.querySelector(".workbench")?.getBoundingClientRect().height ?? 0),
+    viewsHeight: Math.round(document.querySelector(".views-grid")?.getBoundingClientRect().height ?? 0),
+    planHeight: Math.round(document.querySelector(".two-d-panel")?.getBoundingClientRect().height ?? 0),
+    sceneHeight: Math.round(document.querySelector(".three-d-panel")?.getBoundingClientRect().height ?? 0),
+  }));
+
+  await page.mouse.wheel(0, 6000);
+  await page.waitForTimeout(250);
+  const afterScroll = await page.evaluate(() => ({
+    documentScrollHeight: document.documentElement.scrollHeight,
+    bodyScrollHeight: document.body.scrollHeight,
+    scrollY: Math.round(window.scrollY),
+    appHeight: Math.round(document.querySelector(".app-shell")?.getBoundingClientRect().height ?? 0),
+    workbenchHeight: Math.round(document.querySelector(".workbench")?.getBoundingClientRect().height ?? 0),
+    viewsHeight: Math.round(document.querySelector(".views-grid")?.getBoundingClientRect().height ?? 0),
+  }));
+
+  expect(initial.documentScrollHeight).toBeLessThanOrEqual(initial.viewportHeight * 4.6);
+  expect(initial.bodyScrollHeight).toBeLessThanOrEqual(initial.viewportHeight * 4.6);
+  expect(initial.workbenchHeight).toBeLessThanOrEqual(1180);
+  expect(initial.viewsHeight).toBeLessThanOrEqual(1060);
+  expect(initial.planHeight).toBeGreaterThan(0);
+  expect(initial.sceneHeight).toBeGreaterThan(0);
+  expect(afterScroll.documentScrollHeight).toBeLessThanOrEqual(initial.documentScrollHeight + 2);
+  expect(afterScroll.bodyScrollHeight).toBeLessThanOrEqual(initial.bodyScrollHeight + 2);
+  expect(afterScroll.workbenchHeight).toBeLessThanOrEqual(initial.workbenchHeight + 2);
+  expect(afterScroll.viewsHeight).toBeLessThanOrEqual(initial.viewsHeight + 2);
 });

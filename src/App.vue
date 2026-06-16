@@ -37,10 +37,10 @@ const store = usePackingStore();
         <Calculator :size="17" :stroke-width="2.35" aria-hidden="true" />
         计算装载
       </button>
-      <BatchImportDialog />
       <p v-if="store.error" class="error">{{ store.error }}</p>
 
       <ResultSummary />
+      <BatchImportDialog />
       <SkuBreakdown />
     </aside>
 
@@ -237,12 +237,14 @@ p {
   }
 
   .workbench {
-    min-height: 1180px;
+    min-height: 0;
   }
 
   .views-grid {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(640px, auto) minmax(520px, auto);
+    grid-template-rows: clamp(420px, 58dvh, 640px) clamp(300px, 38dvh, 420px);
+    height: auto;
+    overflow: visible;
   }
 }
 </style>
