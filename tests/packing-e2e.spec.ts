@@ -22,6 +22,71 @@ async function calculateSingleSku(page: Page, length: string, width: string, hei
   await page.getByRole("button", { name: "计算装载" }).click();
 }
 
+async function readSceneCanvasScreenshotFrame(page: Page) {
+  const screenshot = await page.locator("#scene-canvas").screenshot();
+  const dataUrl = `data:image/png;base64,${screenshot.toString("base64")}`;
+  const frame = await page.evaluate(async (source) => {
+    const image = new Image();
+    image.src = source;
+    await image.decode();
+
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Screenshot canvas context is missing");
+    context.drawImage(image, 0, 0);
+
+    const width = canvas.width;
+    const height = canvas.height;
+    const { data: pixels } = context.getImageData(0, 0, width, height);
+    let litPixels = 0;
+    let cargoPixels = 0;
+    let minX = width;
+    let maxX = -1;
+    let minY = height;
+    let maxY = -1;
+    let cargoMinY = height;
+    let cargoMaxY = -1;
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const index = (y * width + x) * 4;
+        const red = pixels[index];
+        const green = pixels[index + 1];
+        const blue = pixels[index + 2];
+        const alpha = pixels[index + 3];
+        const isContent = alpha > 0 && (red > 30 || green > 34 || blue > 34);
+        if (!isContent) continue;
+        litPixels += 1;
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+
+        const isCargo = red > 120 && green > 70 && green < 190 && blue < 90;
+        if (!isCargo) continue;
+        cargoPixels += 1;
+        cargoMinY = Math.min(cargoMinY, y);
+        cargoMaxY = Math.max(cargoMaxY, y);
+      }
+    }
+
+    return {
+      width,
+      height,
+      litPixels,
+      cargoPixels,
+      leftMargin: minX,
+      rightMargin: width - 1 - maxX,
+      topMargin: minY,
+      bottomMargin: height - 1 - maxY,
+      cargoTopMargin: cargoMinY,
+      cargoBottomMargin: height - 1 - cargoMaxY,
+    };
+  }, dataUrl);
+  return { ...frame, screenshotBytes: screenshot.byteLength };
+}
+
 test("calculates the 488 x 380 x 291 benchmark and renders both views", async ({ page }) => {
   await calculateSingleSku(page, "488", "380", "291");
 
@@ -37,8 +102,7 @@ test("calculates the 488 x 380 x 291 benchmark and renders both views", async ({
   await expect(page.locator("#plan-canvas-front")).toHaveCount(1);
   await expect(page.locator(".plan-view-card--front")).toContainText("端视图");
   await expect(page.locator(".plan-view-card--front .plan-view-measure")).toContainText("柜宽");
-  await expect(page.locator(".plan-group-summary")).toContainText("宽向 4排");
-  await expect(page.locator(".plan-group-summary")).toContainText("占宽");
+  await expect(page.locator(".plan-group-summary")).toHaveCount(0);
   await page.locator(".plan-view-switch").getByRole("button", { name: "侧视" }).click();
   await expect(page.locator(".plan-view-card--switchable")).toContainText("侧视图");
   await expect(page.locator("#plan-canvas-top")).toHaveCount(0);
@@ -63,6 +127,25 @@ test("sets the progress slider to full after the initial calculation", async ({ 
   await expect(page.locator("#progress-text")).toHaveText("755 / 755");
   await expect(page.locator("#stack-progress")).toHaveValue("755");
   await expect(page.locator("#stack-progress")).toHaveAttribute("style", /--range-progress:\s*100%/);
+});
+
+test("opens expanded dialogs for 2D and 3D visualizations", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "计算装载" }).click();
+
+  await page.locator(".plan-view-card--switchable").getByRole("button", { name: "放大俯视图" }).click();
+  const planDialog = page.getByRole("dialog", { name: "放大查看 俯视图" });
+  await expect(planDialog).toBeVisible();
+  await expect(planDialog.locator("#expanded-plan-canvas")).toHaveCount(1);
+  await planDialog.getByRole("button", { name: "关闭放大视图" }).click();
+  await expect(planDialog).toHaveCount(0);
+
+  await page.locator(".three-d-panel").getByRole("button", { name: "放大 3D 货柜渲染" }).click();
+  const sceneDialog = page.getByRole("dialog", { name: "放大查看 3D 货柜渲染" });
+  await expect(sceneDialog).toBeVisible();
+  await expect(sceneDialog.locator("#expanded-scene-canvas")).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(sceneDialog).toHaveCount(0);
 });
 
 test("scopes the carton color picker trigger and redraws canvas with the selected color", async ({ page }) => {
@@ -188,6 +271,7 @@ test("imports an Excel batch and shows calculated packing results in a dialog", 
   await page.goto("/");
 
   await page.setInputFiles("#batch-excel-input", "tests/fixtures/batch-import-sample.xlsx");
+  await expect(page.getByRole("status")).toContainText("正在解析 Excel");
 
   const dialog = page.getByRole("dialog", { name: "批量导入结果" });
   await expect(dialog).toBeVisible();
@@ -279,4 +363,101 @@ test("keeps the visualization workspace stable while the control panel scrolls",
   expect(layout.planHeight).toBeGreaterThanOrEqual(360);
   expect(layout.sceneHeight).toBeGreaterThan(200);
   expect(layout.planHeight).toBeGreaterThan(layout.sceneHeight);
+});
+
+test("keeps 2D and 3D panels visible within a 14-inch notebook viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "计算装载" }).click();
+
+  const layout = await page.evaluate(() => {
+    const viewsGrid = document.querySelector(".views-grid") as HTMLElement | null;
+    const planPanel = document.querySelector(".two-d-panel") as HTMLElement | null;
+    const scenePanel = document.querySelector(".three-d-panel") as HTMLElement | null;
+    const resultStack = document.querySelector(".result-stack") as HTMLElement | null;
+    const batchImport = document.querySelector(".batch-import") as HTMLElement | null;
+    if (!viewsGrid || !planPanel || !scenePanel) {
+      throw new Error("Visualization panels are missing");
+    }
+    if (!resultStack || !batchImport) {
+      throw new Error("Control panel result elements are missing");
+    }
+    const gridRect = viewsGrid.getBoundingClientRect();
+    const planRect = planPanel.getBoundingClientRect();
+    const sceneRect = scenePanel.getBoundingClientRect();
+    const resultRect = resultStack.getBoundingClientRect();
+    const batchRect = batchImport.getBoundingClientRect();
+    return {
+      gridClientHeight: viewsGrid.clientHeight,
+      gridScrollHeight: viewsGrid.scrollHeight,
+      gridBottom: Math.round(gridRect.bottom),
+      planHeight: Math.round(planRect.height),
+      sceneHeight: Math.round(sceneRect.height),
+      sceneBottom: Math.round(sceneRect.bottom),
+      resultTop: Math.round(resultRect.top),
+      batchTop: Math.round(batchRect.top),
+    };
+  });
+
+  expect(layout.gridScrollHeight).toBeLessThanOrEqual(layout.gridClientHeight + 2);
+  expect(layout.sceneBottom).toBeLessThanOrEqual(layout.gridBottom + 2);
+  expect(layout.planHeight).toBeGreaterThanOrEqual(360);
+  expect(layout.sceneHeight).toBeGreaterThanOrEqual(280);
+  expect(layout.planHeight).toBeGreaterThan(layout.sceneHeight);
+  expect(layout.resultTop).toBeLessThan(layout.batchTop);
+
+  const desktopFrame = await readSceneCanvasScreenshotFrame(page);
+  expect(desktopFrame.screenshotBytes).toBeGreaterThan(1000);
+  expect(desktopFrame.litPixels).toBeGreaterThan(1000);
+  expect(desktopFrame.cargoPixels).toBeGreaterThan(1000);
+  expect(desktopFrame.cargoBottomMargin).toBeGreaterThan(8);
+  expect(desktopFrame.topMargin).toBeGreaterThan(8);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "计算装载" }).click();
+  const mobileFrame = await readSceneCanvasScreenshotFrame(page);
+  expect(mobileFrame.screenshotBytes).toBeGreaterThan(1000);
+  expect(mobileFrame.litPixels).toBeGreaterThan(1000);
+  expect(mobileFrame.cargoPixels).toBeGreaterThan(1000);
+  expect(mobileFrame.cargoBottomMargin).toBeGreaterThan(8);
+});
+
+test("keeps small viewport page height bounded", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "计算装载" }).click();
+
+  const initial = await page.evaluate(() => ({
+    viewportHeight: window.innerHeight,
+    documentScrollHeight: document.documentElement.scrollHeight,
+    bodyScrollHeight: document.body.scrollHeight,
+    appHeight: Math.round(document.querySelector(".app-shell")?.getBoundingClientRect().height ?? 0),
+    workbenchHeight: Math.round(document.querySelector(".workbench")?.getBoundingClientRect().height ?? 0),
+    viewsHeight: Math.round(document.querySelector(".views-grid")?.getBoundingClientRect().height ?? 0),
+    planHeight: Math.round(document.querySelector(".two-d-panel")?.getBoundingClientRect().height ?? 0),
+    sceneHeight: Math.round(document.querySelector(".three-d-panel")?.getBoundingClientRect().height ?? 0),
+  }));
+
+  await page.mouse.wheel(0, 6000);
+  await page.waitForTimeout(250);
+  const afterScroll = await page.evaluate(() => ({
+    documentScrollHeight: document.documentElement.scrollHeight,
+    bodyScrollHeight: document.body.scrollHeight,
+    scrollY: Math.round(window.scrollY),
+    appHeight: Math.round(document.querySelector(".app-shell")?.getBoundingClientRect().height ?? 0),
+    workbenchHeight: Math.round(document.querySelector(".workbench")?.getBoundingClientRect().height ?? 0),
+    viewsHeight: Math.round(document.querySelector(".views-grid")?.getBoundingClientRect().height ?? 0),
+  }));
+
+  expect(initial.documentScrollHeight).toBeLessThanOrEqual(initial.viewportHeight * 4.6);
+  expect(initial.bodyScrollHeight).toBeLessThanOrEqual(initial.viewportHeight * 4.6);
+  expect(initial.workbenchHeight).toBeLessThanOrEqual(1180);
+  expect(initial.viewsHeight).toBeLessThanOrEqual(1060);
+  expect(initial.planHeight).toBeGreaterThan(0);
+  expect(initial.sceneHeight).toBeGreaterThan(0);
+  expect(afterScroll.documentScrollHeight).toBeLessThanOrEqual(initial.documentScrollHeight + 2);
+  expect(afterScroll.bodyScrollHeight).toBeLessThanOrEqual(initial.bodyScrollHeight + 2);
+  expect(afterScroll.workbenchHeight).toBeLessThanOrEqual(initial.workbenchHeight + 2);
+  expect(afterScroll.viewsHeight).toBeLessThanOrEqual(initial.viewsHeight + 2);
 });

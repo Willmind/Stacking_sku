@@ -1,19 +1,11 @@
 <script setup lang="ts">
-import { Download, FileSpreadsheet, Upload, X } from "@lucide/vue";
-import {
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogOverlay,
-  DialogPortal,
-  DialogRoot,
-  DialogTitle,
-} from "reka-ui";
+import { Download, FileSpreadsheet, Upload } from "@lucide/vue";
 import { readSheet } from "read-excel-file/browser";
-import { computed, ref } from "vue";
+import { computed, nextTick, ref } from "vue";
 import templateFileUrl from "../../assets/batch-import-template.xlsx?url";
 import { createBatchResultWorkbook } from "../../core/batchExport";
 import { calculateBatchPacking, type BatchPackingItem, type BatchPackingRow } from "../../core/batchImport";
+import BaseDialog from "../ui/BaseDialog.vue";
 
 const inputRef = ref<HTMLInputElement | null>(null);
 const isOpen = ref(false);
@@ -21,7 +13,7 @@ const isImporting = ref(false);
 const fileName = ref("");
 const results = ref<BatchPackingItem[]>([]);
 const importError = ref("");
-const MIN_IMPORT_LOADING_MS = 260;
+const MIN_IMPORT_LOADING_MS = 700;
 
 const successCount = computed(() => results.value.filter((item) => item.status === "成功").length);
 const failedCount = computed(() => results.value.filter((item) => item.status !== "成功").length);
@@ -69,6 +61,19 @@ function wait(ms: number) {
   });
 }
 
+function nextFrame() {
+  return new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+  });
+}
+
+async function waitForLoadingPaint() {
+  await nextTick();
+  await nextFrame();
+  await nextFrame();
+  await wait(80);
+}
+
 async function handleFileChange(event: Event) {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
@@ -78,6 +83,7 @@ async function handleFileChange(event: Event) {
   importError.value = "";
   isImporting.value = true;
   const loadingStartedAt = performance.now();
+  await waitForLoadingPaint();
 
   try {
     const sheetRows = await readSheet(file);
@@ -150,71 +156,53 @@ async function handleFileChange(event: Event) {
     </Transition>
   </Teleport>
 
-  <DialogRoot v-model:open="isOpen">
-    <DialogPortal>
-      <Transition name="batch-dialog-overlay">
-        <DialogOverlay class="batch-dialog-overlay" />
-      </Transition>
-      <Transition name="batch-dialog-content">
-        <DialogContent class="batch-dialog-content" :aria-describedby="undefined">
-          <header>
-            <div class="dialog-title-row">
-              <span class="dialog-icon" aria-hidden="true">
-                <FileSpreadsheet :size="18" :stroke-width="2.3" />
+  <BaseDialog v-model:open="isOpen" title="批量导入结果" :description="summaryText">
+    <template #icon>
+      <span class="dialog-icon" aria-hidden="true">
+        <FileSpreadsheet :size="18" :stroke-width="2.3" />
+      </span>
+    </template>
+
+    <div v-if="fileName" class="file-line">文件：{{ fileName }}</div>
+
+    <div v-if="results.length" class="result-table-shell">
+      <table>
+        <thead>
+          <tr>
+            <th>人工码垛数量（原始）</th>
+            <th>尺寸（长宽高 mm）</th>
+            <th>柜型</th>
+            <th>最大装载量</th>
+            <th>差值</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="item in results" :key="item.rowNumber" :class="{ failed: item.status !== '成功' }">
+            <td>{{ formatNumber(item.manualCount) }}</td>
+            <td>{{ item.sizeText || "-" }}</td>
+            <td>{{ item.containerType || "-" }}</td>
+            <td>{{ formatNumber(item.totalBoxes) }}</td>
+            <td>
+              <span v-if="item.difference !== null && item.difference < 0" class="negative-difference-chip">
+                {{ formatNumber(item.difference) }}
               </span>
-              <div>
-                <DialogTitle class="dialog-title">批量导入结果</DialogTitle>
-                <DialogDescription class="dialog-description">{{ summaryText }}</DialogDescription>
-              </div>
-            </div>
-            <DialogClose class="dialog-close" aria-label="关闭弹框">
-              <X :size="17" :stroke-width="2.35" aria-hidden="true" />
-            </DialogClose>
-          </header>
+              <template v-else>{{ formatNumber(item.difference) }}</template>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
-          <div v-if="fileName" class="file-line">文件：{{ fileName }}</div>
+    <p v-else class="dialog-error">{{ importError || "没有读取到可计算的数据" }}</p>
 
-          <div v-if="results.length" class="result-table-shell">
-            <table>
-              <thead>
-                <tr>
-                  <th>人工码垛数量（原始）</th>
-                  <th>尺寸（长宽高 mm）</th>
-                  <th>柜型</th>
-                  <th>最大装载量</th>
-                  <th>差值</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="item in results" :key="item.rowNumber" :class="{ failed: item.status !== '成功' }">
-                  <td>{{ formatNumber(item.manualCount) }}</td>
-                  <td>{{ item.sizeText || "-" }}</td>
-                  <td>{{ item.containerType || "-" }}</td>
-                  <td>{{ formatNumber(item.totalBoxes) }}</td>
-                  <td>
-                    <span v-if="item.difference !== null && item.difference < 0" class="negative-difference-chip">
-                      {{ formatNumber(item.difference) }}
-                    </span>
-                    <template v-else>{{ formatNumber(item.difference) }}</template>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <p v-else class="dialog-error">{{ importError || "没有读取到可计算的数据" }}</p>
-
-          <footer>
-            <button v-if="results.length" class="dialog-action primary" type="button" @click="downloadResults">
-              <Download :size="15" :stroke-width="2.35" aria-hidden="true" />
-              下载结果
-            </button>
-            <DialogClose class="dialog-action">关闭</DialogClose>
-          </footer>
-        </DialogContent>
-      </Transition>
-    </DialogPortal>
-  </DialogRoot>
+    <template #footer>
+      <button v-if="results.length" class="dialog-action primary" type="button" @click="downloadResults">
+        <Download :size="15" :stroke-width="2.35" aria-hidden="true" />
+        下载结果
+      </button>
+      <button class="dialog-action" type="button" @click="isOpen = false">关闭</button>
+    </template>
+  </BaseDialog>
 </template>
 
 <style scoped>
@@ -296,7 +284,7 @@ async function handleFileChange(event: Event) {
 .batch-import-loading {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: 90;
   display: grid;
   place-items: center;
   padding: 24px;
@@ -361,77 +349,6 @@ async function handleFileChange(event: Event) {
   transform: translateY(4px) scale(0.985);
 }
 
-.batch-dialog-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  background: rgba(2, 6, 12, 0.72);
-  backdrop-filter: blur(12px);
-}
-
-.batch-dialog-content {
-  position: fixed;
-  left: 50%;
-  top: 50%;
-  z-index: 41;
-  display: grid;
-  width: min(980px, calc(100vw - 36px));
-  max-height: min(720px, calc(100dvh - 36px));
-  transform: translate(-50%, -50%);
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  gap: 14px;
-  overflow: hidden;
-  border: 1px solid rgba(174, 184, 201, 0.24);
-  border-radius: 8px;
-  background: var(--panel);
-  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.46), var(--panel-shadow);
-  padding: 18px;
-}
-
-.batch-dialog-overlay-enter-active,
-.batch-dialog-overlay-leave-active {
-  transition: opacity 140ms ease;
-}
-
-.batch-dialog-overlay-enter-from,
-.batch-dialog-overlay-leave-to {
-  opacity: 0;
-}
-
-.batch-dialog-content-enter-active {
-  transition: opacity 160ms ease, transform 160ms ease;
-}
-
-.batch-dialog-content-leave-active {
-  transition: opacity 120ms ease, transform 120ms ease;
-}
-
-.batch-dialog-content-enter-from,
-.batch-dialog-content-leave-to {
-  opacity: 0;
-  transform: translate(-50%, calc(-50% + 6px)) scale(0.985);
-}
-
-.batch-dialog-content-enter-to,
-.batch-dialog-content-leave-from {
-  opacity: 1;
-  transform: translate(-50%, -50%) scale(1);
-}
-
-.batch-dialog-content header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 14px;
-}
-
-.dialog-title-row {
-  display: flex;
-  min-width: 0;
-  gap: 10px;
-  align-items: flex-start;
-}
-
 .dialog-icon {
   display: grid;
   width: 34px;
@@ -444,17 +361,9 @@ async function handleFileChange(event: Event) {
   color: var(--accent);
 }
 
-.dialog-title {
-  margin: 0;
-  color: var(--text);
-  font-size: 18px;
-  font-weight: 900;
-}
-
-.dialog-description,
 .file-line,
 .dialog-error {
-  margin: 4px 0 0;
+  margin: 0;
   color: var(--muted);
   font-size: 12px;
   font-weight: 800;
@@ -469,7 +378,6 @@ async function handleFileChange(event: Event) {
   background: rgba(255, 255, 255, 0.04);
 }
 
-.dialog-close,
 .dialog-action {
   border: 1px solid rgba(174, 184, 201, 0.22);
   border-radius: 7px;
@@ -478,15 +386,6 @@ async function handleFileChange(event: Event) {
   font-weight: 900;
 }
 
-.dialog-close {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  flex: 0 0 auto;
-  place-items: center;
-}
-
-.dialog-close:hover,
 .dialog-action:hover {
   border-color: var(--control-border-hover);
   background: rgba(255, 255, 255, 0.075);
@@ -560,12 +459,6 @@ tr.failed td {
   border-radius: 8px;
   background: rgba(255, 112, 102, 0.08);
   color: var(--danger);
-}
-
-footer {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
 }
 
 .dialog-action {

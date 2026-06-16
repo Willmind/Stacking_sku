@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { LayoutPanelTop, PanelBottom, PanelLeft } from "@lucide/vue";
+import { LayoutPanelTop, Maximize2, PanelBottom, PanelLeft } from "@lucide/vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { Component, ComponentPublicInstance } from "vue";
 import { getPlan2DPlaneConfig, renderPlan2D, type Plan2DViewMode } from "../../renderers/plan2d";
 import { usePackingStore } from "../../stores/packingStore";
+import VisualizationDialog from "./VisualizationDialog.vue";
 
 const store = usePackingStore();
 let resizeObserver: ResizeObserver | null = null;
@@ -53,6 +54,9 @@ const activePlanView = computed(() => {
 
 const switchableCanvasRef = ref<HTMLCanvasElement | null>(null);
 const frontCanvasRef = ref<HTMLCanvasElement | null>(null);
+const expandedCanvasRef = ref<HTMLCanvasElement | null>(null);
+const expandedPlanViewMode = ref<Plan2DViewMode | null>(null);
+const showGroupSummary = false;
 
 interface PlanGroup {
   label: string;
@@ -77,6 +81,9 @@ const groupSummary = computed(() => {
   });
 });
 
+const allPlanViews = computed(() => [...switchablePlanViews, frontPlanView]);
+const expandedPlanView = computed(() => allPlanViews.value.find((item) => item.id === expandedPlanViewMode.value) ?? null);
+
 function getViewStatus() {
   const result = store.result;
   if (!result?.pattern) return "等待计算";
@@ -98,6 +105,10 @@ function setFrontCanvasRef(element: Element | ComponentPublicInstance | null) {
   frontCanvasRef.value = element instanceof HTMLCanvasElement ? element : null;
 }
 
+function setExpandedCanvasRef(element: Element | ComponentPublicInstance | null) {
+  expandedCanvasRef.value = element instanceof HTMLCanvasElement ? element : null;
+}
+
 function setActivePlanView(mode: SwitchablePlanViewMode) {
   activePlanViewMode.value = mode;
 }
@@ -116,6 +127,29 @@ function drawView(mode: Plan2DViewMode, canvas: HTMLCanvasElement | null) {
 function draw() {
   drawView(activePlanViewMode.value, switchableCanvasRef.value);
   drawView(frontPlanView.id, frontCanvasRef.value);
+  drawExpandedView();
+}
+
+function drawExpandedView() {
+  if (!expandedPlanViewMode.value) return;
+  drawView(expandedPlanViewMode.value, expandedCanvasRef.value);
+}
+
+function openExpandedView(mode: Plan2DViewMode) {
+  expandedPlanViewMode.value = mode;
+  void nextTick(() => {
+    drawExpandedView();
+    if (expandedCanvasRef.value && resizeObserver) resizeObserver.observe(expandedCanvasRef.value);
+  });
+}
+
+function closeExpandedView() {
+  if (expandedCanvasRef.value && resizeObserver) resizeObserver.unobserve(expandedCanvasRef.value);
+  expandedPlanViewMode.value = null;
+}
+
+function getExpandedSubtitle(mode: Plan2DViewMode) {
+  return `${getViewStatus()} · ${getViewMeasure(mode)}`;
 }
 
 onMounted(() => {
@@ -158,17 +192,28 @@ watch(
             </span>
             <span class="plan-view-axis">{{ activePlanView.axisLabel }}</span>
           </div>
-          <div class="plan-view-switch" role="group" aria-label="切换俯视图和侧视图">
+          <div class="plan-view-card-actions">
+            <div class="plan-view-switch" role="group" aria-label="切换俯视图和侧视图">
+              <button
+                v-for="item in switchablePlanViews"
+                :key="item.id"
+                class="plan-view-switch-button"
+                :class="{ 'is-active': activePlanViewMode === item.id }"
+                type="button"
+                :aria-pressed="activePlanViewMode === item.id"
+                @click="setActivePlanView(item.id)"
+              >
+                {{ item.switchLabel }}
+              </button>
+            </div>
             <button
-              v-for="item in switchablePlanViews"
-              :key="item.id"
-              class="plan-view-switch-button"
-              :class="{ 'is-active': activePlanViewMode === item.id }"
+              class="view-expand-button"
               type="button"
-              :aria-pressed="activePlanViewMode === item.id"
-              @click="setActivePlanView(item.id)"
+              :aria-label="`放大${activePlanView.title}`"
+              :title="`放大${activePlanView.title}`"
+              @click="openExpandedView(activePlanView.id)"
             >
-              {{ item.switchLabel }}
+              <Maximize2 :size="15" :stroke-width="2.3" aria-hidden="true" />
             </button>
           </div>
           <span class="plan-view-status">{{ getViewStatus() }}</span>
@@ -191,6 +236,15 @@ watch(
             </span>
             <span class="plan-view-axis">{{ frontPlanView.axisLabel }}</span>
           </div>
+          <button
+            class="view-expand-button"
+            type="button"
+            :aria-label="`放大${frontPlanView.title}`"
+            :title="`放大${frontPlanView.title}`"
+            @click="openExpandedView(frontPlanView.id)"
+          >
+            <Maximize2 :size="15" :stroke-width="2.3" aria-hidden="true" />
+          </button>
           <span class="plan-view-status">{{ getViewStatus() }}</span>
           <span class="plan-view-measure">{{ getViewMeasure(frontPlanView.id) }}</span>
         </header>
@@ -202,9 +256,24 @@ watch(
         ></canvas>
       </section>
     </div>
-    <div v-if="groupSummary.length" class="plan-group-summary" aria-label="2D 排布分区说明">
+    <div v-if="showGroupSummary && groupSummary.length" class="plan-group-summary" aria-label="2D 排布分区说明">
       <span v-for="item in groupSummary" :key="item">{{ item }}</span>
     </div>
+
+    <VisualizationDialog
+      :open="expandedPlanViewMode !== null"
+      :title="expandedPlanView?.title ?? '2D 视图'"
+      :subtitle="expandedPlanView ? getExpandedSubtitle(expandedPlanView.id) : ''"
+      @close="closeExpandedView"
+    >
+      <canvas
+        id="expanded-plan-canvas"
+        class="expanded-plan-canvas"
+        :ref="(element) => setExpandedCanvasRef(element)"
+        width="1400"
+        height="860"
+      ></canvas>
+    </VisualizationDialog>
   </article>
 </template>
 
@@ -303,6 +372,13 @@ span {
   white-space: nowrap;
 }
 
+.plan-view-card-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+  gap: 8px;
+}
+
 .plan-view-switch {
   display: inline-flex;
   gap: 2px;
@@ -332,9 +408,37 @@ span {
 }
 
 .plan-view-switch-button.is-active {
-  background: var(--accent);
-  color: #04110d;
-  box-shadow: 0 8px 18px rgba(66, 214, 164, 0.18);
+  background: rgba(66, 214, 164, 0.16);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(66, 214, 164, 0.22);
+}
+
+.view-expand-button {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border: 1px solid rgba(174, 184, 201, 0.22);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--muted);
+}
+
+.view-expand-button:hover {
+  border-color: rgba(66, 214, 164, 0.45);
+  background: rgba(66, 214, 164, 0.1);
+  color: var(--accent);
+}
+
+.view-expand-button:active {
+  transform: translateY(1px);
+}
+
+.view-expand-button:focus-visible {
+  outline: 0;
+  box-shadow: var(--focus-ring);
 }
 
 .plan-view-status {
@@ -365,6 +469,10 @@ canvas {
     linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
     rgba(3, 8, 14, 0.72);
   background-size: 28px 28px;
+}
+
+.expanded-plan-canvas {
+  height: 100%;
 }
 
 .plan-group-summary {

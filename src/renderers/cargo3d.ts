@@ -23,6 +23,12 @@ const CARGO_YAW_DRAG_SPEED = 0.01;
 const CARGO_PITCH_DRAG_SPEED = 0.006;
 const CARGO_MIN_PITCH = -1.48;
 const CARGO_MAX_PITCH = 1.48;
+const CARGO_DEFAULT_YAW = -0.72;
+const CARGO_DEFAULT_PITCH = 0.66;
+const CARGO_DEFAULT_ZOOM = 0.9;
+const CARGO_DEFAULT_PAN_Y = -8;
+const CARGO_CAMERA_DISTANCE_FACTOR = 2;
+const CARGO_CAMERA_PAN_SCALE_DIVISOR = 780;
 
 export function getCargoPointerDragMode(event: Pick<PointerEvent, "button" | "shiftKey">): CargoPointerDragMode {
   if (event.button === 2 || (event.button === 0 && event.shiftKey)) return "pan";
@@ -273,11 +279,11 @@ export function createCargoScene(canvas: HTMLCanvasElement): CargoScene {
 
   const target = new THREE.Vector3();
   const cameraState = {
-    yaw: -0.72,
-    pitch: 0.72,
-    zoom: 1,
+    yaw: CARGO_DEFAULT_YAW,
+    pitch: CARGO_DEFAULT_PITCH,
+    zoom: CARGO_DEFAULT_ZOOM,
     panX: 0,
-    panY: 4,
+    panY: CARGO_DEFAULT_PAN_Y,
     mode: null as null | CargoPointerDragMode,
     lastX: 0,
     lastY: 0,
@@ -296,8 +302,8 @@ export function createCargoScene(canvas: HTMLCanvasElement): CargoScene {
   function updateCamera(container: PackingResult["container"]) {
     cameraState.container = container;
     const maxDimension = Math.max(container.length, container.width, container.height) * 0.001;
-    const distance = Math.max(3, (maxDimension * 1.36) / cameraState.zoom);
-    const targetScale = maxDimension / 780;
+    const distance = Math.max(3, (maxDimension * CARGO_CAMERA_DISTANCE_FACTOR) / cameraState.zoom);
+    const targetScale = maxDimension / CARGO_CAMERA_PAN_SCALE_DIVISOR;
     target.set(cameraState.panX * targetScale, cameraState.panY * targetScale, 0);
     const cosPitch = Math.cos(cameraState.pitch);
     camera.position.set(
