@@ -37,8 +37,7 @@ test("calculates the 488 x 380 x 291 benchmark and renders both views", async ({
   await expect(page.locator("#plan-canvas-front")).toHaveCount(1);
   await expect(page.locator(".plan-view-card--front")).toContainText("端视图");
   await expect(page.locator(".plan-view-card--front .plan-view-measure")).toContainText("柜宽");
-  await expect(page.locator(".plan-group-summary")).toContainText("宽向 4排");
-  await expect(page.locator(".plan-group-summary")).toContainText("占宽");
+  await expect(page.locator(".plan-group-summary")).toHaveCount(0);
   await page.locator(".plan-view-switch").getByRole("button", { name: "侧视" }).click();
   await expect(page.locator(".plan-view-card--switchable")).toContainText("侧视图");
   await expect(page.locator("#plan-canvas-top")).toHaveCount(0);
@@ -63,6 +62,25 @@ test("sets the progress slider to full after the initial calculation", async ({ 
   await expect(page.locator("#progress-text")).toHaveText("755 / 755");
   await expect(page.locator("#stack-progress")).toHaveValue("755");
   await expect(page.locator("#stack-progress")).toHaveAttribute("style", /--range-progress:\s*100%/);
+});
+
+test("opens expanded dialogs for 2D and 3D visualizations", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "计算装载" }).click();
+
+  await page.locator(".plan-view-card--switchable").getByRole("button", { name: "放大俯视图" }).click();
+  const planDialog = page.getByRole("dialog", { name: "放大查看 俯视图" });
+  await expect(planDialog).toBeVisible();
+  await expect(planDialog.locator("#expanded-plan-canvas")).toHaveCount(1);
+  await planDialog.getByRole("button", { name: "关闭放大视图" }).click();
+  await expect(planDialog).toHaveCount(0);
+
+  await page.locator(".three-d-panel").getByRole("button", { name: "放大 3D 货柜渲染" }).click();
+  const sceneDialog = page.getByRole("dialog", { name: "放大查看 3D 货柜渲染" });
+  await expect(sceneDialog).toBeVisible();
+  await expect(sceneDialog.locator("#expanded-scene-canvas")).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(sceneDialog).toHaveCount(0);
 });
 
 test("scopes the carton color picker trigger and redraws canvas with the selected color", async ({ page }) => {
@@ -188,6 +206,7 @@ test("imports an Excel batch and shows calculated packing results in a dialog", 
   await page.goto("/");
 
   await page.setInputFiles("#batch-excel-input", "tests/fixtures/batch-import-sample.xlsx");
+  await expect(page.getByRole("status")).toContainText("正在解析 Excel");
 
   const dialog = page.getByRole("dialog", { name: "批量导入结果" });
   await expect(dialog).toBeVisible();
@@ -278,5 +297,37 @@ test("keeps the visualization workspace stable while the control panel scrolls",
   expect(layout.planTop).toBeLessThan(layout.sceneTop);
   expect(layout.planHeight).toBeGreaterThanOrEqual(360);
   expect(layout.sceneHeight).toBeGreaterThan(200);
+  expect(layout.planHeight).toBeGreaterThan(layout.sceneHeight);
+});
+
+test("keeps 2D and 3D panels visible within a 14-inch notebook viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "计算装载" }).click();
+
+  const layout = await page.evaluate(() => {
+    const viewsGrid = document.querySelector(".views-grid") as HTMLElement | null;
+    const planPanel = document.querySelector(".two-d-panel") as HTMLElement | null;
+    const scenePanel = document.querySelector(".three-d-panel") as HTMLElement | null;
+    if (!viewsGrid || !planPanel || !scenePanel) {
+      throw new Error("Visualization panels are missing");
+    }
+    const gridRect = viewsGrid.getBoundingClientRect();
+    const planRect = planPanel.getBoundingClientRect();
+    const sceneRect = scenePanel.getBoundingClientRect();
+    return {
+      gridClientHeight: viewsGrid.clientHeight,
+      gridScrollHeight: viewsGrid.scrollHeight,
+      gridBottom: Math.round(gridRect.bottom),
+      planHeight: Math.round(planRect.height),
+      sceneHeight: Math.round(sceneRect.height),
+      sceneBottom: Math.round(sceneRect.bottom),
+    };
+  });
+
+  expect(layout.gridScrollHeight).toBeLessThanOrEqual(layout.gridClientHeight + 2);
+  expect(layout.sceneBottom).toBeLessThanOrEqual(layout.gridBottom + 2);
+  expect(layout.planHeight).toBeGreaterThanOrEqual(360);
+  expect(layout.sceneHeight).toBeGreaterThanOrEqual(280);
   expect(layout.planHeight).toBeGreaterThan(layout.sceneHeight);
 });

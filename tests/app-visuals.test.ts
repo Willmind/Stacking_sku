@@ -11,6 +11,15 @@ const plan2dViewSource = fs.readFileSync(
   path.join(__dirname, "..", "src/components/visualizations/Plan2DView.vue"),
   "utf8",
 );
+const cargo3dViewSource = fs.readFileSync(
+  path.join(__dirname, "..", "src/components/visualizations/Cargo3DView.vue"),
+  "utf8",
+);
+const visualizationDialogSource = fs.existsSync(
+  path.join(__dirname, "..", "src/components/visualizations/VisualizationDialog.vue"),
+)
+  ? fs.readFileSync(path.join(__dirname, "..", "src/components/visualizations/VisualizationDialog.vue"), "utf8")
+  : "";
 const batchImportDialogSource = fs.readFileSync(
   path.join(__dirname, "..", "src/components/controls/BatchImportDialog.vue"),
   "utf8",
@@ -21,6 +30,9 @@ const progressControlSource = fs.readFileSync(
 );
 const skuEditorSource = fs.readFileSync(path.join(__dirname, "..", "src/components/controls/SkuEditor.vue"), "utf8");
 const baseSelectSource = fs.readFileSync(path.join(__dirname, "..", "src/components/ui/BaseSelect.vue"), "utf8");
+const baseDialogSource = fs.existsSync(path.join(__dirname, "..", "src/components/ui/BaseDialog.vue"))
+  ? fs.readFileSync(path.join(__dirname, "..", "src/components/ui/BaseDialog.vue"), "utf8")
+  : "";
 const baseColorPickerSource = fs.existsSync(path.join(__dirname, "..", "src/components/ui/BaseColorPicker.vue"))
   ? fs.readFileSync(path.join(__dirname, "..", "src/components/ui/BaseColorPicker.vue"), "utf8")
   : "";
@@ -82,14 +94,19 @@ describe("2D plan source guards", () => {
     );
   });
 
-  it("shows group labels in an external summary area", () => {
-    assert.match(plan2dViewSource, /plan-group-summary/);
+  it("keeps group summary logic available while hiding the summary area by default", () => {
+    assert.match(plan2dViewSource, /const showGroupSummary = false/);
+    assert.match(plan2dViewSource, /showGroupSummary && groupSummary\.length/);
     assert.match(plan2dViewSource, /groupSummary/);
     assert.match(plan2dViewSource, /占长|占宽/);
   });
 
   it("keeps top and side views switchable next to the persistent front view", () => {
     assert.match(appSource, /\.views-grid\s*\{[\s\S]*grid-template-rows:/);
+    assert.match(appSource, /grid-template-rows:\s*minmax\(360px,\s*1\.18fr\)\s*minmax\(220px,\s*0\.82fr\)/);
+    assert.match(appSource, /\.views-grid\s*\{[\s\S]*overflow:\s*hidden/);
+    assert.doesNotMatch(appSource, /grid-template-rows:\s*minmax\(620px,\s*1\.22fr\)\s*minmax\(380px,\s*0\.78fr\)/);
+    assert.doesNotMatch(appSource, /\.views-grid\s*\{[\s\S]*overflow-y:\s*auto/);
     assert.match(plan2dViewSource, /plan-view-grid/);
     assert.match(plan2dViewSource, /activePlanView/);
     assert.match(plan2dViewSource, /frontPlanView/);
@@ -153,6 +170,45 @@ describe("2D plan source guards", () => {
     assert.doesNotMatch(plan2dSource, /255,\s*112,\s*102/);
     assert.doesNotMatch(plan2dSource, /红色区域为顶部角件避让区/);
   });
+
+  it("draws axis guide annotations outside the 2D container rectangle", () => {
+    assert.match(plan2dSource, /function drawOuterAxisGuides/);
+    assert.match(plan2dSource, /showLabels \? \(compactCanvas \? 34 : 48\) : \(compactCanvas \? 54 : 68\)/);
+    assert.doesNotMatch(plan2dSource, /function drawInnerAxisGuides/);
+  });
+
+  it("uses an upright compact label for the vertical axis guide", () => {
+    assert.match(plan2dSource, /function drawStackedGuideLabel/);
+    assert.match(plan2dSource, /function formatAxisGuideLines/);
+    assert.match(plan2dSource, /getPlan2DVerticalGuideLabelLayout/);
+    assert.match(plan2dSource, /yGuideX,\s*yStart:\s*y1,\s*yEnd:\s*y2/);
+    assert.doesNotMatch(plan2dSource, /boxX \+ 6,\s*boxY - 58/);
+    assert.doesNotMatch(plan2dSource, /formatAxisGuideText\(model\.y\),\s*yGuideX[^)]*-\s*Math\.PI\s*\/\s*2/);
+  });
+
+  it("provides expanded dialogs for detailed 2D and 3D inspection", () => {
+    assert.match(baseDialogSource, /DialogRoot/);
+    assert.match(baseDialogSource, /<DialogPortal v-if="dialogOpen">/);
+    assert.match(baseDialogSource, /base-dialog-overlay/);
+    assert.match(baseDialogSource, /DIALOG_ANIMATION_MS = 240/);
+    assert.match(baseDialogSource, /isClosing/);
+    assert.match(baseDialogSource, /base-dialog-content--closing/);
+    assert.match(baseDialogSource, /@keyframes base-dialog-content-in/);
+    assert.match(baseDialogSource, /@keyframes base-dialog-content-out/);
+    assert.match(baseDialogSource, /base-dialog-content--fullscreen/);
+    assert.match(visualizationDialogSource, /BaseDialog/);
+    assert.match(visualizationDialogSource, /open:\s*boolean/);
+    assert.match(plan2dViewSource, /Maximize2/);
+    assert.match(plan2dViewSource, /VisualizationDialog/);
+    assert.match(plan2dViewSource, /:open="expandedPlanViewMode !== null"/);
+    assert.doesNotMatch(plan2dViewSource, /<VisualizationDialog\s+v-if/);
+    assert.match(plan2dViewSource, /expanded-plan-canvas/);
+    assert.match(cargo3dViewSource, /Maximize2/);
+    assert.match(cargo3dViewSource, /VisualizationDialog/);
+    assert.match(cargo3dViewSource, /:open="isExpanded"/);
+    assert.doesNotMatch(cargo3dViewSource, /<VisualizationDialog\s+v-if/);
+    assert.match(cargo3dViewSource, /expanded-scene-canvas/);
+  });
 });
 
 describe("batch import UI source guards", () => {
@@ -160,6 +216,9 @@ describe("batch import UI source guards", () => {
     assert.match(batchImportDialogSource, /const isImporting = ref\(false\)/);
     assert.match(batchImportDialogSource, /:disabled="isImporting"/);
     assert.match(batchImportDialogSource, /解析中\.\.\./);
+    assert.match(batchImportDialogSource, /const MIN_IMPORT_LOADING_MS = 700/);
+    assert.match(batchImportDialogSource, /function waitForLoadingPaint/);
+    assert.match(batchImportDialogSource, /await waitForLoadingPaint\(\)/);
     assert.match(batchImportDialogSource, /batch-import-spinner/);
     assert.match(batchImportDialogSource, /@keyframes batch-import-spin/);
     assert.match(batchImportDialogSource, /<Transition name="batch-import-loading"/);
@@ -170,10 +229,9 @@ describe("batch import UI source guards", () => {
     assert.match(batchImportDialogSource, /position:\s*fixed/);
     assert.match(batchImportDialogSource, /\.batch-import-loading-card/);
     assert.match(batchImportDialogSource, /\.batch-import-loading-enter-active/);
-    assert.match(batchImportDialogSource, /<Transition name="batch-dialog-overlay"/);
-    assert.match(batchImportDialogSource, /<Transition name="batch-dialog-content"/);
-    assert.match(batchImportDialogSource, /\.batch-dialog-content-enter-active/);
-    assert.match(batchImportDialogSource, /\.batch-dialog-content-leave-active/);
+    assert.match(batchImportDialogSource, /BaseDialog/);
+    assert.doesNotMatch(batchImportDialogSource, /DialogRoot/);
+    assert.doesNotMatch(batchImportDialogSource, /batch-dialog-content-enter-active/);
   });
 
   it("highlights only negative batch import differences as danger chips", () => {

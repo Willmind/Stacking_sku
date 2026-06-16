@@ -188,14 +188,12 @@ p {
 .views-grid {
   display: grid;
   grid-template-columns: 1fr;
-  grid-template-rows: minmax(620px, 1.22fr) minmax(380px, 0.78fr);
+  grid-template-rows: minmax(360px, 1.18fr) minmax(220px, 0.82fr);
   gap: 14px;
   height: 100%;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
   overscroll-behavior: contain;
-  padding-right: 4px;
-  scrollbar-gutter: stable;
 }
 
 .view-panel {
