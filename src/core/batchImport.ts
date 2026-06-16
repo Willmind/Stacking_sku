@@ -1,9 +1,8 @@
 import {
   CONTAINERS,
-  calculatePacking,
+  calculatePackingTotalBoxes,
   type CartonSpec,
   type ContainerSpec,
-  type PackingResult,
 } from "./packing";
 
 export const BATCH_SIZE_COLUMN = "尺寸（长宽高 mm）";
@@ -95,6 +94,10 @@ function formatSize({ length, width, height }: CartonSpec) {
   return `${length}*${width}*${height}`;
 }
 
+function createMaxLoadCacheKey(containerType: BatchContainerType, carton: CartonSpec) {
+  return `${containerType}:${carton.length}:${carton.width}:${carton.height}`;
+}
+
 function createFailedItem(rowNumber: number, row: BatchPackingRow, error: string): BatchPackingItem {
   return {
     rowNumber,
@@ -116,9 +119,8 @@ function createSuccessItem(
   carton: CartonSpec,
   containerType: BatchContainerType,
   manualCount: number,
-  result: PackingResult,
+  totalBoxes: number,
 ): BatchPackingItem {
-  const totalBoxes = result.totalBoxes;
   return {
     rowNumber,
     sizeText: formatSize(carton),
@@ -134,6 +136,8 @@ function createSuccessItem(
 }
 
 export function calculateBatchPacking(rows: BatchPackingRow[]): BatchPackingItem[] {
+  const maxLoadCache = new Map<string, number>();
+
   return rows.flatMap((row, index) => {
     const rowNumber = index + 2;
     const manualValue = readCell(row, BATCH_MANUAL_COLUMN);
@@ -149,8 +153,13 @@ export function calculateBatchPacking(rows: BatchPackingRow[]): BatchPackingItem
       const containerType = parseContainerType(containerValue);
       const manualCount = parseManualCount(manualValue);
       const container = CONTAINERS[containerType] as Required<ContainerSpec>;
-      const result = calculatePacking(container, carton) as PackingResult;
-      return [createSuccessItem(rowNumber, carton, containerType, manualCount, result)];
+      const cacheKey = createMaxLoadCacheKey(containerType, carton);
+      let totalBoxes = maxLoadCache.get(cacheKey);
+      if (totalBoxes === undefined) {
+        totalBoxes = calculatePackingTotalBoxes(container, carton);
+        maxLoadCache.set(cacheKey, totalBoxes);
+      }
+      return [createSuccessItem(rowNumber, carton, containerType, manualCount, totalBoxes)];
     } catch (caught) {
       return [createFailedItem(rowNumber, row, caught instanceof Error ? caught.message : "解析失败")];
     }

@@ -59,6 +59,44 @@ describe("batch import", () => {
     assert.match(results[2].error || "", /人工码垛数量/);
   });
 
+  it("calculates small-carton batch rows without building full visual positions", () => {
+    const startedAt = performance.now();
+    const results = calculateBatchPacking([
+      { "人工码垛数量（原始）": 5200, "尺寸（长宽高 mm）": "255*230*225", 柜型: "40HQ" },
+      { "人工码垛数量（原始）": 4600, "尺寸（长宽高 mm）": "310*225*210", 柜型: "40HQ" },
+      { "人工码垛数量（原始）": 4100, "尺寸（长宽高 mm）": "305*240*230", 柜型: "40HQ" },
+    ]);
+    const elapsed = performance.now() - startedAt;
+
+    assert.deepEqual(
+      results.map((result) => result.totalBoxes),
+      [5280, 4812, 4158],
+    );
+    assert.deepEqual(
+      results.map((result) => result.difference),
+      [80, 212, 58],
+    );
+    assert.ok(elapsed < 1000, `small-carton batch calculation took ${elapsed.toFixed(1)}ms`);
+  });
+
+  it("reuses maximum-load calculations for repeated carton specs", () => {
+    const repeatedRows = Array.from({ length: 40 }, (_, index) => ({
+      "人工码垛数量（原始）": 5200 + index,
+      "尺寸（长宽高 mm）": "255*230*225",
+      柜型: "40HQ",
+    }));
+
+    const startedAt = performance.now();
+    const results = calculateBatchPacking(repeatedRows);
+    const elapsed = performance.now() - startedAt;
+
+    assert.equal(results.length, 40);
+    assert.ok(results.every((result) => result.totalBoxes === 5280));
+    assert.equal(results[0].difference, 80);
+    assert.equal(results[39].difference, 41);
+    assert.ok(elapsed < 800, `repeated carton batch calculation took ${elapsed.toFixed(1)}ms`);
+  });
+
   it("exports batch results as a readable xlsx workbook", () => {
     const results = calculateBatchPacking([
       { "人工码垛数量（原始）": 1740, "尺寸（长宽高 mm）": "465*360*291", 柜型: "40HQ" },
