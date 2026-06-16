@@ -806,6 +806,72 @@ export type {
     };
   }
 
+  function layerCollidesWithTopBand(stackIndex, cartonHeight, container, cornerBlock) {
+    return intersects(
+      stackIndex * cartonHeight,
+      cartonHeight,
+      container.height - cornerBlock.height,
+      cornerBlock.height,
+    );
+  }
+
+  function countAcceptedPositionsForStack(basePositions, stackIndex, container, cornerBlock) {
+    const acceptedInStackBand = [];
+
+    for (const basePosition of orderFloorPositionsForLoading(basePositions)) {
+      const position = {
+        ...basePosition,
+        z: stackIndex * basePosition.dz,
+        stackIndex,
+      };
+      const acceptedRects = acceptedInStackBand.map(floorRectFromPosition);
+      let acceptedPosition = null;
+
+      if (collidesCornerBlock(position, container, cornerBlock)) {
+        acceptedPosition = findCornerSafePosition(position, acceptedInStackBand, container, cornerBlock);
+      } else if (acceptedInStackBand.some((accepted) => matchesPositionFootprint(position, accepted))) {
+        acceptedPosition = findCornerDisplacedPosition(position, acceptedInStackBand, container, cornerBlock);
+      } else if (overlapsAnyFloorRect(position, acceptedRects)) {
+        acceptedPosition = findCornerDisplacedPosition(position, acceptedInStackBand, container, cornerBlock);
+      } else {
+        acceptedPosition = position;
+      }
+
+      if (acceptedPosition) {
+        acceptedInStackBand.push(acceptedPosition);
+      }
+    }
+
+    return acceptedInStackBand.length;
+  }
+
+  function evaluateCandidateTotal(container, carton, pattern, cornerBlock) {
+    const basePositions = [
+      ...createLayerPositions(pattern, carton.height),
+      ...(pattern.extraLayerPositions || []),
+    ].sort((a, b) => a.x - b.x || a.y - b.y);
+    const layerCount = Math.floor(container.height / carton.height);
+    const perLayerBoxCount = basePositions.length;
+    const affectedStackIndexes = [];
+
+    for (let index = 0; index < layerCount; index += 1) {
+      if (layerCollidesWithTopBand(index, carton.height, container, cornerBlock)) {
+        affectedStackIndexes.push(index);
+      }
+    }
+
+    let totalBoxes = perLayerBoxCount * (layerCount - affectedStackIndexes.length);
+    for (const stackIndex of affectedStackIndexes) {
+      totalBoxes += countAcceptedPositionsForStack(basePositions, stackIndex, container, cornerBlock);
+    }
+
+    return {
+      totalBoxes,
+      blockedByCornerTotal: perLayerBoxCount * layerCount - totalBoxes,
+      perLayerBoxCount,
+    };
+  }
+
   function compareResults(next, current) {
     if (!current) return true;
     if (next.totalBoxes !== current.totalBoxes) {
@@ -816,6 +882,20 @@ export type {
     }
     if (next.pattern.perLayerBoxCount !== current.pattern.perLayerBoxCount) {
       return next.pattern.perLayerBoxCount > current.pattern.perLayerBoxCount;
+    }
+    return false;
+  }
+
+  function compareCandidateTotals(next, current) {
+    if (!current) return true;
+    if (next.totalBoxes !== current.totalBoxes) {
+      return next.totalBoxes > current.totalBoxes;
+    }
+    if (next.blockedByCornerTotal !== current.blockedByCornerTotal) {
+      return next.blockedByCornerTotal < current.blockedByCornerTotal;
+    }
+    if (next.perLayerBoxCount !== current.perLayerBoxCount) {
+      return next.perLayerBoxCount > current.perLayerBoxCount;
     }
     return false;
   }
@@ -869,6 +949,27 @@ export type {
     }
 
     return best;
+  }
+
+  function calculatePackingTotalBoxes(containerInput, cartonInput, options = {}) {
+    const container = normalizeContainer(containerInput);
+    const carton = normalizeCarton(cartonInput);
+    const cornerBlock = {
+      ...DEFAULT_CORNER_BLOCK,
+      ...(options.cornerBlock || {}),
+    };
+
+    const candidates = enumerateCandidates(container, carton);
+    let best = null;
+
+    for (const candidate of candidates) {
+      const result = evaluateCandidateTotal(container, carton, candidate, cornerBlock);
+      if (compareCandidateTotals(result, best)) {
+        best = result;
+      }
+    }
+
+    return best ? best.totalBoxes : 0;
   }
 
   function calculateMultiSkuPacking(containerInput, skuInputs, options = {}) {
@@ -929,6 +1030,7 @@ export {
   DEFAULT_CORNER_BLOCK,
   LOADING_STRATEGIES,
   calculatePacking,
+  calculatePackingTotalBoxes,
   calculateMultiSkuPacking,
   generateBoxPositions,
   collidesCornerBlock,
