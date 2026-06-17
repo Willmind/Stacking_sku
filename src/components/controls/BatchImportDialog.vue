@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Download, FileSpreadsheet, Upload } from "@lucide/vue";
 import { readSheet } from "read-excel-file/browser";
-import { computed, nextTick, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref } from "vue";
 import templateFileUrl from "../../assets/batch-import-template.xlsx?url";
 import { createBatchResultWorkbook } from "../../core/batchExport";
 import { calculateBatchPacking, type BatchPackingItem, type BatchPackingRow } from "../../core/batchImport";
@@ -14,6 +14,9 @@ const fileName = ref("");
 const results = ref<BatchPackingItem[]>([]);
 const importError = ref("");
 const MIN_IMPORT_LOADING_MS = 700;
+const LONG_IMPORT_NOTICE_MS = 2500;
+const isLongImporting = ref(false);
+let longImportTimer: number | null = null;
 
 const successCount = computed(() => results.value.filter((item) => item.status === "成功").length);
 const failedCount = computed(() => results.value.filter((item) => item.status !== "成功").length);
@@ -21,6 +24,15 @@ const summaryText = computed(() => {
   if (!results.value.length) return importError.value || "没有读取到可计算的数据";
   return `共 ${results.value.length} 条 · 成功 ${successCount.value} 条 · 异常 ${failedCount.value} 条`;
 });
+const loadingDescription = computed(() =>
+  isLongImporting.value ? "文件较大，正在继续计算..." : "请稍候，正在读取表格并计算装载结果",
+);
+
+function clearLongImportTimer() {
+  if (longImportTimer === null) return;
+  window.clearTimeout(longImportTimer);
+  longImportTimer = null;
+}
 
 function formatNumber(value: number | null) {
   return value === null ? "-" : value.toLocaleString("zh-CN");
@@ -81,7 +93,13 @@ async function handleFileChange(event: Event) {
 
   fileName.value = file.name;
   importError.value = "";
+  isLongImporting.value = false;
   isImporting.value = true;
+  clearLongImportTimer();
+  longImportTimer = window.setTimeout(() => {
+    isLongImporting.value = true;
+    longImportTimer = null;
+  }, LONG_IMPORT_NOTICE_MS);
   const loadingStartedAt = performance.now();
   await waitForLoadingPaint();
 
@@ -104,15 +122,19 @@ async function handleFileChange(event: Event) {
     results.value = [];
     importError.value = caught instanceof Error ? caught.message : "Excel 解析失败";
   } finally {
+    clearLongImportTimer();
     const loadingElapsed = performance.now() - loadingStartedAt;
     if (loadingElapsed < MIN_IMPORT_LOADING_MS) {
       await wait(MIN_IMPORT_LOADING_MS - loadingElapsed);
     }
     isImporting.value = false;
+    isLongImporting.value = false;
     input.value = "";
     isOpen.value = true;
   }
 }
+
+onBeforeUnmount(clearLongImportTimer);
 </script>
 
 <template>
@@ -147,9 +169,19 @@ async function handleFileChange(event: Event) {
       <div v-if="isImporting" class="batch-import-loading" role="status" aria-live="polite">
         <div class="batch-import-loading-card">
           <span class="batch-import-spinner batch-import-loading-spinner" aria-hidden="true"></span>
-          <div>
-            <strong>正在解析 Excel</strong>
-            <span>请稍候，正在批量计算装载结果</span>
+          <div class="batch-import-loading-content">
+            <div class="batch-import-loading-copy">
+              <strong>正在解析 Excel</strong>
+              <span>{{ loadingDescription }}</span>
+            </div>
+            <span
+              class="batch-import-progress"
+              role="progressbar"
+              aria-label="Excel 导入进度"
+              aria-valuetext="正在处理"
+            >
+              <span aria-hidden="true"></span>
+            </span>
           </div>
         </div>
       </div>
@@ -304,7 +336,13 @@ async function handleFileChange(event: Event) {
   padding: 16px 18px;
 }
 
-.batch-import-loading-card div {
+.batch-import-loading-content {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+}
+
+.batch-import-loading-copy {
   display: grid;
   gap: 3px;
 }
@@ -321,11 +359,40 @@ async function handleFileChange(event: Event) {
   font-weight: 800;
 }
 
+.batch-import-progress {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(174, 184, 201, 0.16);
+}
+
+.batch-import-progress span {
+  position: absolute;
+  inset-block: 0;
+  left: -42%;
+  width: 42%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(66, 214, 164, 0), rgba(66, 214, 164, 0.92), rgba(104, 166, 255, 0.88));
+  animation: batch-import-progress 1080ms ease-in-out infinite;
+}
+
 .batch-import-loading-spinner {
   width: 24px;
   height: 24px;
   flex: 0 0 auto;
   border-width: 3px;
+}
+
+@keyframes batch-import-progress {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(338%);
+  }
 }
 
 .batch-import-loading-enter-active,
