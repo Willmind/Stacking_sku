@@ -272,6 +272,7 @@ test("imports an Excel batch and shows calculated packing results in a dialog", 
 
   await page.setInputFiles("#batch-excel-input", "tests/fixtures/batch-import-sample.xlsx");
   await expect(page.getByRole("status")).toContainText("正在解析 Excel");
+  await expect(page.getByRole("progressbar", { name: "Excel 导入进度" })).toBeVisible();
 
   const dialog = page.getByRole("dialog", { name: "批量导入结果" });
   await expect(dialog).toBeVisible();
