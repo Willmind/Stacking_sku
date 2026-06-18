@@ -7,32 +7,42 @@ import BaseNumberField from "../ui/BaseNumberField.vue";
 const props = defineProps<{
   sku: SkuInput;
   index: number;
+  isDragging?: boolean;
+  isDropTarget?: boolean;
 }>();
 
 const emit = defineEmits<{
   update: [index: number, patch: Partial<SkuInput>];
-  dragStart: [index: number];
-  dropOn: [index: number];
+  dragStart: [index: number, event: PointerEvent];
 }>();
 
-function updateSkuNumber(key: "length" | "width" | "height" | "target", value: number) {
-  emit("update", props.index, { [key]: value });
+function updateSkuTarget(value: number) {
+  emit("update", props.index, { target: value });
+}
+
+function startDrag(event: PointerEvent) {
+  if (event.button !== 0) return;
+  event.preventDefault();
+  emit("dragStart", props.index, event);
 }
 </script>
 
 <template>
   <article
     class="sku-card"
-    draggable="true"
-    @dragstart="emit('dragStart', props.index)"
-    @dragover.prevent
-    @drop="emit('dropOn', props.index)"
+    :class="{ 'sku-card--dragging': props.isDragging, 'sku-card--drop-target': props.isDropTarget }"
+    :data-sku-drop-index="props.index"
   >
     <div class="sku-card-header">
-      <button class="drag-handle" type="button" aria-label="拖动 SKU">
+      <button
+        class="drag-handle"
+        type="button"
+        aria-label="拖动 SKU"
+        @pointerdown="startDrag"
+      >
         <GripVertical :size="16" :stroke-width="2.35" aria-hidden="true" />
       </button>
-      <strong>SKU {{ sku.label }}</strong>
+      <strong>{{ sku.label }}</strong>
       <BaseColorPicker
         :id="`sku-${sku.label}-color`"
         :model-value="sku.color"
@@ -42,10 +52,14 @@ function updateSkuNumber(key: "length" | "width" | "height" | "target", value: n
       />
     </div>
     <div class="sku-fields">
-      <BaseNumberField :id="`sku-${sku.label}-length`" label="长 mm" class="sku-length" :model-value="sku.length" :min="1" @update:model-value="updateSkuNumber('length', $event)" />
-      <BaseNumberField :id="`sku-${sku.label}-width`" label="宽 mm" class="sku-width" :model-value="sku.width" :min="1" @update:model-value="updateSkuNumber('width', $event)" />
-      <BaseNumberField :id="`sku-${sku.label}-height`" label="高 mm" class="sku-height" :model-value="sku.height" :min="1" @update:model-value="updateSkuNumber('height', $event)" />
-      <BaseNumberField :id="`sku-${sku.label}-target`" label="目标" class="sku-target" :model-value="sku.target" :min="1" @update:model-value="updateSkuNumber('target', $event)" />
+      <BaseNumberField
+        :id="`sku-${sku.label}-target`"
+        label="目标数量"
+        class="sku-target"
+        :model-value="sku.target"
+        :min="1"
+        @update:model-value="updateSkuTarget"
+      />
     </div>
   </article>
 </template>
@@ -58,6 +72,16 @@ function updateSkuNumber(key: "length" | "width" | "height" | "target", value: n
   border: 1px solid var(--line);
   border-radius: 8px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.048), rgba(255, 255, 255, 0.022));
+}
+
+.sku-card--dragging {
+  border-color: rgba(66, 214, 164, 0.58);
+  opacity: 0.42;
+}
+
+.sku-card--drop-target {
+  border-color: rgba(92, 237, 193, 0.78);
+  background: rgba(66, 214, 164, 0.1);
 }
 
 .sku-card-header {
@@ -76,6 +100,7 @@ function updateSkuNumber(key: "length" | "width" | "height" | "target", value: n
   border-radius: 7px;
   background: linear-gradient(180deg, var(--control-bg), var(--control-bg-strong));
   color: var(--muted);
+  cursor: grab;
   font-weight: 900;
 }
 
@@ -85,9 +110,13 @@ function updateSkuNumber(key: "length" | "width" | "height" | "target", value: n
   background: linear-gradient(180deg, var(--control-bg-hover), var(--control-bg));
 }
 
+.drag-handle:active {
+  cursor: grabbing;
+}
+
 .sku-fields {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
 }
 

@@ -50,10 +50,29 @@ export type {
 
   const MIN_DOOR_SIDE_REMAINDER_CLEARANCE = DEFAULT_CORNER_BLOCK.length;
 
+  const POSITIVE_NUMBER_LABELS = {
+    "container length": "柜体长度",
+    "container width": "柜体宽度",
+    "container height": "柜体高度",
+    "carton length": "纸箱长度",
+    "carton width": "纸箱宽度",
+    "carton height": "纸箱高度",
+    "target quantity": "目标数量",
+  };
+
+  function formatInputName(name) {
+    const skuFieldMatch = name.match(/^(.*) (target quantity|carton length|carton width|carton height)$/);
+    if (skuFieldMatch) {
+      const [, label, key] = skuFieldMatch;
+      return `${label} ${POSITIVE_NUMBER_LABELS[key] || key}`;
+    }
+    return POSITIVE_NUMBER_LABELS[name] || name;
+  }
+
   function positiveNumber(value, name) {
     const number = Number(value);
     if (!Number.isFinite(number) || number <= 0) {
-      throw new Error(`${name} must be a positive number`);
+      throw new Error(`${formatInputName(name)}必须为正数`);
     }
     return number;
   }
@@ -61,7 +80,7 @@ export type {
   function normalizeContainer(input) {
     const source = typeof input === "string" ? CONTAINERS[input] : input;
     if (!source) {
-      throw new Error("container must be one of 20GP, 40GP, 40HQ, or a dimension object");
+      throw new Error("柜型必须为 20GP、40GP、40HQ，或传入自定义柜体尺寸对象");
     }
 
     return {
@@ -83,12 +102,12 @@ export type {
 
   function normalizeSku(input, index) {
     if (!input || typeof input !== "object") {
-      throw new Error("SKU entry must be an object");
+      throw new Error("SKU 条目必须为对象");
     }
     const label = input.label || String.fromCharCode(65 + index);
     const target = positiveNumber(input.target, `${label} target quantity`);
     if (!Number.isInteger(target)) {
-      throw new Error(`${label} target quantity must be an integer`);
+      throw new Error(`${label} 目标数量必须为整数`);
     }
     return {
       label,
@@ -101,18 +120,32 @@ export type {
   }
 
   function normalizeSkus(inputs) {
-    if (!Array.isArray(inputs) || inputs.length < 2 || inputs.length > 10) {
-      throw new Error("multi-SKU mode requires 2 to 10 SKUs");
+    if (!Array.isArray(inputs) || inputs.length < 2 || inputs.length > 5) {
+      throw new Error("多 SKU 模式只支持 2 到 5 个 SKU");
     }
     const skus = inputs.map(normalizeSku);
     const labels = new Set();
     for (const sku of skus) {
       if (labels.has(sku.label)) {
-        throw new Error(`SKU label "${sku.label}" must be unique`);
+        throw new Error(`SKU 名称 "${sku.label}" 不能重复`);
       }
       labels.add(sku.label);
     }
     return skus;
+  }
+
+  function assertSameSkuDimensions(skus) {
+    const [firstSku] = skus;
+    const mismatched = skus.find(
+      (sku) =>
+        sku.length !== firstSku.length ||
+        sku.width !== firstSku.width ||
+        sku.height !== firstSku.height,
+    );
+
+    if (mismatched) {
+      throw new Error("多 SKU 模式仅支持所有 SKU 使用同尺寸纸箱");
+    }
   }
 
   function getOrientations(carton) {
@@ -974,9 +1007,10 @@ export type {
 
   function calculateMultiSkuPacking(containerInput, skuInputs, options = {}) {
     const skus = normalizeSkus(skuInputs);
+    assertSameSkuDimensions(skus);
     const strategy = options.strategy || LOADING_STRATEGIES.MULTI_DESTINATION;
     if (!Object.values(LOADING_STRATEGIES).includes(strategy)) {
-      throw new Error("strategy must be multi-destination or same-destination");
+      throw new Error("装载策略必须为 multi-destination 或 same-destination");
     }
 
     const firstSku = skus[0];

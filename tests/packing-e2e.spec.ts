@@ -254,6 +254,49 @@ test("uses styled dropdown popovers for container and strategy selection", async
   await expect(page.locator("#total-boxes")).toHaveText("1,750");
 
   await page.getByLabel("多 SKU").check();
+  await expect(page.locator("#sku-count")).toHaveAttribute("max", "5");
+  await expect(page.locator("#sku-shared-length")).toBeVisible();
+  await expect(page.locator("#sku-shared-width")).toBeVisible();
+  await expect(page.locator("#sku-shared-height")).toBeVisible();
+  await expect(page.locator("#sku-list").getByText("长 mm")).toHaveCount(0);
+  await expect(page.locator("#sku-list").getByText("宽 mm")).toHaveCount(0);
+  await expect(page.locator("#sku-list").getByText("高 mm")).toHaveCount(0);
+  const skuCards = page.locator("#sku-list .sku-card");
+  const firstSkuCardBox = await skuCards.nth(0).boundingBox();
+  const secondSkuCardBox = await skuCards.nth(1).boundingBox();
+  expect(firstSkuCardBox).not.toBeNull();
+  expect(secondSkuCardBox).not.toBeNull();
+  expect(Math.abs((firstSkuCardBox?.y ?? 0) - (secondSkuCardBox?.y ?? 0))).toBeLessThan(4);
+  expect((secondSkuCardBox?.x ?? 0)).toBeGreaterThan((firstSkuCardBox?.x ?? 0) + (firstSkuCardBox?.width ?? 0) * 0.8);
+  await expect(skuCards.first()).not.toHaveAttribute("draggable", "true");
+  await expect(skuCards.first().locator(".drag-handle")).not.toHaveAttribute("draggable", "true");
+  const firstSkuTitle = page.locator("#sku-list .sku-card strong").first();
+  await expect(firstSkuTitle).toHaveText("A");
+  const firstSkuTarget = skuCards.nth(0).locator(".base-number-input");
+  const secondSkuTarget = skuCards.nth(1).locator(".base-number-input");
+  await firstSkuTarget.fill("111");
+  await firstSkuTarget.blur();
+  await secondSkuTarget.fill("222");
+  await secondSkuTarget.blur();
+  await expect(firstSkuTarget).toHaveValue("111");
+  await expect(secondSkuTarget).toHaveValue("222");
+  const firstHandleBox = await skuCards.nth(0).locator(".drag-handle").boundingBox();
+  expect(firstHandleBox).not.toBeNull();
+  await page.mouse.move((firstHandleBox?.x ?? 0) + 8, (firstHandleBox?.y ?? 0) + 8);
+  await page.mouse.down();
+  await page.mouse.move((firstSkuCardBox?.x ?? 0) + 42, (firstSkuCardBox?.y ?? 0) + 42);
+  const dragPreview = page.locator(".sku-drag-preview");
+  await expect(dragPreview).toBeVisible();
+  await expect(dragPreview).toContainText("A");
+  const dragPreviewBox = await dragPreview.boundingBox();
+  expect(dragPreviewBox?.width).toBeGreaterThan((firstSkuCardBox?.width ?? 0) * 0.7);
+  await page.mouse.move((secondSkuCardBox?.x ?? 0) + (secondSkuCardBox?.width ?? 0) / 2, (secondSkuCardBox?.y ?? 0) + (secondSkuCardBox?.height ?? 0) / 2);
+  await expect(skuCards.nth(1)).toHaveClass(/sku-card--drop-target/);
+  await page.mouse.up();
+  await expect(skuCards.nth(0).locator("strong")).toHaveText("B");
+  await expect(skuCards.nth(1).locator("strong")).toHaveText("A");
+  await expect(skuCards.nth(0).locator(".base-number-input")).toHaveValue("222");
+  await expect(skuCards.nth(1).locator(".base-number-input")).toHaveValue("111");
   await page.getByRole("combobox", { name: "装载策略" }).click();
   await expect(page.getByRole("listbox")).toBeVisible();
   const sameDestinationOption = page.getByRole("option", { name: "同卸货地/完整面优先" });
@@ -331,7 +374,7 @@ test("keeps the visualization workspace stable while the control panel scrolls",
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
 
-  await expect(page.locator("#sku-count-value")).toHaveText("10");
+  await expect(page.locator("#sku-count-value")).toHaveText("5");
   await expect(page.locator("#sku-count")).toHaveAttribute("style", /--range-progress:\s*100%/);
 
   const layout = await page.evaluate(() => {

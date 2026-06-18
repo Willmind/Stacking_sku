@@ -290,9 +290,34 @@ for (const target of [0.5, 1.5]) {
         ],
         { cornerBlock: { length: 0, width: 0, height: 0 } },
       ),
-    /target quantity|integer/,
+    /目标数量必须为整数/,
   );
 }
+
+assert.throws(
+  () =>
+    Packing.calculateMultiSkuPacking(
+      customContainer(600, 300, 300),
+      [
+        sku("A", 100, 100, 100, 1, "#d8923a"),
+        sku("B", 120, 100, 100, 1, "#42d6a4"),
+      ],
+      { cornerBlock: { length: 0, width: 0, height: 0 } },
+    ),
+  /同尺寸/,
+);
+
+assert.throws(
+  () =>
+    Packing.calculateMultiSkuPacking(
+      customContainer(600, 300, 300),
+      Array.from({ length: 6 }, (_, index) =>
+        sku(String.fromCharCode(65 + index), 100, 100, 100, 1, "#d8923a"),
+      ),
+      { cornerBlock: { length: 0, width: 0, height: 0 } },
+    ),
+  /2 到 5 个 SKU/,
+);
 
 assert.throws(
   () =>
@@ -304,7 +329,7 @@ assert.throws(
       ],
       { cornerBlock: { length: 0, width: 0, height: 0 } },
     ),
-  /unique|duplicate|SKU label/,
+  /SKU 名称.*不能重复/,
 );
 
 assert.throws(
@@ -317,7 +342,7 @@ assert.throws(
       ],
       { cornerBlock: { length: 0, width: 0, height: 0 } },
     ),
-  /SKU.*object/,
+  /SKU.*对象/,
 );
 
 assert.throws(
@@ -326,7 +351,7 @@ assert.throws(
       customContainer(500, 330, 250),
       carton(0, 100, 100),
     ),
-  /positive number/,
+  /纸箱长度必须为正数/,
 );
 
   });
