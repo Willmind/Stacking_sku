@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Boxes, Calculator } from "@lucide/vue";
+import { computed } from "vue";
 import BatchImportDialog from "./components/controls/BatchImportDialog.vue";
 import ContainerForm from "./components/controls/ContainerForm.vue";
 import PackingModeSwitch from "./components/controls/PackingModeSwitch.vue";
@@ -13,6 +14,17 @@ import SkuBreakdown from "./components/results/SkuBreakdown.vue";
 import { usePackingStore } from "./stores/packingStore";
 
 const store = usePackingStore();
+type StatusTone = "idle" | "dirty" | "success" | "empty" | "error";
+
+const statusToneByLabel: Record<string, StatusTone> = {
+  待计算: "idle",
+  待重新计算: "dirty",
+  已完成计算: "success",
+  无法装载: "empty",
+  计算失败: "error",
+};
+
+const statusChipClass = computed(() => `status-chip--${statusToneByLabel[store.status] ?? "idle"}`);
 </script>
 
 <template>
@@ -47,7 +59,7 @@ const store = usePackingStore();
     <section class="workbench" aria-label="装柜可视化">
       <header class="top-strip">
         <div class="status-line">
-          <span id="status-chip">{{ store.status }}</span>
+          <span id="status-chip" :class="statusChipClass" aria-live="polite">{{ store.status }}</span>
           <strong id="progress-text">{{ store.progressText }}</strong>
         </div>
         <ProgressControl />
@@ -176,14 +188,65 @@ p {
 }
 
 #status-chip {
-  min-width: 90px;
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  justify-content: center;
+  min-width: 96px;
   padding: 8px 12px;
-  border: 1px solid rgba(66, 214, 164, 0.45);
+  border: 1px solid var(--status-chip-border);
   border-radius: 6px;
-  color: var(--accent);
+  background: var(--status-chip-bg);
+  color: var(--status-chip-color);
   font-size: 13px;
   font-weight: 900;
   text-align: center;
+  box-shadow: inset 0 0 0 1px var(--status-chip-ring);
+}
+
+#status-chip::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 12px currentColor;
+  opacity: 0.86;
+}
+
+.status-chip--idle {
+  --status-chip-bg: rgba(161, 175, 192, 0.1);
+  --status-chip-border: rgba(161, 175, 192, 0.28);
+  --status-chip-color: var(--muted);
+  --status-chip-ring: rgba(161, 175, 192, 0.08);
+}
+
+.status-chip--dirty {
+  --status-chip-bg: rgba(217, 166, 79, 0.14);
+  --status-chip-border: rgba(217, 166, 79, 0.46);
+  --status-chip-color: #f0bc68;
+  --status-chip-ring: rgba(217, 166, 79, 0.1);
+}
+
+.status-chip--success {
+  --status-chip-bg: rgba(66, 214, 164, 0.13);
+  --status-chip-border: rgba(66, 214, 164, 0.5);
+  --status-chip-color: var(--accent);
+  --status-chip-ring: rgba(66, 214, 164, 0.12);
+}
+
+.status-chip--empty {
+  --status-chip-bg: rgba(104, 166, 255, 0.12);
+  --status-chip-border: rgba(104, 166, 255, 0.43);
+  --status-chip-color: #8dbdff;
+  --status-chip-ring: rgba(104, 166, 255, 0.1);
+}
+
+.status-chip--error {
+  --status-chip-bg: rgba(240, 120, 120, 0.13);
+  --status-chip-border: rgba(240, 120, 120, 0.48);
+  --status-chip-color: #ff8d8d;
+  --status-chip-ring: rgba(240, 120, 120, 0.1);
 }
 
 .views-grid {

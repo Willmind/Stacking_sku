@@ -109,6 +109,21 @@ describe("control panel layout source guards", () => {
     assert.match(resultSummarySource, /summary-card--primary/);
     assert.match(resultSummarySource, /metric-grid--compact/);
   });
+
+  it("uses distinct status-chip tones for calculation states", () => {
+    assert.match(appSource, /statusToneByLabel/);
+    assert.match(appSource, /:class="statusChipClass"/);
+    assert.match(appSource, /aria-live="polite"/);
+    assert.match(appSource, /#status-chip::before/);
+
+    for (const statusLabel of ["待计算", "待重新计算", "已完成计算", "无法装载", "计算失败"]) {
+      assert.match(appSource, new RegExp(statusLabel));
+    }
+
+    for (const tone of ["idle", "dirty", "success", "empty", "error"]) {
+      assert.match(appSource, new RegExp(`\\.status-chip--${tone}`));
+    }
+  });
 });
 
 describe("2D plan source guards", () => {

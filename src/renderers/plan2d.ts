@@ -175,6 +175,23 @@ function uniqueProjectedCount(rects: ProjectedRect[], axis: "x" | "y") {
   return new Set(keys).size;
 }
 
+function uniqueProjectedSizeCount(rects: ProjectedRect[], axis: "x" | "y") {
+  const sizes = rects.map((rect) => Math.round(axis === "x" ? rect.dx : rect.dy));
+  return new Set(sizes).size;
+}
+
+function getVisibleCountLabel(
+  rects: ProjectedRect[],
+  viewMode: Plan2DViewMode,
+  axisLabel: string,
+  axis: "x" | "y",
+) {
+  const countLabel = countLabelForAxis(axisLabel, axis);
+  const isElevationHorizontalAxis = viewMode !== "top" && axis === "x";
+  if (isElevationHorizontalAxis && uniqueProjectedSizeCount(rects, axis) > 1) return "";
+  return countLabel;
+}
+
 function getVisibleProjectedRects(
   result: PackingResult,
   visibleCount: number,
@@ -238,14 +255,14 @@ function getPlan2DAxisGuideModel(
   return {
     x: {
       count: uniqueProjectedCount(rects, "x"),
-      countLabel: countLabelForAxis(plane.xLabel, "x"),
+      countLabel: getVisibleCountLabel(rects, viewMode, plane.xLabel, "x"),
       axisLabel: plane.xLabel,
       occupied: occupiedX,
       remaining: Math.max(0, plane.width - occupiedX),
     },
     y: {
       count: uniqueProjectedCount(rects, "y"),
-      countLabel: countLabelForAxis(plane.yLabel, "y"),
+      countLabel: getVisibleCountLabel(rects, viewMode, plane.yLabel, "y"),
       axisLabel: plane.yLabel,
       occupied: occupiedY,
       remaining: Math.max(0, plane.height - occupiedY),
@@ -311,16 +328,14 @@ function drawGuideLabel(ctx: CanvasRenderingContext2D, text: string, x: number, 
 
 function formatAxisGuideText(metric: Plan2DAxisGuideMetric) {
   const axisName = axisNameForLabel(metric.axisLabel);
-  return `${formatNumber(metric.count)}${metric.countLabel} · 占${axisName} ${formatNumber(metric.occupied)}mm · 余量 ${formatNumber(metric.remaining)}mm`;
+  const countText = metric.countLabel ? `${formatNumber(metric.count)}${metric.countLabel} · ` : "";
+  return `${countText}占${axisName} ${formatNumber(metric.occupied)}mm · 余量 ${formatNumber(metric.remaining)}mm`;
 }
 
 function formatAxisGuideLines(metric: Plan2DAxisGuideMetric) {
   const axisName = axisNameForLabel(metric.axisLabel);
-  return [
-    `${formatNumber(metric.count)}${metric.countLabel}`,
-    `占${axisName} ${formatNumber(metric.occupied)}mm`,
-    `余量 ${formatNumber(metric.remaining)}mm`,
-  ];
+  const lines = [`占${axisName} ${formatNumber(metric.occupied)}mm`, `余量 ${formatNumber(metric.remaining)}mm`];
+  return metric.countLabel ? [`${formatNumber(metric.count)}${metric.countLabel}`, ...lines] : lines;
 }
 
 function getStackedGuideLabelSize(lines: string[], measureText: (text: string) => number) {

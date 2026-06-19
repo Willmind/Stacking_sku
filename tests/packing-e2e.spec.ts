@@ -92,6 +92,7 @@ test("calculates the 488 x 380 x 291 benchmark and renders both views", async ({
 
   await expect(page.locator("#total-boxes")).toHaveText("1,340");
   await expect(page.locator("#status-chip")).toHaveText("已完成计算");
+  await expect(page.locator("#status-chip")).toHaveClass(/status-chip--success/);
   await expect(page.locator(".plan-view-card")).toHaveCount(2);
   await expect(page.locator(".plan-view-card--switchable")).toContainText("俯视图");
   await expect(page.locator(".plan-view-card--switchable .plan-view-status")).toContainText("当前显示");
@@ -223,10 +224,12 @@ test("adjusts number fields with styled steppers", async ({ page }) => {
 
   await page.getByRole("button", { name: "计算装载" }).click();
   await expect(page.locator("#status-chip")).toHaveText("已完成计算");
+  await expect(page.locator("#status-chip")).toHaveClass(/status-chip--success/);
 
   await cartonSection.getByRole("button", { name: "减少 长 mm" }).click();
   await expect(cartonLength).toHaveValue("480");
   await expect(page.locator("#status-chip")).toHaveText("待重新计算");
+  await expect(page.locator("#status-chip")).toHaveClass(/status-chip--dirty/);
 
   await cartonLength.fill("1");
   await cartonLength.blur();
