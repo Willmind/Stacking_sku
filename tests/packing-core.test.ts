@@ -19,6 +19,10 @@ function summarizeSkuCounts(result) {
   return Object.fromEntries(result.skuSummary.map((item) => [item.label, item.loaded]));
 }
 
+function footprintKey(position) {
+  return `${position.x}:${position.y}:${position.dx}:${position.dy}`;
+}
+
 function assertClose(actual, expected, tolerance = 0.0001) {
   assert.ok(
     Math.abs(actual - expected) <= tolerance,
@@ -369,6 +373,38 @@ describe("packing core", () => {
   const positions = Packing.generateBoxPositions(result, result.totalBoxes);
   assert.equal(result.pattern.family, "heterogeneous-zones");
   assert.equal(result.blockedByCornerTotal, 2);
+  assertNoCornerCollisions(result, positions);
+}
+
+{
+  const result = Packing.calculateMultiSkuPacking(
+    Packing.CONTAINERS["20GP"],
+    [
+      sku("A", 300, 320, 260, 100, "#d8923a"),
+      sku("B", 500, 320, 260, 100, "#42d6a4"),
+    ],
+    {
+      strategy: "multi-destination",
+    },
+  );
+
+  const positions = Packing.generateBoxPositions(result, result.totalBoxes);
+  const aFootprints = result.layerPositions.filter((position) => position.skuLabel === "A");
+  const bFootprints = result.layerPositions.filter((position) => position.skuLabel === "B");
+
+  assert.equal(result.totalBoxes, 200);
+  assert.deepEqual(summarizeSkuCounts(result), { A: 100, B: 100 });
+  assert.equal(aFootprints.length, 12);
+  assert.equal(bFootprints.length, 12);
+  assert.equal(new Set(aFootprints.map(footprintKey)).size, aFootprints.length);
+  assert.equal(new Set(bFootprints.map(footprintKey)).size, bFootprints.length);
+  assert.equal(
+    result.layerPositions.some((position) => position.adjustedForCorner),
+    false,
+    "heterogeneous top-view footprints should not be created from corner-avoidance offsets",
+  );
+  assertPositionsFitContainer(result, positions);
+  assertNoPositionOverlaps(positions);
   assertNoCornerCollisions(result, positions);
 }
 

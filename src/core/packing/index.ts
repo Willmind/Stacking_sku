@@ -1002,11 +1002,18 @@ export type {
     const layerPositions = [];
 
     const indexedPositions = positions.map((position, sequenceIndex) => {
-      const faceKey = `${position.x}:${position.y}:${position.dx}:${position.dy}`;
+      const { sourceFootprint, ...publicPosition } = position;
+      const footprint = sourceFootprint || position;
+      const faceKey = `${footprint.x}:${footprint.y}:${footprint.dx}:${footprint.dy}`;
       if (!faceIndexByKey.has(faceKey)) {
         faceIndexByKey.set(faceKey, layerPositions.length);
+        const { adjustedForCorner: _adjustedForCorner, ...layerPosition } = publicPosition;
         layerPositions.push({
-          ...position,
+          ...layerPosition,
+          x: footprint.x,
+          y: footprint.y,
+          dx: footprint.dx,
+          dy: footprint.dy,
           z: 0,
           stackIndex: 0,
           sequenceIndex: layerPositions.length,
@@ -1017,7 +1024,7 @@ export type {
       stackCountByKey.set(faceKey, stackIndex + 1);
 
       return {
-        ...position,
+        ...publicPosition,
         faceIndex: faceIndexByKey.get(faceKey),
         stackIndex,
         sequenceIndex,
@@ -1027,6 +1034,16 @@ export type {
     return {
       orderedPositions: indexedPositions,
       layerPositions,
+    };
+  }
+
+  function createHeterogeneousSourceFootprint(zoneResult, position, offsetX) {
+    const source = zoneResult.layerPositions[position.faceIndex] || position;
+    return {
+      x: source.x + offsetX,
+      y: source.y,
+      dx: source.dx,
+      dy: source.dy,
     };
   }
 
@@ -1100,6 +1117,7 @@ export type {
       const offsetPositions = selectedPositions.map((position) => ({
         ...position,
         x: position.x + cursorX,
+        sourceFootprint: createHeterogeneousSourceFootprint(zoneResult, position, cursorX),
         skuLabel: sku.label,
         skuColor: sku.color,
       }));
