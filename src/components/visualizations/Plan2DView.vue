@@ -2,7 +2,13 @@
 import { LayoutPanelTop, Maximize2, PanelBottom, PanelLeft } from "@lucide/vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { Component, ComponentPublicInstance } from "vue";
-import { getPlan2DPlaneConfig, renderPlan2D, type Plan2DViewMode } from "../../renderers/plan2d";
+import {
+  getPlan2DAxisGuideMetrics,
+  getPlan2DPlaneConfig,
+  renderPlan2D,
+  type Plan2DFrontViewSide,
+  type Plan2DViewMode,
+} from "../../renderers/plan2d";
 import { usePackingStore } from "../../stores/packingStore";
 import VisualizationDialog from "./VisualizationDialog.vue";
 
@@ -47,7 +53,13 @@ const frontPlanView: PlanViewItem = {
   icon: PanelBottom,
 };
 
+const frontViewSides: Array<{ id: Plan2DFrontViewSide; label: string }> = [
+  { id: "corner", label: "角件端" },
+  { id: "door", label: "柜门" },
+];
+
 const activePlanViewMode = ref<SwitchablePlanViewMode>("top");
+const activeFrontViewSide = ref<Plan2DFrontViewSide>("corner");
 const activePlanView = computed(() => {
   return switchablePlanViews.find((item) => item.id === activePlanViewMode.value) ?? switchablePlanViews[0];
 });
@@ -93,8 +105,10 @@ function getViewStatus() {
 function getViewMeasure(mode: Plan2DViewMode) {
   const result = store.result;
   if (!result?.pattern) return "等待尺寸";
-  const plane = getPlan2DPlaneConfig(result, mode);
-  return `${plane.xLabel} ${formatNumber(plane.width)}mm · 占用 ${formatNumber(plane.occupiedWidth)}mm`;
+  const frontViewSide = getFrontViewSideForMode(mode);
+  const plane = getPlan2DPlaneConfig(result, mode, { frontViewSide });
+  const metrics = getPlan2DAxisGuideMetrics(result, result.totalBoxes, mode, { frontViewSide });
+  return `${plane.xLabel} ${formatNumber(plane.width)}mm · 占用 ${formatNumber(metrics.x.occupied)}mm`;
 }
 
 function setSwitchableCanvasRef(element: Element | ComponentPublicInstance | null) {
@@ -113,6 +127,18 @@ function setActivePlanView(mode: SwitchablePlanViewMode) {
   activePlanViewMode.value = mode;
 }
 
+function setFrontViewSide(side: Plan2DFrontViewSide) {
+  activeFrontViewSide.value = side;
+}
+
+function getFrontViewSideForMode(mode: Plan2DViewMode) {
+  return mode === "front" ? activeFrontViewSide.value : undefined;
+}
+
+function getFrontViewSideLabel() {
+  return frontViewSides.find((side) => side.id === activeFrontViewSide.value)?.label ?? frontViewSides[0].label;
+}
+
 function drawView(mode: Plan2DViewMode, canvas: HTMLCanvasElement | null) {
   if (!canvas) return;
   renderPlan2D({
@@ -120,6 +146,7 @@ function drawView(mode: Plan2DViewMode, canvas: HTMLCanvasElement | null) {
     result: store.result,
     visibleCount: store.visibleCount,
     viewMode: mode,
+    frontViewSide: getFrontViewSideForMode(mode),
     showLabels: false,
   });
 }
@@ -152,6 +179,10 @@ function getExpandedSubtitle(mode: Plan2DViewMode) {
   return `${getViewStatus()} · ${getViewMeasure(mode)}`;
 }
 
+function getExpandedTitle(view: PlanViewItem) {
+  return view.id === "front" ? `${view.title} · ${getFrontViewSideLabel()}` : view.title;
+}
+
 onMounted(() => {
   draw();
   resizeObserver = new ResizeObserver(draw);
@@ -165,7 +196,7 @@ onBeforeUnmount(() => {
 });
 
 watch(
-  () => [store.result, store.visibleCount, activePlanViewMode.value],
+  () => [store.result, store.visibleCount, activePlanViewMode.value, activeFrontViewSide.value],
   () => {
     void nextTick(draw);
   },
@@ -236,15 +267,30 @@ watch(
             </span>
             <span class="plan-view-axis">{{ frontPlanView.axisLabel }}</span>
           </div>
-          <button
-            class="view-expand-button"
-            type="button"
-            :aria-label="`放大${frontPlanView.title}`"
-            :title="`放大${frontPlanView.title}`"
-            @click="openExpandedView(frontPlanView.id)"
-          >
-            <Maximize2 :size="15" :stroke-width="2.3" aria-hidden="true" />
-          </button>
+          <div class="plan-view-card-actions">
+            <div class="plan-view-switch plan-view-switch--front" role="group" aria-label="切换端视图视角">
+              <button
+                v-for="side in frontViewSides"
+                :key="side.id"
+                class="plan-view-switch-button"
+                :class="{ 'is-active': activeFrontViewSide === side.id }"
+                type="button"
+                :aria-pressed="activeFrontViewSide === side.id"
+                @click="setFrontViewSide(side.id)"
+              >
+                {{ side.label }}
+              </button>
+            </div>
+            <button
+              class="view-expand-button"
+              type="button"
+              :aria-label="`放大${frontPlanView.title}`"
+              :title="`放大${frontPlanView.title}`"
+              @click="openExpandedView(frontPlanView.id)"
+            >
+              <Maximize2 :size="15" :stroke-width="2.3" aria-hidden="true" />
+            </button>
+          </div>
           <span class="plan-view-status">{{ getViewStatus() }}</span>
           <span class="plan-view-measure">{{ getViewMeasure(frontPlanView.id) }}</span>
         </header>
@@ -262,7 +308,7 @@ watch(
 
     <VisualizationDialog
       :open="expandedPlanViewMode !== null"
-      :title="expandedPlanView?.title ?? '2D 视图'"
+      :title="expandedPlanView ? getExpandedTitle(expandedPlanView) : '2D 视图'"
       :subtitle="expandedPlanView ? getExpandedSubtitle(expandedPlanView.id) : ''"
       @close="closeExpandedView"
     >
