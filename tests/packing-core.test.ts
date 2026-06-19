@@ -412,6 +412,56 @@ describe("packing core", () => {
   assertNoCornerCollisions(result, positions);
 }
 
+{
+  const result = Packing.calculateMultiSkuPacking(
+    Packing.CONTAINERS["20GP"],
+    [
+      sku("A", 250, 320, 260, 100, "#d8923a"),
+      sku("B", 500, 320, 260, 100, "#42d6a4"),
+    ],
+    {
+      strategy: "multi-destination",
+    },
+  );
+
+  const positions = Packing.generateBoxPositions(result, result.totalBoxes);
+  const bFootprints = result.layerPositions.filter((position) => position.skuLabel === "B");
+  const lowerLeftCompactedB = bFootprints.filter((position) => position.x < 500 && position.y >= 1280);
+
+  assert.equal(result.totalBoxes, 200);
+  assert.deepEqual(summarizeSkuCounts(result), { A: 100, B: 100 });
+  assert.ok(
+    lowerLeftCompactedB.length >= 3,
+    "same-width later SKU footprints should shift left into lower empty lanes",
+  );
+  assertPositionsFitContainer(result, positions);
+  assertNoPositionOverlaps(positions);
+  assertNoCornerCollisions(result, positions);
+}
+
+{
+  const result = Packing.calculateMultiSkuPacking(
+    Packing.CONTAINERS["20GP"],
+    [
+      sku("A", 677, 443, 388, 80, "#d8923a"),
+      sku("B", 491, 518, 332, 44, "#42d6a4"),
+      sku("C", 265, 503, 275, 37, "#6e8bff"),
+      sku("D", 411, 294, 339, 60, "#f87171"),
+    ],
+    {
+      strategy: "multi-destination",
+    },
+  );
+
+  const positions = Packing.generateBoxPositions(result, result.totalBoxes);
+
+  assert.equal(result.totalBoxes, 221);
+  assert.deepEqual(summarizeSkuCounts(result), { A: 80, B: 44, C: 37, D: 60 });
+  assertPositionsFitContainer(result, positions);
+  assertNoPositionOverlaps(positions);
+  assertNoCornerCollisions(result, positions);
+}
+
 for (const target of [0.5, 1.5]) {
   assert.throws(
     () =>
