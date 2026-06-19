@@ -977,6 +977,107 @@ export type {
     return rects;
   }
 
+  function boxesOverlap3d(a, b) {
+    return (
+      intersects(a.x, a.dx, b.x, b.dx) &&
+      intersects(a.y, a.dy, b.y, b.dy) &&
+      intersects(a.z, a.dz, b.z, b.dz)
+    );
+  }
+
+  function groupPositionsBySourceFootprint(positions) {
+    const groups = new Map();
+
+    for (const position of positions) {
+      const footprint = getPositionFootprint(position);
+      const key = `${footprint.x}:${footprint.y}:${footprint.dx}:${footprint.dy}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(position);
+    }
+
+    return Array.from(groups.values());
+  }
+
+  function shiftHeterogeneousPosition(position, deltaX) {
+    const footprint = getPositionFootprint(position);
+    return {
+      ...position,
+      x: position.x + deltaX,
+      sourceFootprint: {
+        ...footprint,
+        x: footprint.x + deltaX,
+      },
+    };
+  }
+
+  function canPlaceHeterogeneousGroup(group, deltaX, container, cornerBlock, occupiedPositions, occupiedRects) {
+    const shiftedGroup = group.map((position) => shiftHeterogeneousPosition(position, deltaX));
+    const footprint = getPositionFootprint(shiftedGroup[0]);
+
+    if (
+      !positionFitsFloor(
+        {
+          x: footprint.x,
+          y: footprint.y,
+          dx: footprint.dx,
+          dy: footprint.dy,
+        },
+        container,
+      ) ||
+      overlapsAnyFloorRect(footprint, occupiedRects)
+    ) {
+      return false;
+    }
+
+    for (const position of shiftedGroup) {
+      if (!positionFitsFloor(position, container)) return false;
+      if (position.z + position.dz > container.height) return false;
+      if (collidesCornerBlock(position, container, cornerBlock)) return false;
+      if (occupiedPositions.some((occupied) => boxesOverlap3d(position, occupied))) return false;
+    }
+
+    return true;
+  }
+
+  function createLeftCompactionCandidates(footprint, occupiedRects) {
+    const candidates = new Set([0, footprint.x]);
+
+    for (const rect of occupiedRects) {
+      if (!intersects(footprint.y, footprint.dy, rect.y, rect.dy)) continue;
+      candidates.add(rect.x + rect.dx);
+    }
+
+    return Array.from(candidates)
+      .filter((x) => Number.isFinite(x) && x >= 0 && x <= footprint.x)
+      .sort((a, b) => a - b);
+  }
+
+  function compactHeterogeneousPositionsLeft(container, positions, occupiedPositions, cornerBlock) {
+    const compactedPositions = [];
+    const acceptedPositions = occupiedPositions.slice();
+    const acceptedRects = uniqueFloorRectsFromPositions(acceptedPositions);
+
+    for (const group of groupPositionsBySourceFootprint(positions)) {
+      const footprint = getPositionFootprint(group[0]);
+      let compactedGroup = group;
+
+      for (const candidateX of createLeftCompactionCandidates(footprint, acceptedRects)) {
+        const deltaX = candidateX - footprint.x;
+        if (!canPlaceHeterogeneousGroup(group, deltaX, container, cornerBlock, acceptedPositions, acceptedRects)) {
+          continue;
+        }
+        compactedGroup = group.map((position) => shiftHeterogeneousPosition(position, deltaX));
+        break;
+      }
+
+      compactedPositions.push(...compactedGroup);
+      acceptedPositions.push(...compactedGroup);
+      acceptedRects.push(footprintRectFromPosition(compactedGroup[0]));
+    }
+
+    return compactedPositions;
+  }
+
   function createLayersFromPositions(positions) {
     const layersByIndex = new Map();
     for (const position of positions) {
@@ -1088,6 +1189,43 @@ export type {
     return acceptedByStack;
   }
 
+  function cloneAcceptedByStack(acceptedByStack) {
+    const cloned = new Map();
+    for (const [stackIndex, positions] of acceptedByStack.entries()) {
+      cloned.set(stackIndex, positions.slice());
+    }
+    return cloned;
+  }
+
+  function addPositionsToAcceptedByStack(acceptedByStack, positions) {
+    for (const position of positions) {
+      const stackIndex = Number.isFinite(position.stackIndex) ? position.stackIndex : 0;
+      if (!acceptedByStack.has(stackIndex)) acceptedByStack.set(stackIndex, []);
+      acceptedByStack.get(stackIndex).push(position);
+    }
+  }
+
+  function isHeterogeneousPosition3dSafe(position, container, cornerBlock, occupiedPositions) {
+    if (!positionFitsFloor(position, container)) return false;
+    if (position.z < 0 || position.z + position.dz > container.height) return false;
+    if (collidesCornerBlock(position, container, cornerBlock)) return false;
+    return !occupiedPositions.some((occupied) => boxesOverlap3d(position, occupied));
+  }
+
+  function selectSafeHeterogeneousStackPositions(stackPositions, limit, container, cornerBlock, occupiedPositions) {
+    const selected = [];
+
+    for (const position of stackPositions.slice().sort((a, b) => a.z - b.z || a.stackIndex - b.stackIndex)) {
+      if (selected.length >= limit) break;
+      if (!isHeterogeneousPosition3dSafe(position, container, cornerBlock, [...occupiedPositions, ...selected])) {
+        break;
+      }
+      selected.push(position);
+    }
+
+    return selected;
+  }
+
   function createBackfillStartCandidates(occupiedRects, limit, size, boundary) {
     const starts = new Set([0, Math.max(0, limit - size)]);
     const dimension = boundary === "x" ? "dx" : "dy";
@@ -1150,6 +1288,7 @@ export type {
 
     const layerCount = Math.floor(container.height / sku.height);
     const acceptedByStack = createAcceptedByStackFromPositions(occupiedPositions);
+    const acceptedPositions = occupiedPositions.slice();
     const acceptedFloorRects = uniqueFloorRectsFromPositions(occupiedPositions);
     const candidates = createBackfillFootprintCandidates(container, sku, occupiedPositions, maxLength);
     const selectedPositions = [];
@@ -1158,13 +1297,14 @@ export type {
       if (selectedPositions.length >= target) return;
       if (overlapsAnyFloorRect(candidate, acceptedFloorRects)) return;
 
+      const candidateAcceptedByStack = cloneAcceptedByStack(acceptedByStack);
       const stackPositions = createStackedFacePositions(
         candidate,
         candidateIndex,
         layerCount,
         container,
         cornerBlock,
-        acceptedByStack,
+        candidateAcceptedByStack,
       );
       if (stackPositions.length === 0) return;
 
@@ -1175,15 +1315,25 @@ export type {
         dy: candidate.dy,
       };
       const remaining = target - selectedPositions.length;
-      selectedPositions.push(
-        ...stackPositions.slice(0, remaining).map((position) => ({
+      const safeStackPositions = selectSafeHeterogeneousStackPositions(
+        stackPositions,
+        remaining,
+        container,
+        cornerBlock,
+        acceptedPositions,
+      );
+      if (safeStackPositions.length === 0) return;
+
+      const acceptedStackPositions = safeStackPositions.map((position) => ({
           ...position,
           sourceFootprint,
           skuLabel: sku.label,
           skuColor: sku.color,
-        })),
-      );
-      acceptedFloorRects.push(floorRectFromPosition(candidate));
+        }));
+      selectedPositions.push(...acceptedStackPositions);
+      acceptedPositions.push(...acceptedStackPositions);
+      addPositionsToAcceptedByStack(acceptedByStack, acceptedStackPositions);
+      acceptedFloorRects.push(footprintRectFromPosition(acceptedStackPositions[0]));
     });
 
     return selectedPositions;
@@ -1278,9 +1428,15 @@ export type {
           skuLabel: sku.label,
           skuColor: sku.color,
         }));
+        const compactedOffsetPositions = compactHeterogeneousPositionsLeft(
+          container,
+          offsetPositions,
+          assignedPositions,
+          cornerBlock,
+        );
 
-        assignedPositions.push(...offsetPositions);
-        skuPositions.push(...offsetPositions);
+        assignedPositions.push(...compactedOffsetPositions);
+        skuPositions.push(...compactedOffsetPositions);
         blockedByCornerTotal += zoneResult.blockedByCornerTotal;
         zoneUsedLength = selectedPositions.length === 0 ? 0 : getOccupiedLength(selectedPositions);
       }
@@ -1291,7 +1447,7 @@ export type {
         occupiedWidth: getOccupiedWidth(skuPositions),
       });
       if (zoneUsedLength > 0) {
-        cursorX += zoneUsedLength;
+        cursorX = Math.max(cursorX, getOccupiedLength(assignedPositions));
       }
     }
 

@@ -396,7 +396,7 @@ test("labels heterogeneous multi SKU stack metrics without implying uniform laye
 test("backfills reusable floor space for heterogeneous multi SKU top view", async ({ page }) => {
   await page.goto("/");
   await page.getByLabel("多 SKU").check();
-  await page.locator("#sku-A-length").fill("300");
+  await page.locator("#sku-A-length").fill("250");
   await page.locator("#sku-A-length").blur();
   await page.locator("#sku-A-width").fill("320");
   await page.locator("#sku-A-width").blur();
@@ -430,8 +430,8 @@ test("backfills reusable floor space for heterogeneous multi SKU top view", asyn
     const scale = Math.min((width - pad * 2) / 5898, (height - pad * 2) / 2352);
     const boxX = (width - 5898 * scale) / 2;
     const boxY = (height - 2352 * scale) / 2 + (compactCanvas ? 4 : 10);
-    const sampleX = Math.round((boxX + (320 + 160) * scale) * dpr);
-    const sampleY = Math.round((boxY + (1500 + 250) * scale) * dpr);
+    const sampleX = Math.round((boxX + 400 * scale) * dpr);
+    const sampleY = Math.round((boxY + 1760 * scale) * dpr);
     const [red, green, blue, alpha] = context.getImageData(sampleX, sampleY, 1, 1).data;
     return { red, green, blue, alpha };
   });
