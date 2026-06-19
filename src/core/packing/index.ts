@@ -134,18 +134,14 @@ export type {
     return skus;
   }
 
-  function assertSameSkuDimensions(skus) {
+  function hasSameSkuDimensions(skus) {
     const [firstSku] = skus;
-    const mismatched = skus.find(
+    return skus.every(
       (sku) =>
-        sku.length !== firstSku.length ||
-        sku.width !== firstSku.width ||
-        sku.height !== firstSku.height,
+        sku.length === firstSku.length &&
+        sku.width === firstSku.width &&
+        sku.height === firstSku.height,
     );
-
-    if (mismatched) {
-      throw new Error("多 SKU 模式仅支持所有 SKU 使用同尺寸纸箱");
-    }
   }
 
   function getOrientations(carton) {
@@ -933,6 +929,45 @@ export type {
     return false;
   }
 
+  function calculateUsedHeight(positions) {
+    if (positions.length === 0) return 0;
+    return Math.max(...positions.map((position) => position.z + position.dz));
+  }
+
+  function calculatePositionsVolume(positions) {
+    return positions.reduce((sum, position) => sum + position.dx * position.dy * position.dz, 0);
+  }
+
+  function getOccupiedLength(positions) {
+    if (positions.length === 0) return 0;
+    return Math.max(...positions.map((position) => position.x + position.dx));
+  }
+
+  function getOccupiedWidth(positions) {
+    if (positions.length === 0) return 0;
+    return Math.max(...positions.map((position) => position.y + position.dy));
+  }
+
+  function createLayersFromPositions(positions) {
+    const layersByIndex = new Map();
+    for (const position of positions) {
+      const index = Number.isFinite(position.stackIndex) ? position.stackIndex : 0;
+      if (!layersByIndex.has(index)) {
+        layersByIndex.set(index, {
+          index,
+          z: position.z,
+          boxCount: 0,
+          blockedByCorner: 0,
+        });
+      }
+      const layer = layersByIndex.get(index);
+      layer.z = Math.min(layer.z, position.z);
+      layer.boxCount += 1;
+    }
+
+    return Array.from(layersByIndex.values()).sort((a, b) => a.index - b.index);
+  }
+
   function summarizeSkuAllocation(skus, positions) {
     return skus.map((sku) => {
       const loaded = positions.filter((position) => position.skuLabel === sku.label).length;
@@ -944,6 +979,186 @@ export type {
         shortfall: Math.max(0, sku.target - loaded),
       };
     });
+  }
+
+  function createZeroCornerBlock() {
+    return {
+      length: 0,
+      width: 0,
+      height: 0,
+    };
+  }
+
+  function createZoneCornerBlock(cornerBlock, offsetX) {
+    return {
+      ...cornerBlock,
+      length: Math.max(0, cornerBlock.length - offsetX),
+    };
+  }
+
+  function reindexHeterogeneousPositions(positions) {
+    const faceIndexByKey = new Map();
+    const stackCountByKey = new Map();
+    const layerPositions = [];
+
+    const indexedPositions = positions.map((position, sequenceIndex) => {
+      const faceKey = `${position.x}:${position.y}:${position.dx}:${position.dy}`;
+      if (!faceIndexByKey.has(faceKey)) {
+        faceIndexByKey.set(faceKey, layerPositions.length);
+        layerPositions.push({
+          ...position,
+          z: 0,
+          stackIndex: 0,
+          sequenceIndex: layerPositions.length,
+        });
+      }
+
+      const stackIndex = stackCountByKey.get(faceKey) || 0;
+      stackCountByKey.set(faceKey, stackIndex + 1);
+
+      return {
+        ...position,
+        faceIndex: faceIndexByKey.get(faceKey),
+        stackIndex,
+        sequenceIndex,
+      };
+    });
+
+    return {
+      orderedPositions: indexedPositions,
+      layerPositions,
+    };
+  }
+
+  function calculateSameDimensionMultiSkuPacking(containerInput, skus, options, strategy) {
+    const firstSku = skus[0];
+    const baseResult = calculatePacking(
+      containerInput,
+      { length: firstSku.length, width: firstSku.width, height: firstSku.height },
+      options,
+    );
+    const sourcePositions = baseResult.orderedPositions || [];
+    const assignedPositions =
+      strategy === LOADING_STRATEGIES.SAME_DESTINATION
+        ? assignSameDestinationSkus(sourcePositions, skus)
+        : assignMultiDestinationSkus(sourcePositions, skus);
+    const skuSummary = summarizeSkuAllocation(skus, assignedPositions);
+    const layers = baseResult.layers.map((layer) => ({
+      ...layer,
+      boxCount: assignedPositions.filter((position) => position.stackIndex === layer.index).length,
+    }));
+    const containerVolume = baseResult.container.length * baseResult.container.width * baseResult.container.height;
+    const volumeLoaded = calculatePositionsVolume(assignedPositions);
+
+    return {
+      ...baseResult,
+      mode: "multi",
+      strategy,
+      skus,
+      orderedPositions: assignedPositions,
+      layers,
+      totalBoxes: assignedPositions.length,
+      usedHeight: calculateUsedHeight(assignedPositions),
+      utilizationRatio: containerVolume > 0 ? volumeLoaded / containerVolume : 0,
+      skuSummary,
+    };
+  }
+
+  function calculateHeterogeneousMultiSkuPacking(containerInput, skus, options, strategy) {
+    const container = normalizeContainer(containerInput);
+    const cornerBlock = {
+      ...DEFAULT_CORNER_BLOCK,
+      ...(options.cornerBlock || {}),
+    };
+    const assignedPositions = [];
+    const groups = [];
+    let cursorX = 0;
+    let blockedByCornerTotal = 0;
+
+    for (const sku of skus) {
+      const remainingLength = container.length - cursorX;
+      if (remainingLength <= 0) break;
+
+      const zoneContainer = {
+        ...container,
+        id: "CUSTOM",
+        name: `${sku.label} 装载分区`,
+        length: remainingLength,
+      };
+      const zoneCornerBlock = cursorX >= cornerBlock.length
+        ? createZeroCornerBlock()
+        : createZoneCornerBlock(cornerBlock, cursorX);
+      const zoneResult = calculatePacking(
+        zoneContainer,
+        { length: sku.length, width: sku.width, height: sku.height },
+        {
+          ...options,
+          cornerBlock: zoneCornerBlock,
+        },
+      );
+      const selectedPositions = zoneResult.orderedPositions.slice(0, sku.target);
+      const offsetPositions = selectedPositions.map((position) => ({
+        ...position,
+        x: position.x + cursorX,
+        skuLabel: sku.label,
+        skuColor: sku.color,
+      }));
+
+      assignedPositions.push(...offsetPositions);
+      blockedByCornerTotal += zoneResult.blockedByCornerTotal;
+
+      const zoneUsedLength = selectedPositions.length === 0 ? 0 : getOccupiedLength(selectedPositions);
+      groups.push({
+        label: sku.label,
+        count: selectedPositions.length,
+        occupiedLength: zoneUsedLength,
+        occupiedWidth: getOccupiedWidth(selectedPositions),
+      });
+      if (zoneUsedLength > 0) {
+        cursorX += zoneUsedLength;
+      }
+    }
+
+    const { orderedPositions, layerPositions } = reindexHeterogeneousPositions(assignedPositions);
+    const layers = createLayersFromPositions(orderedPositions);
+    const totalBoxes = orderedPositions.length;
+    const usedHeight = calculateUsedHeight(orderedPositions);
+    const occupiedLength = getOccupiedLength(orderedPositions);
+    const occupiedWidth = getOccupiedWidth(orderedPositions);
+    const containerVolume = container.length * container.width * container.height;
+    const volumeLoaded = calculatePositionsVolume(orderedPositions);
+
+    return {
+      container,
+      carton: {
+        length: skus[0].length,
+        width: skus[0].width,
+        height: skus[0].height,
+      },
+      cornerBlock,
+      pattern: totalBoxes > 0
+        ? {
+            family: "heterogeneous-zones",
+            name: "异尺寸按 SKU 顺序分区",
+            occupiedLength,
+            occupiedWidth,
+            floorPositions: layerPositions,
+            groups,
+          }
+        : null,
+      layerPositions,
+      orderedPositions,
+      perLayerBoxCount: layers.reduce((max, layer) => Math.max(max, layer.boxCount), 0),
+      layers,
+      totalBoxes,
+      blockedByCornerTotal,
+      usedHeight,
+      utilizationRatio: containerVolume > 0 ? volumeLoaded / containerVolume : 0,
+      mode: "multi",
+      strategy,
+      skus,
+      skuSummary: summarizeSkuAllocation(skus, orderedPositions),
+    };
   }
 
   function calculatePacking(containerInput, cartonInput, options = {}) {
@@ -1007,47 +1222,14 @@ export type {
 
   function calculateMultiSkuPacking(containerInput, skuInputs, options = {}) {
     const skus = normalizeSkus(skuInputs);
-    assertSameSkuDimensions(skus);
     const strategy = options.strategy || LOADING_STRATEGIES.MULTI_DESTINATION;
     if (!Object.values(LOADING_STRATEGIES).includes(strategy)) {
       throw new Error("装载策略必须为 multi-destination 或 same-destination");
     }
 
-    const firstSku = skus[0];
-    const baseResult = calculatePacking(
-      containerInput,
-      { length: firstSku.length, width: firstSku.width, height: firstSku.height },
-      options,
-    );
-    const sourcePositions = baseResult.orderedPositions || [];
-    const assignedPositions =
-      strategy === LOADING_STRATEGIES.SAME_DESTINATION
-        ? assignSameDestinationSkus(sourcePositions, skus)
-        : assignMultiDestinationSkus(sourcePositions, skus);
-    const skuSummary = summarizeSkuAllocation(skus, assignedPositions);
-    const layers = baseResult.layers.map((layer) => ({
-      ...layer,
-      boxCount: assignedPositions.filter((position) => position.stackIndex === layer.index).length,
-    }));
-    const usedHeight =
-      assignedPositions.length === 0
-        ? 0
-        : (Math.max(...assignedPositions.map((position) => position.stackIndex)) + 1) * baseResult.carton.height;
-    const containerVolume = baseResult.container.length * baseResult.container.width * baseResult.container.height;
-    const volumeLoaded = assignedPositions.length * firstSku.length * firstSku.width * firstSku.height;
-
-    return {
-      ...baseResult,
-      mode: "multi",
-      strategy,
-      skus,
-      orderedPositions: assignedPositions,
-      layers,
-      totalBoxes: assignedPositions.length,
-      usedHeight,
-      utilizationRatio: containerVolume > 0 ? volumeLoaded / containerVolume : 0,
-      skuSummary,
-    };
+    return hasSameSkuDimensions(skus)
+      ? calculateSameDimensionMultiSkuPacking(containerInput, skus, options, strategy)
+      : calculateHeterogeneousMultiSkuPacking(containerInput, skus, options, strategy);
   }
 
   function generateBoxPositions(result, visibleCount = result.totalBoxes) {

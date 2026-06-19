@@ -44,6 +44,14 @@ function createSku(index: number, carton: CartonSpec = DEFAULT_CARTON): SkuInput
   };
 }
 
+function getNextSkuIndex(skus: SkuInput[]) {
+  const usedLabels = new Set(skus.map((sku) => sku.label));
+  for (let index = 0; index < SKU_COLORS.length; index += 1) {
+    if (!usedLabels.has(String.fromCharCode(65 + index))) return index;
+  }
+  return skus.length;
+}
+
 function applySingleColor(result: PackingResult, color: string): PackingResult {
   const withColor = (position: BoxPosition): BoxPosition => ({ ...position, skuColor: color });
 
@@ -60,11 +68,10 @@ export const usePackingStore = defineStore("packing", () => {
   const container = ref<Required<ContainerSpec>>(cloneContainer("20GP"));
   const mode = ref<PackingMode>("single");
   const singleCarton = ref<CartonSpec>({ ...DEFAULT_CARTON });
-  const multiCarton = ref<CartonSpec>({ ...DEFAULT_CARTON });
   const singleColor = ref("#d8923a");
   const skuCount = ref(2);
   const strategy = ref<LoadingStrategy>("multi-destination");
-  const skus = ref<SkuInput[]>([createSku(0, multiCarton.value), createSku(1, multiCarton.value)]);
+  const skus = ref<SkuInput[]>([createSku(0), createSku(1)]);
   const result = ref<PackingResult | null>(null);
   const visibleCount = ref(0);
   const status = ref("待计算");
@@ -76,26 +83,6 @@ export const usePackingStore = defineStore("packing", () => {
   });
 
   const totalBoxesText = computed(() => (result.value?.totalBoxes ?? 0).toLocaleString("zh-CN"));
-
-  function relabelSkus() {
-    skus.value = skus.value.map((sku, index) => ({
-      ...sku,
-      label: String.fromCharCode(65 + index),
-    }));
-  }
-
-  function withSharedSkuDimensions(sku: SkuInput): SkuInput {
-    return {
-      ...sku,
-      length: multiCarton.value.length,
-      width: multiCarton.value.width,
-      height: multiCarton.value.height,
-    };
-  }
-
-  function syncSkuDimensions() {
-    skus.value = skus.value.map(withSharedSkuDimensions);
-  }
 
   function markDirty() {
     status.value = result.value ? "待重新计算" : "待计算";
@@ -117,24 +104,16 @@ export const usePackingStore = defineStore("packing", () => {
     const count = Math.max(2, Math.min(5, Math.round(nextCount)));
     skuCount.value = count;
     while (skus.value.length < count) {
-      skus.value.push(createSku(skus.value.length, multiCarton.value));
+      skus.value.push(createSku(getNextSkuIndex(skus.value)));
     }
     skus.value = skus.value.slice(0, count);
-    relabelSkus();
-    syncSkuDimensions();
-    markDirty();
-  }
-
-  function updateMultiCarton(patch: Partial<CartonSpec>) {
-    multiCarton.value = { ...multiCarton.value, ...patch };
-    syncSkuDimensions();
     markDirty();
   }
 
   function updateSku(index: number, patch: Partial<SkuInput>) {
     const current = skus.value[index];
     if (!current) return;
-    skus.value[index] = withSharedSkuDimensions({ ...current, ...patch });
+    skus.value[index] = { ...current, ...patch };
     markDirty();
   }
 
@@ -152,11 +131,10 @@ export const usePackingStore = defineStore("packing", () => {
   function calculate() {
     error.value = "";
     try {
-      const sharedSkus = skus.value.map(withSharedSkuDimensions);
       const next: PackingResult =
         mode.value === "single"
           ? applySingleColor(calculatePacking(container.value, singleCarton.value), singleColor.value)
-          : (calculateMultiSkuPacking(container.value, sharedSkus, { strategy: strategy.value }) as PackingResult);
+          : (calculateMultiSkuPacking(container.value, skus.value, { strategy: strategy.value }) as PackingResult);
       result.value = next;
       visibleCount.value = next.totalBoxes;
       status.value = next.totalBoxes > 0 ? "已完成计算" : "无法装载";
@@ -173,7 +151,6 @@ export const usePackingStore = defineStore("packing", () => {
     container,
     mode,
     singleCarton,
-    multiCarton,
     singleColor,
     skuCount,
     strategy,
@@ -187,11 +164,9 @@ export const usePackingStore = defineStore("packing", () => {
     calculate,
     markDirty,
     moveSku,
-    relabelSkus,
     setContainerType,
     setMode,
     setSkuCount,
-    updateMultiCarton,
     updateSku,
   };
 });

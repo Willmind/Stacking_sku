@@ -3,7 +3,6 @@ import { computed, onBeforeUnmount, ref } from "vue";
 import type { LoadingStrategy } from "../../core/packing";
 import { usePackingStore } from "../../stores/packingStore";
 import SkuCard from "./SkuCard.vue";
-import BaseNumberField from "../ui/BaseNumberField.vue";
 import BaseSelect, { type SelectOption } from "../ui/BaseSelect.vue";
 
 const store = usePackingStore();
@@ -15,6 +14,7 @@ const dragPreview = ref<null | {
   x: number;
   y: number;
   width: number;
+  size: string;
   offsetX: number;
   offsetY: number;
 }>(null);
@@ -108,6 +108,7 @@ function onDragStart(index: number, event: PointerEvent) {
   dragPreview.value = {
     label: sku.label,
     target: sku.target,
+    size: `${sku.length} × ${sku.width} × ${sku.height}`,
     x: rect.left,
     y: rect.top,
     width: rect.width,
@@ -138,30 +139,7 @@ onBeforeUnmount(finishDrag);
 
 <template>
   <section class="field-group" aria-label="多 SKU 纸箱规格">
-    <h2>同尺寸多 SKU</h2>
-    <div class="shared-carton-grid" aria-label="公共纸箱尺寸">
-      <BaseNumberField
-        id="sku-shared-length"
-        label="纸箱长 mm"
-        :model-value="store.multiCarton.length"
-        :min="1"
-        @update:model-value="store.updateMultiCarton({ length: $event })"
-      />
-      <BaseNumberField
-        id="sku-shared-width"
-        label="纸箱宽 mm"
-        :model-value="store.multiCarton.width"
-        :min="1"
-        @update:model-value="store.updateMultiCarton({ width: $event })"
-      />
-      <BaseNumberField
-        id="sku-shared-height"
-        label="纸箱高 mm"
-        :model-value="store.multiCarton.height"
-        :min="1"
-        @update:model-value="store.updateMultiCarton({ height: $event })"
-      />
-    </div>
+    <h2>异尺寸多 SKU</h2>
     <label>
       SKU 个数
       <span class="slider-row">
@@ -189,7 +167,7 @@ onBeforeUnmount(finishDrag);
     <div id="sku-list" class="sku-list">
       <SkuCard
         v-for="(skuItem, index) in store.skus"
-        :key="`${skuItem.label}-${index}`"
+        :key="skuItem.label"
         :sku="skuItem"
         :index="index"
         :is-dragging="draggedIndex === index"
@@ -210,9 +188,10 @@ onBeforeUnmount(finishDrag);
         }"
       >
         <div class="sku-drag-preview-header">
-          <strong>{{ dragPreview.label }}</strong>
+          <strong>SKU {{ dragPreview.label }}</strong>
           <span>目标 {{ dragPreview.target.toLocaleString('zh-CN') }}</span>
         </div>
+        <small>{{ dragPreview.size }} mm</small>
       </div>
     </Teleport>
   </section>
@@ -253,12 +232,6 @@ input[type="range"] {
   align-items: center;
 }
 
-.shared-carton-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
 #sku-count-value {
   display: inline-flex;
   min-height: 26px;
@@ -274,15 +247,14 @@ input[type="range"] {
 
 .sku-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .sku-drag-preview {
   position: fixed;
   z-index: 120;
   pointer-events: none;
-  transform: rotate(1deg) scale(1.02);
+  transform: scale(1.02);
   border: 1px solid rgba(92, 237, 193, 0.64);
   border-radius: 8px;
   background: linear-gradient(180deg, rgba(26, 36, 49, 0.98), rgba(18, 27, 38, 0.98));
@@ -309,8 +281,15 @@ input[type="range"] {
   font-weight: 850;
 }
 
+.sku-drag-preview small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
 @media (max-width: 520px) {
-  .shared-carton-grid,
   .sku-list {
     grid-template-columns: 1fr;
   }

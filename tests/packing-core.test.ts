@@ -36,6 +36,40 @@ function assertNoCornerCollisions(result, positions) {
   }
 }
 
+function boxesOverlap3d(a, b) {
+  return (
+    a.x < b.x + b.dx &&
+    a.x + a.dx > b.x &&
+    a.y < b.y + b.dy &&
+    a.y + a.dy > b.y &&
+    a.z < b.z + b.dz &&
+    a.z + a.dz > b.z
+  );
+}
+
+function assertPositionsFitContainer(result, positions) {
+  for (const position of positions) {
+    assert.ok(position.x >= 0, "box x should be inside the container");
+    assert.ok(position.y >= 0, "box y should be inside the container");
+    assert.ok(position.z >= 0, "box z should be inside the container");
+    assert.ok(position.x + position.dx <= result.container.length, "box length should fit the container");
+    assert.ok(position.y + position.dy <= result.container.width, "box width should fit the container");
+    assert.ok(position.z + position.dz <= result.container.height, "box height should fit the container");
+  }
+}
+
+function assertNoPositionOverlaps(positions) {
+  for (let index = 0; index < positions.length; index += 1) {
+    for (let nextIndex = index + 1; nextIndex < positions.length; nextIndex += 1) {
+      assert.equal(
+        boxesOverlap3d(positions[index], positions[nextIndex]),
+        false,
+        `positions ${index} and ${nextIndex} should not overlap`,
+      );
+    }
+  }
+}
+
 function assertStartsBottomToTop(result) {
   const positions = Packing.generateBoxPositions(result, 3);
   assert.ok(positions.length >= 3, "expected at least three generated positions");
@@ -279,6 +313,65 @@ describe("packing core", () => {
   assert.deepEqual(fullFacesThenTail.map((position) => position.skuLabel), ["B", "B", "B", "B", "A"]);
 }
 
+{
+  const result = Packing.calculateMultiSkuPacking(
+    customContainer(700, 200, 200),
+    [
+      sku("A", 240, 100, 100, 4, "#d8923a"),
+      sku("B", 120, 180, 100, 4, "#42d6a4"),
+    ],
+    {
+      strategy: "multi-destination",
+      cornerBlock: { length: 0, width: 0, height: 0 },
+    },
+  );
+
+  const positions = Packing.generateBoxPositions(result, result.totalBoxes);
+  const aPositions = positions.filter((position) => position.skuLabel === "A");
+  const bPositions = positions.filter((position) => position.skuLabel === "B");
+
+  assert.equal(result.mode, "multi");
+  assert.equal(result.totalBoxes, 8);
+  assert.deepEqual(summarizeSkuCounts(result), { A: 4, B: 4 });
+  assert.deepEqual(aPositions.map((position) => [position.dx, position.dy, position.dz]), [
+    [240, 100, 100],
+    [240, 100, 100],
+    [240, 100, 100],
+    [240, 100, 100],
+  ]);
+  assert.deepEqual(
+    bPositions.map((position) => [[position.dx, position.dy].sort((a, b) => a - b), position.dz]),
+    [
+      [[120, 180], 100],
+      [[120, 180], 100],
+      [[120, 180], 100],
+      [[120, 180], 100],
+    ],
+  );
+  assertPositionsFitContainer(result, positions);
+  assertNoPositionOverlaps(positions);
+  assertClose(result.utilizationRatio, 0.6514285714);
+}
+
+{
+  const result = Packing.calculateMultiSkuPacking(
+    customContainer(1000, 330, 250),
+    [
+      sku("A", 120, 110, 100, 22, "#d8923a"),
+      sku("B", 200, 110, 100, 1, "#42d6a4"),
+    ],
+    {
+      strategy: "multi-destination",
+      cornerBlock: { length: 110, width: 110, height: 80 },
+    },
+  );
+
+  const positions = Packing.generateBoxPositions(result, result.totalBoxes);
+  assert.equal(result.pattern.family, "heterogeneous-zones");
+  assert.equal(result.blockedByCornerTotal, 2);
+  assertNoCornerCollisions(result, positions);
+}
+
 for (const target of [0.5, 1.5]) {
   assert.throws(
     () =>
@@ -293,19 +386,6 @@ for (const target of [0.5, 1.5]) {
     /目标数量必须为整数/,
   );
 }
-
-assert.throws(
-  () =>
-    Packing.calculateMultiSkuPacking(
-      customContainer(600, 300, 300),
-      [
-        sku("A", 100, 100, 100, 1, "#d8923a"),
-        sku("B", 120, 100, 100, 1, "#42d6a4"),
-      ],
-      { cornerBlock: { length: 0, width: 0, height: 0 } },
-    ),
-  /同尺寸/,
-);
 
 assert.throws(
   () =>

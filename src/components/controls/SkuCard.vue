@@ -20,6 +20,18 @@ function updateSkuTarget(value: number) {
   emit("update", props.index, { target: value });
 }
 
+function updateSkuLength(value: number) {
+  emit("update", props.index, { length: value });
+}
+
+function updateSkuWidth(value: number) {
+  emit("update", props.index, { width: value });
+}
+
+function updateSkuHeight(value: number) {
+  emit("update", props.index, { height: value });
+}
+
 function startDrag(event: PointerEvent) {
   if (event.button !== 0) return;
   event.preventDefault();
@@ -40,22 +52,46 @@ function startDrag(event: PointerEvent) {
         aria-label="拖动 SKU"
         @pointerdown="startDrag"
       >
-        <GripVertical :size="16" :stroke-width="2.35" aria-hidden="true" />
+        <GripVertical :size="16" :stroke-width="2.45" aria-hidden="true" />
       </button>
-      <strong>{{ sku.label }}</strong>
+      <strong>SKU {{ sku.label }}</strong>
       <BaseColorPicker
         :id="`sku-${sku.label}-color`"
+        class="card-color-field"
         :model-value="sku.color"
         :aria-label="`SKU ${sku.label} 箱体颜色`"
-        compact
         @update:model-value="emit('update', props.index, { color: $event })"
       />
     </div>
     <div class="sku-fields">
       <BaseNumberField
+        :id="`sku-${sku.label}-length`"
+        label="长 mm"
+        class="sku-number-field"
+        :model-value="sku.length"
+        :min="1"
+        @update:model-value="updateSkuLength"
+      />
+      <BaseNumberField
+        :id="`sku-${sku.label}-width`"
+        label="宽 mm"
+        class="sku-number-field"
+        :model-value="sku.width"
+        :min="1"
+        @update:model-value="updateSkuWidth"
+      />
+      <BaseNumberField
+        :id="`sku-${sku.label}-height`"
+        label="高 mm"
+        class="sku-number-field"
+        :model-value="sku.height"
+        :min="1"
+        @update:model-value="updateSkuHeight"
+      />
+      <BaseNumberField
         :id="`sku-${sku.label}-target`"
-        label="目标数量"
-        class="sku-target"
+        label="目标"
+        class="sku-number-field"
         :model-value="sku.target"
         :min="1"
         @update:model-value="updateSkuTarget"
@@ -67,8 +103,8 @@ function startDrag(event: PointerEvent) {
 <style scoped>
 .sku-card {
   display: grid;
-  gap: 12px;
-  padding: 12px;
+  gap: 16px;
+  padding: 16px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.048), rgba(255, 255, 255, 0.022));
@@ -86,18 +122,19 @@ function startDrag(event: PointerEvent) {
 
 .sku-card-header {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) 48px;
+  grid-template-columns: 42px minmax(0, 1fr) 54px;
+  gap: 12px;
   align-items: center;
-  gap: 10px;
 }
 
 .drag-handle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 34px;
+  width: 42px;
+  min-height: 42px;
   border: 1px solid var(--control-border);
-  border-radius: 7px;
+  border-radius: 8px;
   background: linear-gradient(180deg, var(--control-bg), var(--control-bg-strong));
   color: var(--muted);
   cursor: grab;
@@ -114,10 +151,62 @@ function startDrag(event: PointerEvent) {
   cursor: grabbing;
 }
 
-.sku-fields {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
+.sku-card-header strong {
+  min-width: 0;
+  color: var(--text);
+  font-size: 21px;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
 }
 
+.card-color-field {
+  justify-self: end;
+}
+
+.sku-fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sku-number-field {
+  min-width: 0;
+}
+
+.sku-number-field :deep(.base-number-control) {
+  min-height: 40px;
+  border-radius: 6px;
+}
+
+.sku-number-field :deep(.base-number-input) {
+  min-height: 38px;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 850;
+  text-align: center;
+}
+
+.sku-number-field :deep(.base-number-actions) {
+  width: 24px;
+}
+
+@media (max-width: 520px) {
+  .sku-card {
+    padding: 14px;
+  }
+
+  .sku-card-header {
+    grid-template-columns: 40px minmax(0, 1fr) 50px;
+  }
+
+  .drag-handle {
+    width: 40px;
+    min-height: 40px;
+  }
+
+  .sku-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 </style>
