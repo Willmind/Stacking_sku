@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, ref } from "vue";
 import type { LoadingStrategy } from "../../core/packing";
 import { usePackingStore } from "../../stores/packingStore";
 import SkuCard from "./SkuCard.vue";
@@ -7,8 +7,19 @@ import BaseSelect, { type SelectOption } from "../ui/BaseSelect.vue";
 
 const store = usePackingStore();
 const draggedIndex = ref<number | null>(null);
+const dropTargetIndex = ref<number | null>(null);
+const dragPreview = ref<null | {
+  label: string;
+  target: number;
+  x: number;
+  y: number;
+  width: number;
+  size: string;
+  offsetX: number;
+  offsetY: number;
+}>(null);
 const skuCountMin = 2;
-const skuCountMax = 10;
+const skuCountMax = 5;
 const skuCountProgressPercent = computed(() => {
   const range = skuCountMax - skuCountMin;
   if (range <= 0) return "0%";
@@ -21,25 +32,114 @@ const strategyOptions: SelectOption[] = [
   { value: "same-destination", label: "同卸货地/完整面优先", description: "优先铺满可视面" },
 ];
 
-function onDragStart(index: number) {
-  draggedIndex.value = index;
+function getDropTargetIndex(clientX: number, clientY: number) {
+  const cards = Array.from(document.querySelectorAll<HTMLElement>("[data-sku-drop-index]"));
+  const targetCard = cards.find((card) => {
+    const rect = card.getBoundingClientRect();
+    return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+  });
+  const index = Number(targetCard?.dataset.skuDropIndex);
+  return Number.isInteger(index) ? index : null;
 }
 
-function onDrop(index: number) {
-  if (draggedIndex.value === null) return;
-  store.moveSku(draggedIndex.value, index);
+function finishDrag() {
   draggedIndex.value = null;
+  dropTargetIndex.value = null;
+  dragPreview.value = null;
+  document.body.style.userSelect = "";
+  document.body.classList.remove("sku-drag-active");
+  document.removeEventListener("pointermove", onDocumentPointerMove);
+  document.removeEventListener("pointerup", onDocumentPointerUp);
+  document.removeEventListener("pointercancel", onDocumentPointerCancel);
+  document.removeEventListener("mousemove", onDocumentMouseMove);
+  document.removeEventListener("mouseup", onDocumentMouseUp);
+}
+
+function onDocumentPointerCancel() {
+  finishDrag();
+}
+
+function updateDragPosition(clientX: number, clientY: number) {
+  if (!dragPreview.value) return;
+  dragPreview.value = {
+    ...dragPreview.value,
+    x: clientX - dragPreview.value.offsetX,
+    y: clientY - dragPreview.value.offsetY,
+  };
+  dropTargetIndex.value = getDropTargetIndex(clientX, clientY);
+}
+
+function releaseDrag(clientX: number, clientY: number) {
+  const sourceIndex = draggedIndex.value;
+  const targetIndex = getDropTargetIndex(clientX, clientY);
+
+  if (sourceIndex !== null && targetIndex !== null) {
+    store.moveSku(sourceIndex, targetIndex);
+  }
+  finishDrag();
+}
+
+function onDocumentPointerMove(event: PointerEvent) {
+  updateDragPosition(event.clientX, event.clientY);
+}
+
+function onDocumentMouseMove(event: MouseEvent) {
+  updateDragPosition(event.clientX, event.clientY);
+}
+
+function onDocumentPointerUp(event: PointerEvent) {
+  releaseDrag(event.clientX, event.clientY);
+}
+
+function onDocumentMouseUp(event: MouseEvent) {
+  releaseDrag(event.clientX, event.clientY);
+}
+
+function onDragStart(index: number, event: PointerEvent) {
+  const sourceCard = event.currentTarget instanceof HTMLElement
+    ? event.currentTarget.closest<HTMLElement>("[data-sku-drop-index]")
+    : null;
+  const rect = sourceCard?.getBoundingClientRect();
+  const sku = store.skus[index];
+  if (!rect || !sku) return;
+
+  draggedIndex.value = index;
+  dropTargetIndex.value = index;
+  dragPreview.value = {
+    label: sku.label,
+    target: sku.target,
+    size: `${sku.length} × ${sku.width} × ${sku.height}`,
+    x: rect.left,
+    y: rect.top,
+    width: rect.width,
+    offsetX: event.clientX - rect.left,
+    offsetY: event.clientY - rect.top,
+  };
+  document.body.style.userSelect = "none";
+  document.body.classList.add("sku-drag-active");
+  document.removeEventListener("pointermove", onDocumentPointerMove);
+  document.removeEventListener("pointerup", onDocumentPointerUp);
+  document.removeEventListener("pointercancel", onDocumentPointerCancel);
+  document.removeEventListener("mousemove", onDocumentMouseMove);
+  document.removeEventListener("mouseup", onDocumentMouseUp);
+  document.addEventListener("pointermove", onDocumentPointerMove);
+  document.addEventListener("pointerup", onDocumentPointerUp);
+  document.addEventListener("pointercancel", onDocumentPointerCancel);
+  document.addEventListener("mousemove", onDocumentMouseMove);
+  document.addEventListener("mouseup", onDocumentMouseUp);
 }
 
 function updateStrategy(value: string) {
   store.strategy = value as LoadingStrategy;
   store.markDirty();
 }
+
+onBeforeUnmount(finishDrag);
 </script>
 
 <template>
   <section class="field-group" aria-label="多 SKU 纸箱规格">
-    <h2>纸箱规格</h2>
+    <h2>异尺寸多 SKU</h2>
     <label>
       SKU 个数
       <span class="slider-row">
@@ -67,14 +167,33 @@ function updateStrategy(value: string) {
     <div id="sku-list" class="sku-list">
       <SkuCard
         v-for="(skuItem, index) in store.skus"
-        :key="`${skuItem.label}-${index}`"
+        :key="skuItem.label"
         :sku="skuItem"
         :index="index"
+        :is-dragging="draggedIndex === index"
+        :is-drop-target="dropTargetIndex === index && draggedIndex !== index"
         @update="store.updateSku"
         @drag-start="onDragStart"
-        @drop-on="onDrop"
       />
     </div>
+
+    <Teleport to="body">
+      <div
+        v-if="dragPreview"
+        class="sku-drag-preview"
+        :style="{
+          left: `${dragPreview.x}px`,
+          top: `${dragPreview.y}px`,
+          width: `${dragPreview.width}px`,
+        }"
+      >
+        <div class="sku-drag-preview-header">
+          <strong>SKU {{ dragPreview.label }}</strong>
+          <span>目标 {{ dragPreview.target.toLocaleString('zh-CN') }}</span>
+        </div>
+        <small>{{ dragPreview.size }} mm</small>
+      </div>
+    </Teleport>
   </section>
 </template>
 
@@ -128,6 +247,51 @@ input[type="range"] {
 
 .sku-list {
   display: grid;
+  gap: 8px;
+}
+
+.sku-drag-preview {
+  position: fixed;
+  z-index: 120;
+  pointer-events: none;
+  transform: scale(1.02);
+  border: 1px solid rgba(92, 237, 193, 0.64);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(26, 36, 49, 0.98), rgba(18, 27, 38, 0.98));
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.38);
+  padding: 12px;
+}
+
+.sku-drag-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 10px;
+}
+
+.sku-drag-preview strong {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.sku-drag-preview span {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.sku-drag-preview small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+@media (max-width: 520px) {
+  .sku-list {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

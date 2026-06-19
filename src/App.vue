@@ -85,6 +85,7 @@ const store = usePackingStore();
   display: flex;
   flex-direction: column;
   gap: 18px;
+  contain: layout paint;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 18px;

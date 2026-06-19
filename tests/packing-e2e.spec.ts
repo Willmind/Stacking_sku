@@ -254,6 +254,105 @@ test("uses styled dropdown popovers for container and strategy selection", async
   await expect(page.locator("#total-boxes")).toHaveText("1,750");
 
   await page.getByLabel("多 SKU").check();
+  await expect(page.locator("#sku-count")).toHaveAttribute("max", "5");
+  await expect(page.locator("#sku-shared-length")).toHaveCount(0);
+  await expect(page.locator("#sku-shared-width")).toHaveCount(0);
+  await expect(page.locator("#sku-shared-height")).toHaveCount(0);
+  await expect(page.locator("#sku-A-length")).toBeVisible();
+  await expect(page.locator("#sku-A-width")).toBeVisible();
+  await expect(page.locator("#sku-A-height")).toBeVisible();
+  await expect(page.locator("#sku-B-length")).toBeVisible();
+  await expect(page.locator("#sku-B-width")).toBeVisible();
+  await expect(page.locator("#sku-B-height")).toBeVisible();
+  await expect(page.locator(".sku-table-header")).toHaveCount(0);
+  const skuCards = page.locator("#sku-list .sku-card");
+  const firstSkuCardBox = await skuCards.nth(0).boundingBox();
+  const secondSkuCardBox = await skuCards.nth(1).boundingBox();
+  expect(firstSkuCardBox).not.toBeNull();
+  expect(secondSkuCardBox).not.toBeNull();
+  expect(firstSkuCardBox?.height).toBeLessThan(180);
+  expect((secondSkuCardBox?.y ?? 0)).toBeGreaterThan((firstSkuCardBox?.y ?? 0) + (firstSkuCardBox?.height ?? 0) * 0.7);
+  expect(Math.abs((firstSkuCardBox?.x ?? 0) - (secondSkuCardBox?.x ?? 0))).toBeLessThan(4);
+  await expect(skuCards.first()).not.toHaveAttribute("draggable", "true");
+  await expect(skuCards.first().locator(".drag-handle")).not.toHaveAttribute("draggable", "true");
+  const firstSkuTitle = page.locator("#sku-list .sku-card strong").first();
+  await expect(firstSkuTitle).toHaveText("SKU A");
+  await expect(skuCards.first().locator(".base-number-input")).toHaveCount(4);
+  const firstSkuTarget = page.locator("#sku-A-target");
+  const secondSkuTarget = page.locator("#sku-B-target");
+  const firstSkuTargetBox = await firstSkuTarget.boundingBox();
+  const firstSkuColorBox = await skuCards.first().locator(".card-color-field .carton-color").boundingBox();
+  const firstSkuLengthBox = await page.locator("#sku-A-length").boundingBox();
+  const firstSkuWidthBox = await page.locator("#sku-A-width").boundingBox();
+  const firstSkuHeightBox = await page.locator("#sku-A-height").boundingBox();
+  const firstSkuControlWidths = await skuCards.first().locator(".sku-fields .base-number-control").evaluateAll((controls) =>
+    controls.map((control) => Math.round(control.getBoundingClientRect().width)),
+  );
+  expect(firstSkuControlWidths).toHaveLength(4);
+  expect(Math.min(...firstSkuControlWidths)).toBeGreaterThan(70);
+  expect(firstSkuTargetBox?.width).toBeGreaterThan(38);
+  expect(firstSkuColorBox?.width).toBeGreaterThanOrEqual(48);
+  expect(Math.abs((firstSkuCardBox?.x ?? 0) + (firstSkuCardBox?.width ?? 0) - 16 - ((firstSkuColorBox?.x ?? 0) + (firstSkuColorBox?.width ?? 0)))).toBeLessThanOrEqual(3);
+  expect(firstSkuLengthBox?.width).toBeGreaterThan(38);
+  expect(firstSkuWidthBox?.width).toBeGreaterThan(38);
+  expect(firstSkuHeightBox?.width).toBeGreaterThan(38);
+  expect(Math.abs((firstSkuLengthBox?.y ?? 0) - (firstSkuWidthBox?.y ?? 0))).toBeLessThan(4);
+  expect(Math.abs((firstSkuWidthBox?.y ?? 0) - (firstSkuHeightBox?.y ?? 0))).toBeLessThan(4);
+  expect(Math.abs((firstSkuHeightBox?.y ?? 0) - (firstSkuTargetBox?.y ?? 0))).toBeLessThan(4);
+  await firstSkuTarget.fill("111");
+  await firstSkuTarget.blur();
+  await secondSkuTarget.fill("222");
+  await secondSkuTarget.blur();
+  await page.locator("#sku-A-length").fill("240");
+  await page.locator("#sku-A-length").blur();
+  await page.locator("#sku-A-width").fill("100");
+  await page.locator("#sku-A-width").blur();
+  await page.locator("#sku-A-height").fill("100");
+  await page.locator("#sku-A-height").blur();
+  await page.locator("#sku-B-length").fill("120");
+  await page.locator("#sku-B-length").blur();
+  await page.locator("#sku-B-width").fill("180");
+  await page.locator("#sku-B-width").blur();
+  await page.locator("#sku-B-height").fill("100");
+  await page.locator("#sku-B-height").blur();
+  await expect(firstSkuTarget).toHaveValue("111");
+  await expect(secondSkuTarget).toHaveValue("222");
+  const firstSkuCardBoxAfterEdit = await skuCards.nth(0).boundingBox();
+  const secondSkuCardBoxAfterEdit = await skuCards.nth(1).boundingBox();
+  expect(firstSkuCardBoxAfterEdit).not.toBeNull();
+  expect(secondSkuCardBoxAfterEdit).not.toBeNull();
+  const firstHandleBox = await skuCards.nth(0).locator(".drag-handle").boundingBox();
+  expect(firstHandleBox).not.toBeNull();
+  await page.mouse.move((firstHandleBox?.x ?? 0) + 8, (firstHandleBox?.y ?? 0) + 8);
+  await page.mouse.down();
+  await page.mouse.move((firstSkuCardBoxAfterEdit?.x ?? 0) + 42, (firstSkuCardBoxAfterEdit?.y ?? 0) + 42);
+  const dragPreview = page.locator(".sku-drag-preview");
+  await expect(dragPreview).toBeVisible();
+  await expect(dragPreview).toContainText("SKU A");
+  const dragPreviewRotation = await dragPreview.evaluate((element) => {
+    const matrix = new DOMMatrixReadOnly(getComputedStyle(element).transform);
+    return { b: matrix.b, c: matrix.c };
+  });
+  expect(Math.abs(dragPreviewRotation.b)).toBeLessThan(0.001);
+  expect(Math.abs(dragPreviewRotation.c)).toBeLessThan(0.001);
+  const dragPreviewBox = await dragPreview.boundingBox();
+  expect(dragPreviewBox?.width).toBeGreaterThan((firstSkuCardBoxAfterEdit?.width ?? 0) * 0.7);
+  await page.mouse.move(
+    (secondSkuCardBoxAfterEdit?.x ?? 0) + (secondSkuCardBoxAfterEdit?.width ?? 0) / 2,
+    (secondSkuCardBoxAfterEdit?.y ?? 0) + (secondSkuCardBoxAfterEdit?.height ?? 0) / 2,
+  );
+  await expect(skuCards.nth(1)).toHaveClass(/sku-card--drop-target/);
+  await page.mouse.up();
+  await expect(skuCards.nth(0).locator("strong")).toHaveText("SKU B");
+  await expect(skuCards.nth(1).locator("strong")).toHaveText("SKU A");
+  await expect(skuCards.nth(0).locator(".base-number-input").nth(0)).toHaveValue("120");
+  await expect(skuCards.nth(0).locator(".base-number-input").nth(1)).toHaveValue("180");
+  await expect(skuCards.nth(0).locator(".base-number-input").nth(2)).toHaveValue("100");
+  await expect(skuCards.nth(0).locator(".base-number-input").nth(3)).toHaveValue("222");
+  await expect(skuCards.nth(1).locator(".base-number-input").nth(0)).toHaveValue("240");
+  await expect(skuCards.nth(1).locator(".base-number-input").nth(1)).toHaveValue("100");
+  await expect(skuCards.nth(1).locator(".base-number-input").nth(2)).toHaveValue("100");
+  await expect(skuCards.nth(1).locator(".base-number-input").nth(3)).toHaveValue("111");
   await page.getByRole("combobox", { name: "装载策略" }).click();
   await expect(page.getByRole("listbox")).toBeVisible();
   const sameDestinationOption = page.getByRole("option", { name: "同卸货地/完整面优先" });
@@ -265,6 +364,81 @@ test("uses styled dropdown popovers for container and strategy selection", async
   expect(sameDestinationLabelBox?.width).toBeGreaterThan(150);
   await page.getByRole("option", { name: "同卸货地/完整面优先" }).click();
   await expect(page.getByRole("combobox", { name: "装载策略" })).toContainText("同卸货地/完整面优先");
+});
+
+test("labels heterogeneous multi SKU stack metrics without implying uniform layers", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("多 SKU").check();
+  await page.locator("#sku-A-target").fill("2");
+  await page.locator("#sku-A-target").blur();
+  await page.locator("#sku-A-length").fill("3000");
+  await page.locator("#sku-A-length").blur();
+  await page.locator("#sku-A-width").fill("1000");
+  await page.locator("#sku-A-width").blur();
+  await page.locator("#sku-A-height").fill("900");
+  await page.locator("#sku-A-height").blur();
+  await page.locator("#sku-B-target").fill("2");
+  await page.locator("#sku-B-target").blur();
+  await page.locator("#sku-B-length").fill("2500");
+  await page.locator("#sku-B-length").blur();
+  await page.locator("#sku-B-width").fill("900");
+  await page.locator("#sku-B-width").blur();
+  await page.locator("#sku-B-height").fill("800");
+  await page.locator("#sku-B-height").blur();
+
+  await page.getByRole("button", { name: "计算装载" }).click();
+
+  await expect(page.locator("#pattern-name")).toHaveText("异尺寸按 SKU 顺序分区");
+  await expect(page.locator("#per-layer-count").locator("xpath=preceding-sibling::dt")).toHaveText("最大层级箱数");
+  await expect(page.locator("#layer-count").locator("xpath=preceding-sibling::dt")).toHaveText("堆叠层级");
+});
+
+test("backfills reusable floor space for heterogeneous multi SKU top view", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("多 SKU").check();
+  await page.locator("#sku-A-length").fill("300");
+  await page.locator("#sku-A-length").blur();
+  await page.locator("#sku-A-width").fill("320");
+  await page.locator("#sku-A-width").blur();
+  await page.locator("#sku-A-height").fill("260");
+  await page.locator("#sku-A-height").blur();
+  await page.locator("#sku-A-target").fill("100");
+  await page.locator("#sku-A-target").blur();
+  await page.locator("#sku-B-length").fill("500");
+  await page.locator("#sku-B-length").blur();
+  await page.locator("#sku-B-width").fill("320");
+  await page.locator("#sku-B-width").blur();
+  await page.locator("#sku-B-height").fill("260");
+  await page.locator("#sku-B-height").blur();
+  await page.locator("#sku-B-target").fill("100");
+  await page.locator("#sku-B-target").blur();
+
+  await page.getByRole("button", { name: "计算装载" }).click();
+
+  await expect(page.locator("#total-boxes")).toHaveText("200");
+  const backfillPixel = await page.locator("#plan-canvas-top").evaluate((element) => {
+    const canvas = element as HTMLCanvasElement;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("2D canvas context is missing");
+
+    const rect = canvas.getBoundingClientRect();
+    const dpr = canvas.width / rect.width;
+    const width = rect.width;
+    const height = rect.height;
+    const compactCanvas = height < 320 || width < 520;
+    const pad = compactCanvas ? 34 : 48;
+    const scale = Math.min((width - pad * 2) / 5898, (height - pad * 2) / 2352);
+    const boxX = (width - 5898 * scale) / 2;
+    const boxY = (height - 2352 * scale) / 2 + (compactCanvas ? 4 : 10);
+    const sampleX = Math.round((boxX + (320 + 160) * scale) * dpr);
+    const sampleY = Math.round((boxY + (1500 + 250) * scale) * dpr);
+    const [red, green, blue, alpha] = context.getImageData(sampleX, sampleY, 1, 1).data;
+    return { red, green, blue, alpha };
+  });
+
+  expect(backfillPixel.alpha).toBeGreaterThan(150);
+  expect(backfillPixel.green).toBeGreaterThan(backfillPixel.red + 40);
+  expect(backfillPixel.green).toBeGreaterThan(backfillPixel.blue + 15);
 });
 
 test("imports an Excel batch and shows calculated packing results in a dialog", async ({ page }) => {
@@ -331,7 +505,7 @@ test("keeps the visualization workspace stable while the control panel scrolls",
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
 
-  await expect(page.locator("#sku-count-value")).toHaveText("10");
+  await expect(page.locator("#sku-count-value")).toHaveText("5");
   await expect(page.locator("#sku-count")).toHaveAttribute("style", /--range-progress:\s*100%/);
 
   const layout = await page.evaluate(() => {

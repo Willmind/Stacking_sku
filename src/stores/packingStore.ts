@@ -15,6 +15,7 @@ import {
 export type PackingMode = "single" | "multi";
 
 const SKU_COLORS = ["#d8923a", "#42d6a4", "#6e8bff", "#ff7066", "#b7e35f"];
+const DEFAULT_CARTON: CartonSpec = { length: 480, width: 320, height: 260 };
 type ContainerType = keyof typeof CONTAINERS;
 
 function isContainerType(type: string): type is ContainerType {
@@ -32,15 +33,23 @@ function cloneContainer(type: ContainerType): Required<ContainerSpec> {
   };
 }
 
-function createSku(index: number): SkuInput {
+function createSku(index: number, carton: CartonSpec = DEFAULT_CARTON): SkuInput {
   return {
     label: String.fromCharCode(65 + index),
-    length: 480,
-    width: 320,
-    height: 260,
+    length: carton.length,
+    width: carton.width,
+    height: carton.height,
     target: 100,
     color: SKU_COLORS[index % SKU_COLORS.length],
   };
+}
+
+function getNextSkuIndex(skus: SkuInput[]) {
+  const usedLabels = new Set(skus.map((sku) => sku.label));
+  for (let index = 0; index < SKU_COLORS.length; index += 1) {
+    if (!usedLabels.has(String.fromCharCode(65 + index))) return index;
+  }
+  return skus.length;
 }
 
 function applySingleColor(result: PackingResult, color: string): PackingResult {
@@ -58,7 +67,7 @@ export const usePackingStore = defineStore("packing", () => {
   const containerType = ref<ContainerType>("20GP");
   const container = ref<Required<ContainerSpec>>(cloneContainer("20GP"));
   const mode = ref<PackingMode>("single");
-  const singleCarton = ref<CartonSpec>({ length: 480, width: 320, height: 260 });
+  const singleCarton = ref<CartonSpec>({ ...DEFAULT_CARTON });
   const singleColor = ref("#d8923a");
   const skuCount = ref(2);
   const strategy = ref<LoadingStrategy>("multi-destination");
@@ -74,13 +83,6 @@ export const usePackingStore = defineStore("packing", () => {
   });
 
   const totalBoxesText = computed(() => (result.value?.totalBoxes ?? 0).toLocaleString("zh-CN"));
-
-  function relabelSkus() {
-    skus.value = skus.value.map((sku, index) => ({
-      ...sku,
-      label: String.fromCharCode(65 + index),
-    }));
-  }
 
   function markDirty() {
     status.value = result.value ? "待重新计算" : "待计算";
@@ -99,13 +101,12 @@ export const usePackingStore = defineStore("packing", () => {
   }
 
   function setSkuCount(nextCount: number) {
-    const count = Math.max(2, Math.min(10, Math.round(nextCount)));
+    const count = Math.max(2, Math.min(5, Math.round(nextCount)));
     skuCount.value = count;
     while (skus.value.length < count) {
-      skus.value.push(createSku(skus.value.length));
+      skus.value.push(createSku(getNextSkuIndex(skus.value)));
     }
     skus.value = skus.value.slice(0, count);
-    relabelSkus();
     markDirty();
   }
 
@@ -113,7 +114,6 @@ export const usePackingStore = defineStore("packing", () => {
     const current = skus.value[index];
     if (!current) return;
     skus.value[index] = { ...current, ...patch };
-    relabelSkus();
     markDirty();
   }
 
@@ -125,7 +125,6 @@ export const usePackingStore = defineStore("packing", () => {
     const [moved] = next.splice(fromIndex, 1);
     next.splice(toIndex, 0, moved);
     skus.value = next;
-    relabelSkus();
     markDirty();
   }
 
@@ -165,7 +164,6 @@ export const usePackingStore = defineStore("packing", () => {
     calculate,
     markDirty,
     moveSku,
-    relabelSkus,
     setContainerType,
     setMode,
     setSkuCount,

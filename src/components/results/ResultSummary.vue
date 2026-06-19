@@ -5,9 +5,13 @@ import { usePackingStore } from "../../stores/packingStore";
 const store = usePackingStore();
 
 const layersWithBoxes = computed(() => store.result?.layers.filter((layer) => layer.boxCount > 0).length ?? 0);
+const isHeterogeneousResult = computed(() => store.result?.pattern?.family === "heterogeneous-zones");
+const perLayerMetricLabel = computed(() => (isHeterogeneousResult.value ? "最大层级箱数" : "每层数量"));
+const layerMetricLabel = computed(() => (isHeterogeneousResult.value ? "堆叠层级" : "层数"));
 const patternName = computed(() => {
   const pattern = store.result?.pattern;
   if (!pattern) return "-";
+  if (pattern.family === "heterogeneous-zones") return "异尺寸按 SKU 顺序分区";
   return pattern.family === "width-lanes" ? "按柜宽分区混排" : "按柜长分区混排";
 });
 
@@ -29,11 +33,11 @@ function formatMm(value: number) {
     </div>
     <dl class="metric-grid metric-grid--compact">
       <div>
-        <dt>每层数量</dt>
+        <dt>{{ perLayerMetricLabel }}</dt>
         <dd id="per-layer-count">{{ formatNumber(store.result?.perLayerBoxCount ?? 0) }}</dd>
       </div>
       <div>
-        <dt>层数</dt>
+        <dt>{{ layerMetricLabel }}</dt>
         <dd id="layer-count">{{ formatNumber(layersWithBoxes) }}</dd>
       </div>
       <div>
