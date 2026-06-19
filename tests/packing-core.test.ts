@@ -396,6 +396,10 @@ describe("packing core", () => {
   assert.deepEqual(summarizeSkuCounts(result), { A: 100, B: 100 });
   assert.equal(aFootprints.length, 12);
   assert.equal(bFootprints.length, 12);
+  assert.ok(
+    bFootprints.some((position) => position.x < 640),
+    "later heterogeneous SKUs should reuse empty floor space left by earlier SKUs",
+  );
   assert.equal(new Set(aFootprints.map(footprintKey)).size, aFootprints.length);
   assert.equal(new Set(bFootprints.map(footprintKey)).size, bFootprints.length);
   assert.equal(

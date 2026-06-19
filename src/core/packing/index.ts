@@ -948,6 +948,35 @@ export type {
     return Math.max(...positions.map((position) => position.y + position.dy));
   }
 
+  function getPositionFootprint(position) {
+    return position.sourceFootprint || position;
+  }
+
+  function footprintRectFromPosition(position) {
+    const footprint = getPositionFootprint(position);
+    return {
+      x: footprint.x,
+      y: footprint.y,
+      dx: footprint.dx,
+      dy: footprint.dy,
+    };
+  }
+
+  function uniqueFloorRectsFromPositions(positions) {
+    const seen = new Set();
+    const rects = [];
+
+    for (const position of positions) {
+      const rect = footprintRectFromPosition(position);
+      const key = `${rect.x}:${rect.y}:${rect.dx}:${rect.dy}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rects.push(rect);
+    }
+
+    return rects;
+  }
+
   function createLayersFromPositions(positions) {
     const layersByIndex = new Map();
     for (const position of positions) {
@@ -1047,6 +1076,119 @@ export type {
     };
   }
 
+  function createAcceptedByStackFromPositions(positions) {
+    const acceptedByStack = new Map();
+
+    for (const position of positions) {
+      const stackIndex = Number.isFinite(position.stackIndex) ? position.stackIndex : 0;
+      if (!acceptedByStack.has(stackIndex)) acceptedByStack.set(stackIndex, []);
+      acceptedByStack.get(stackIndex).push(position);
+    }
+
+    return acceptedByStack;
+  }
+
+  function createBackfillStartCandidates(occupiedRects, limit, size, boundary) {
+    const starts = new Set([0, Math.max(0, limit - size)]);
+    const dimension = boundary === "x" ? "dx" : "dy";
+
+    for (const rect of occupiedRects) {
+      const start = rect[boundary];
+      const end = start + rect[dimension];
+      starts.add(start);
+      starts.add(end);
+      starts.add(start - size);
+      starts.add(end - size);
+    }
+
+    return Array.from(starts)
+      .filter((start) => Number.isFinite(start) && start >= 0 && start + size <= limit)
+      .sort((a, b) => a - b);
+  }
+
+  function createBackfillFootprintCandidates(container, sku, occupiedPositions, maxLength) {
+    if (maxLength <= 0) return [];
+
+    const occupiedRects = uniqueFloorRectsFromPositions(occupiedPositions);
+    const orientations = Object.values(getOrientations(sku));
+    const candidates = [];
+    const seen = new Set();
+
+    for (const orientation of orientations) {
+      const xStarts = createBackfillStartCandidates(occupiedRects, maxLength, orientation.x, "x");
+      const yStarts = createBackfillStartCandidates(occupiedRects, container.width, orientation.y, "y");
+
+      for (const x of xStarts) {
+        for (const y of yStarts) {
+          const candidate = {
+            x,
+            y,
+            z: 0,
+            dx: orientation.x,
+            dy: orientation.y,
+            dz: sku.height,
+            orientationId: orientation.id,
+            label: orientation.label,
+            source: "heterogeneous-backfill",
+          };
+          const key = `${candidate.x}:${candidate.y}:${candidate.dx}:${candidate.dy}`;
+          if (seen.has(key)) continue;
+          if (!positionFitsFloor(candidate, container)) continue;
+          if (candidate.x + candidate.dx > maxLength) continue;
+          if (overlapsAnyFloorRect(candidate, occupiedRects)) continue;
+          seen.add(key);
+          candidates.push(candidate);
+        }
+      }
+    }
+
+    return candidates.sort((a, b) => a.x - b.x || a.y - b.y || a.dx - b.dx || a.dy - b.dy);
+  }
+
+  function createHeterogeneousBackfillPositions(container, sku, target, occupiedPositions, maxLength, cornerBlock) {
+    if (target <= 0 || occupiedPositions.length === 0 || maxLength <= 0) return [];
+
+    const layerCount = Math.floor(container.height / sku.height);
+    const acceptedByStack = createAcceptedByStackFromPositions(occupiedPositions);
+    const acceptedFloorRects = uniqueFloorRectsFromPositions(occupiedPositions);
+    const candidates = createBackfillFootprintCandidates(container, sku, occupiedPositions, maxLength);
+    const selectedPositions = [];
+
+    candidates.forEach((candidate, candidateIndex) => {
+      if (selectedPositions.length >= target) return;
+      if (overlapsAnyFloorRect(candidate, acceptedFloorRects)) return;
+
+      const stackPositions = createStackedFacePositions(
+        candidate,
+        candidateIndex,
+        layerCount,
+        container,
+        cornerBlock,
+        acceptedByStack,
+      );
+      if (stackPositions.length === 0) return;
+
+      const sourceFootprint = {
+        x: candidate.x,
+        y: candidate.y,
+        dx: candidate.dx,
+        dy: candidate.dy,
+      };
+      const remaining = target - selectedPositions.length;
+      selectedPositions.push(
+        ...stackPositions.slice(0, remaining).map((position) => ({
+          ...position,
+          sourceFootprint,
+          skuLabel: sku.label,
+          skuColor: sku.color,
+        })),
+      );
+      acceptedFloorRects.push(floorRectFromPosition(candidate));
+    });
+
+    return selectedPositions;
+  }
+
   function calculateSameDimensionMultiSkuPacking(containerInput, skus, options, strategy) {
     const firstSku = skus[0];
     const baseResult = calculatePacking(
@@ -1093,44 +1235,60 @@ export type {
     let blockedByCornerTotal = 0;
 
     for (const sku of skus) {
-      const remainingLength = container.length - cursorX;
-      if (remainingLength <= 0) break;
+      const skuPositions = [];
+      let remainingTarget = sku.target;
 
-      const zoneContainer = {
-        ...container,
-        id: "CUSTOM",
-        name: `${sku.label} 装载分区`,
-        length: remainingLength,
-      };
-      const zoneCornerBlock = cursorX >= cornerBlock.length
-        ? createZeroCornerBlock()
-        : createZoneCornerBlock(cornerBlock, cursorX);
-      const zoneResult = calculatePacking(
-        zoneContainer,
-        { length: sku.length, width: sku.width, height: sku.height },
-        {
-          ...options,
-          cornerBlock: zoneCornerBlock,
-        },
+      const backfillPositions = createHeterogeneousBackfillPositions(
+        container,
+        sku,
+        remainingTarget,
+        assignedPositions,
+        cursorX,
+        cornerBlock,
       );
-      const selectedPositions = zoneResult.orderedPositions.slice(0, sku.target);
-      const offsetPositions = selectedPositions.map((position) => ({
-        ...position,
-        x: position.x + cursorX,
-        sourceFootprint: createHeterogeneousSourceFootprint(zoneResult, position, cursorX),
-        skuLabel: sku.label,
-        skuColor: sku.color,
-      }));
+      assignedPositions.push(...backfillPositions);
+      skuPositions.push(...backfillPositions);
+      remainingTarget -= backfillPositions.length;
 
-      assignedPositions.push(...offsetPositions);
-      blockedByCornerTotal += zoneResult.blockedByCornerTotal;
+      const remainingLength = container.length - cursorX;
+      let zoneUsedLength = 0;
+      if (remainingTarget > 0 && remainingLength > 0) {
+        const zoneContainer = {
+          ...container,
+          id: "CUSTOM",
+          name: `${sku.label} 装载分区`,
+          length: remainingLength,
+        };
+        const zoneCornerBlock = cursorX >= cornerBlock.length
+          ? createZeroCornerBlock()
+          : createZoneCornerBlock(cornerBlock, cursorX);
+        const zoneResult = calculatePacking(
+          zoneContainer,
+          { length: sku.length, width: sku.width, height: sku.height },
+          {
+            ...options,
+            cornerBlock: zoneCornerBlock,
+          },
+        );
+        const selectedPositions = zoneResult.orderedPositions.slice(0, remainingTarget);
+        const offsetPositions = selectedPositions.map((position) => ({
+          ...position,
+          x: position.x + cursorX,
+          sourceFootprint: createHeterogeneousSourceFootprint(zoneResult, position, cursorX),
+          skuLabel: sku.label,
+          skuColor: sku.color,
+        }));
 
-      const zoneUsedLength = selectedPositions.length === 0 ? 0 : getOccupiedLength(selectedPositions);
+        assignedPositions.push(...offsetPositions);
+        skuPositions.push(...offsetPositions);
+        blockedByCornerTotal += zoneResult.blockedByCornerTotal;
+        zoneUsedLength = selectedPositions.length === 0 ? 0 : getOccupiedLength(selectedPositions);
+      }
       groups.push({
         label: sku.label,
-        count: selectedPositions.length,
-        occupiedLength: zoneUsedLength,
-        occupiedWidth: getOccupiedWidth(selectedPositions),
+        count: skuPositions.length,
+        occupiedLength: skuPositions.length === 0 ? 0 : getOccupiedLength(skuPositions),
+        occupiedWidth: getOccupiedWidth(skuPositions),
       });
       if (zoneUsedLength > 0) {
         cursorX += zoneUsedLength;
