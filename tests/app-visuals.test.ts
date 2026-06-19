@@ -162,6 +162,17 @@ describe("2D plan source guards", () => {
     assert.doesNotMatch(plan2dViewSource, /plan-view-card--side/);
   });
 
+  it("keeps the front view switchable between corner and door endpoints", () => {
+    assert.match(plan2dViewSource, /frontViewSides/);
+    assert.match(plan2dViewSource, /activeFrontViewSide/);
+    assert.match(plan2dViewSource, /plan-view-switch--front/);
+    assert.match(plan2dViewSource, /角件端/);
+    assert.match(plan2dViewSource, /柜门/);
+    assert.match(plan2dViewSource, /frontViewSide:/);
+    assert.match(plan2dSource, /Plan2DFrontViewSide/);
+    assert.match(plan2dSource, /getFrontEndpointDrawingPositions/);
+  });
+
   it("keeps auxiliary labels compact on short 2D canvases", () => {
     assert.match(plan2dSource, /isCompactCanvas/);
     assert.match(plan2dSource, /showMeasurementLabels/);
@@ -193,7 +204,7 @@ describe("2D plan source guards", () => {
   });
 
   it("draws the container outline after cargo boxes", () => {
-    const boxLoopIndex = plan2dSource.indexOf("for (const { box, visibleBox } of sortedDrawingPositions)");
+    const boxLoopIndex = plan2dSource.indexOf("for (const drawingPosition of sortedDrawingPositions)");
     const outlineIndex = plan2dSource.indexOf("drawContainerOutline(ctx, plane, scale)", boxLoopIndex);
 
     assert.ok(boxLoopIndex > -1, "2D renderer should draw cargo boxes in one predictable loop");

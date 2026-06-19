@@ -5,12 +5,22 @@ import { getPlan2DAxisGuideMetrics, getPlan2DVerticalGuideLabelLayout, renderPla
 
 function createRecordingCanvas(width = 980, height = 620) {
   const drawnText: string[] = [];
+  const filledRects: Array<{ fillStyle: string; x: number; y: number; width: number; height: number }> = [];
   const context = {
+    fillStyle: "",
     beginPath() {},
     clearRect() {},
     closePath() {},
     fill() {},
-    fillRect() {},
+    fillRect(x: number, y: number, rectWidth: number, rectHeight: number) {
+      filledRects.push({
+        fillStyle: this.fillStyle,
+        x,
+        y,
+        width: rectWidth,
+        height: rectHeight,
+      });
+    },
     fillText(text: string) {
       drawnText.push(text);
     },
@@ -40,7 +50,7 @@ function createRecordingCanvas(width = 980, height = 620) {
     },
   } as unknown as HTMLCanvasElement;
 
-  return { canvas, drawnText };
+  return { canvas, drawnText, filledRects };
 }
 
 describe("2D plan axis guide metrics", () => {
@@ -93,7 +103,7 @@ describe("2D plan axis guide metrics", () => {
 
     assert.equal(sideMetrics.x.count, 67);
     assert.equal(sideMetrics.x.countLabel, "");
-    assert.equal(frontMetrics.x.count, 35);
+    assert.ok(frontMetrics.x.count < 35);
     assert.equal(frontMetrics.x.countLabel, "");
 
     const side = createRecordingCanvas();
@@ -119,6 +129,34 @@ describe("2D plan axis guide metrics", () => {
 
     assert.ok(!front.drawnText.some((text) => text.includes("35排")));
     assert.ok(front.drawnText.includes("占宽 2,320mm · 余量 32mm"));
+  });
+
+  it("renders front views from the selected endpoint instead of flattening the full container length", () => {
+    const result = calculatePacking("20GP", { length: 120, width: 320, height: 260 });
+    const renderFront = (frontViewSide: "corner" | "door") => {
+      const recording = createRecordingCanvas();
+      renderPlan2D({
+        canvas: recording.canvas,
+        result,
+        visibleCount: result.totalBoxes,
+        viewMode: "front",
+        frontViewSide,
+        devicePixelRatio: 1,
+      });
+      return {
+        ...recording,
+        cargoRects: recording.filledRects.filter((rect) => rect.fillStyle.includes("0.82")),
+      };
+    };
+
+    const corner = renderFront("corner");
+    const door = renderFront("door");
+
+    assert.ok(corner.cargoRects.length < 500);
+    assert.ok(door.cargoRects.length < 500);
+    assert.notEqual(corner.cargoRects.length, door.cargoRects.length);
+    assert.ok(corner.drawnText.includes("角件端视角"));
+    assert.ok(door.drawnText.includes("柜门视角"));
   });
 
   it("places the vertical guide label outside the left guide and centers it on the occupied span", () => {

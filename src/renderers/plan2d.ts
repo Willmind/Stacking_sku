@@ -10,11 +10,17 @@ export interface Plan2DRenderOptions {
   result: PackingResult | null;
   visibleCount: number;
   viewMode?: Plan2DViewMode;
+  frontViewSide?: Plan2DFrontViewSide;
   devicePixelRatio?: number;
   showLabels?: boolean;
 }
 
 export type Plan2DViewMode = "top" | "side" | "front";
+export type Plan2DFrontViewSide = "corner" | "door";
+
+export interface Plan2DProjectionOptions {
+  frontViewSide?: Plan2DFrontViewSide;
+}
 
 export interface Plan2DAxisGuideMetric {
   count: number;
@@ -43,6 +49,13 @@ interface AxisGuideModel extends Plan2DAxisGuideMetrics {
     yStart: number;
     yEnd: number;
   };
+}
+
+interface Plan2DDrawingPosition {
+  box: BoxPosition;
+  visibleBox: BoxPosition | null;
+  projectedRect?: ProjectedRect;
+  baseMarker?: boolean;
 }
 
 export interface Plan2DGuideLabelLayout {
@@ -153,6 +166,10 @@ function keyForPosition(position: BoxPosition) {
   return `${position.x}:${position.y}:${position.dx}:${position.dy}`;
 }
 
+function normalizeFrontViewSide(frontViewSide?: Plan2DFrontViewSide): Plan2DFrontViewSide {
+  return frontViewSide === "door" ? "door" : "corner";
+}
+
 function isCompactCanvas(width: number, height: number) {
   return height < 320 || width < 520;
 }
@@ -196,6 +213,7 @@ function getVisibleProjectedRects(
   result: PackingResult,
   visibleCount: number,
   viewMode: Plan2DViewMode,
+  options: Plan2DProjectionOptions = {},
 ) {
   const normalizedVisibleCount = Math.max(0, Math.min(result.totalBoxes, Math.floor(visibleCount)));
   const container = result.container;
@@ -212,6 +230,14 @@ function getVisibleProjectedRects(
       .filter((rect): rect is ProjectedRect => Boolean(rect));
   }
 
+  if (viewMode === "front") {
+    return getFrontEndpointSurfaceItems(
+      generateBoxPositions(result, normalizedVisibleCount),
+      container,
+      normalizeFrontViewSide(options.frontViewSide),
+    ).map((item) => item.projectedRect);
+  }
+
   return generateBoxPositions(result, normalizedVisibleCount).map((position) =>
     projectBox(position, container, viewMode),
   );
@@ -221,9 +247,10 @@ function getPlan2DAxisGuideModel(
   result: PackingResult,
   visibleCount: number,
   viewMode: Plan2DViewMode,
+  options: Plan2DProjectionOptions = {},
 ): AxisGuideModel {
-  const plane = getPlan2DPlaneConfig(result, viewMode);
-  const rects = getVisibleProjectedRects(result, visibleCount, viewMode);
+  const plane = getPlan2DPlaneConfig(result, viewMode, options);
+  const rects = getVisibleProjectedRects(result, visibleCount, viewMode, options);
   const emptyMetric = (axisLabel: string, axis: "x" | "y"): Plan2DAxisGuideMetric => ({
     count: 0,
     countLabel: countLabelForAxis(axisLabel, axis),
@@ -280,8 +307,9 @@ export function getPlan2DAxisGuideMetrics(
   result: PackingResult,
   visibleCount: number,
   viewMode: Plan2DViewMode,
+  options: Plan2DProjectionOptions = {},
 ): Plan2DAxisGuideMetrics {
-  const model = getPlan2DAxisGuideModel(result, visibleCount, viewMode);
+  const model = getPlan2DAxisGuideModel(result, visibleCount, viewMode, options);
   return {
     x: model.x,
     y: model.y,
@@ -290,6 +318,10 @@ export function getPlan2DAxisGuideMetrics(
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+function intersects(aStart: number, aSize: number, bStart: number, bSize: number) {
+  return aStart < bStart + bSize && aStart + aSize > bStart;
 }
 
 function drawGuideLabel(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, angle = 0) {
@@ -423,7 +455,9 @@ function drawOuterAxisGuides(
   canvasWidth: number,
   canvasHeight: number,
 ) {
-  const model = getPlan2DAxisGuideModel(result, visibleCount, viewMode);
+  const model = getPlan2DAxisGuideModel(result, visibleCount, viewMode, {
+    frontViewSide: plane.frontViewSide,
+  });
   if (model.x.occupied <= 0 || model.y.occupied <= 0) return;
 
   const planWidth = plane.width * scale;
@@ -489,8 +523,9 @@ function drawOuterPlanLabels(
   height: number,
   viewMode: Plan2DViewMode,
   visibleCount: number,
+  options: Plan2DProjectionOptions = {},
 ) {
-  const plane = getPlan2DPlaneConfig(result, viewMode);
+  const plane = getPlan2DPlaneConfig(result, viewMode, options);
   const planWidth = plane.width * scale;
   const planHeight = plane.height * scale;
   const compactCanvas = isCompactCanvas(width, height);
@@ -538,8 +573,13 @@ function drawOuterPlanLabels(
   ctx.restore();
 }
 
-export function getPlan2DPlaneConfig(result: PackingResult, viewMode: Plan2DViewMode) {
+export function getPlan2DPlaneConfig(
+  result: PackingResult,
+  viewMode: Plan2DViewMode,
+  options: Plan2DProjectionOptions = {},
+) {
   const { container, pattern } = result;
+  const frontViewSide = normalizeFrontViewSide(options.frontViewSide);
   if (viewMode === "side") {
     return {
       width: container.length,
@@ -559,7 +599,8 @@ export function getPlan2DPlaneConfig(result: PackingResult, viewMode: Plan2DView
       occupiedHeight: result.usedHeight,
       xLabel: "柜宽",
       yLabel: "柜高",
-      directionLabel: "左右为柜宽方向，上方为柜顶角件",
+      directionLabel: frontViewSide === "door" ? "柜门视角" : "角件端视角",
+      frontViewSide,
     };
   }
   return {
@@ -571,6 +612,88 @@ export function getPlan2DPlaneConfig(result: PackingResult, viewMode: Plan2DView
     yLabel: "柜宽",
     directionLabel: "左侧为柜内最里面，右侧为柜门方向",
   };
+}
+
+function projectedRectsOverlap(a: ProjectedRect, b: ProjectedRect) {
+  return intersects(a.x, a.dx, b.x, b.dx) && intersects(a.y, a.dy, b.y, b.dy);
+}
+
+function subtractProjectedRect(rect: ProjectedRect, blocker: ProjectedRect): ProjectedRect[] {
+  if (!projectedRectsOverlap(rect, blocker)) return [rect];
+
+  const x1 = Math.max(rect.x, blocker.x);
+  const x2 = Math.min(rect.x + rect.dx, blocker.x + blocker.dx);
+  const y1 = Math.max(rect.y, blocker.y);
+  const y2 = Math.min(rect.y + rect.dy, blocker.y + blocker.dy);
+  const rectX2 = rect.x + rect.dx;
+  const rectY2 = rect.y + rect.dy;
+  const fragments: ProjectedRect[] = [];
+
+  if (rect.y < y1) {
+    fragments.push({ x: rect.x, y: rect.y, dx: rect.dx, dy: y1 - rect.y });
+  }
+  if (y2 < rectY2) {
+    fragments.push({ x: rect.x, y: y2, dx: rect.dx, dy: rectY2 - y2 });
+  }
+  if (rect.x < x1) {
+    fragments.push({ x: rect.x, y: y1, dx: x1 - rect.x, dy: y2 - y1 });
+  }
+  if (x2 < rectX2) {
+    fragments.push({ x: x2, y: y1, dx: rectX2 - x2, dy: y2 - y1 });
+  }
+
+  return fragments.filter((fragment) => fragment.dx > 0 && fragment.dy > 0);
+}
+
+function subtractProjectedRects(rect: ProjectedRect, blockers: ProjectedRect[]) {
+  let fragments = [rect];
+  for (const blocker of blockers) {
+    fragments = fragments.flatMap((fragment) => subtractProjectedRect(fragment, blocker));
+    if (fragments.length === 0) break;
+  }
+  return fragments;
+}
+
+function getFrontEndpointDepth(position: BoxPosition, frontViewSide: Plan2DFrontViewSide) {
+  return frontViewSide === "door" ? -(position.x + position.dx) : position.x;
+}
+
+function getFrontEndpointSurfaceItems(
+  positions: BoxPosition[],
+  container: PackingResult["container"],
+  frontViewSide: Plan2DFrontViewSide,
+) {
+  const sortedPositions = positions
+    .slice()
+    .sort((a, b) => {
+      const depthDiff = getFrontEndpointDepth(a, frontViewSide) - getFrontEndpointDepth(b, frontViewSide);
+      return depthDiff || a.z - b.z || a.y - b.y || a.x - b.x;
+    });
+  const surfaceItems: Array<{ box: BoxPosition; projectedRect: ProjectedRect }> = [];
+  const occludingRects: ProjectedRect[] = [];
+  let cursor = 0;
+
+  while (cursor < sortedPositions.length) {
+    const depth = getFrontEndpointDepth(sortedPositions[cursor], frontViewSide);
+    const sameDepthPositions: BoxPosition[] = [];
+    while (
+      cursor < sortedPositions.length &&
+      getFrontEndpointDepth(sortedPositions[cursor], frontViewSide) === depth
+    ) {
+      sameDepthPositions.push(sortedPositions[cursor]);
+      cursor += 1;
+    }
+
+    for (const box of sameDepthPositions) {
+      const projectedRect = projectBox(box, container, "front");
+      const fragments = subtractProjectedRects(projectedRect, occludingRects);
+      surfaceItems.push(...fragments.map((fragment) => ({ box, projectedRect: fragment })));
+    }
+
+    occludingRects.push(...sameDepthPositions.map((box) => projectBox(box, container, "front")));
+  }
+
+  return surfaceItems;
 }
 
 function projectBox(box: BoxPosition, container: PackingResult["container"], viewMode: Plan2DViewMode) {
@@ -625,11 +748,28 @@ function getElevationDrawingPositions(result: PackingResult, visibleCount: numbe
   ];
 }
 
+function getFrontEndpointDrawingPositions(
+  result: PackingResult,
+  visibleCount: number,
+  frontViewSide: Plan2DFrontViewSide,
+): Plan2DDrawingPosition[] {
+  const visiblePositions = generateBoxPositions(result, visibleCount);
+  const visibleKeys = new Set(visiblePositions.map((position) => `${position.sequenceIndex}:${keyForPosition(position)}:${position.z}`));
+
+  return getFrontEndpointSurfaceItems(result.orderedPositions, result.container, frontViewSide).map(({ box, projectedRect }) => ({
+    box,
+    visibleBox: visibleKeys.has(`${box.sequenceIndex}:${keyForPosition(box)}:${box.z}`) ? box : null,
+    projectedRect,
+    baseMarker: true,
+  }));
+}
+
 export function renderPlan2D({
   canvas,
   result,
   visibleCount,
   viewMode = "top",
+  frontViewSide,
   devicePixelRatio,
   showLabels = true,
 }: Plan2DRenderOptions): void {
@@ -644,7 +784,10 @@ export function renderPlan2D({
   const compactCanvas = isCompactCanvas(width, height);
   const pad = showLabels ? (compactCanvas ? 34 : 48) : (compactCanvas ? 54 : 68);
   const container = result.container;
-  const plane = getPlan2DPlaneConfig(result, viewMode);
+  const normalizedFrontViewSide = normalizeFrontViewSide(frontViewSide);
+  const plane = getPlan2DPlaneConfig(result, viewMode, {
+    frontViewSide: normalizedFrontViewSide,
+  });
   const scale = Math.min((width - pad * 2) / plane.width, (height - pad * 2) / plane.height);
   const boxX = (width - plane.width * scale) / 2;
   const boxY = (height - plane.height * scale) / 2 + (showLabels ? (compactCanvas ? 4 : 10) : 0);
@@ -654,15 +797,20 @@ export function renderPlan2D({
   drawContainerFill(ctx, plane, scale);
 
   const drawingPositions =
-    viewMode === "top" ? getTopViewDrawingPositions(result, visibleCount) : getElevationDrawingPositions(result, visibleCount);
+    viewMode === "top"
+      ? getTopViewDrawingPositions(result, visibleCount)
+      : viewMode === "front"
+        ? getFrontEndpointDrawingPositions(result, visibleCount, normalizedFrontViewSide)
+        : getElevationDrawingPositions(result, visibleCount);
   const sortedDrawingPositions = drawingPositions
     .slice()
     .sort((a, b) => Number(Boolean(a.visibleBox)) - Number(Boolean(b.visibleBox)));
 
-  for (const { box, visibleBox } of sortedDrawingPositions) {
+  for (const drawingPosition of sortedDrawingPositions) {
+    const { box, visibleBox } = drawingPosition;
     const isVisible = Boolean(visibleBox);
     const boxRgb = hexToRgb(colorForBox(visibleBox || box));
-    const rect = projectBox(box, container, viewMode);
+    const rect = drawingPosition.projectedRect || projectBox(box, container, viewMode);
 
     ctx.fillStyle = isVisible
       ? `rgba(${boxRgb.r}, ${boxRgb.g}, ${boxRgb.b}, 0.82)`
@@ -678,6 +826,8 @@ export function renderPlan2D({
   drawOuterAxisGuides(ctx, result, visibleCount, viewMode, plane, scale, boxX, boxY, width, height);
 
   if (showLabels) {
-    drawOuterPlanLabels(ctx, result, boxX, boxY, scale, width, height, viewMode, visibleCount);
+    drawOuterPlanLabels(ctx, result, boxX, boxY, scale, width, height, viewMode, visibleCount, {
+      frontViewSide: normalizedFrontViewSide,
+    });
   }
 }
