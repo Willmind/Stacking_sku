@@ -1,7 +1,47 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import { calculatePacking } from "../src/core/packing";
-import { getPlan2DAxisGuideMetrics, getPlan2DVerticalGuideLabelLayout } from "../src/renderers/plan2d";
+import { getPlan2DAxisGuideMetrics, getPlan2DVerticalGuideLabelLayout, renderPlan2D } from "../src/renderers/plan2d";
+
+function createRecordingCanvas(width = 980, height = 620) {
+  const drawnText: string[] = [];
+  const context = {
+    beginPath() {},
+    clearRect() {},
+    closePath() {},
+    fill() {},
+    fillRect() {},
+    fillText(text: string) {
+      drawnText.push(text);
+    },
+    lineTo() {},
+    measureText(text: string) {
+      return { width: text.length * 7 };
+    },
+    moveTo() {},
+    quadraticCurveTo() {},
+    restore() {},
+    rotate() {},
+    save() {},
+    setLineDash() {},
+    setTransform() {},
+    stroke() {},
+    strokeRect() {},
+    translate() {},
+  };
+  const canvas = {
+    width,
+    height,
+    getBoundingClientRect() {
+      return { width, height };
+    },
+    getContext(type: string) {
+      return type === "2d" ? context : null;
+    },
+  } as unknown as HTMLCanvasElement;
+
+  return { canvas, drawnText };
+}
 
 describe("2D plan axis guide metrics", () => {
   it("summarizes top-view occupied length and width from the visible footprints", () => {
@@ -44,6 +84,41 @@ describe("2D plan axis guide metrics", () => {
       occupied: 2340,
       remaining: 53,
     });
+  });
+
+  it("hides misleading projection counts on mixed-orientation elevation guides", () => {
+    const result = calculatePacking("20GP", { length: 120, width: 320, height: 260 });
+    const sideMetrics = getPlan2DAxisGuideMetrics(result, result.totalBoxes, "side");
+    const frontMetrics = getPlan2DAxisGuideMetrics(result, result.totalBoxes, "front");
+
+    assert.equal(sideMetrics.x.count, 67);
+    assert.equal(sideMetrics.x.countLabel, "");
+    assert.equal(frontMetrics.x.count, 35);
+    assert.equal(frontMetrics.x.countLabel, "");
+
+    const side = createRecordingCanvas();
+    renderPlan2D({
+      canvas: side.canvas,
+      result,
+      visibleCount: result.totalBoxes,
+      viewMode: "side",
+      devicePixelRatio: 1,
+    });
+
+    assert.ok(!side.drawnText.some((text) => text.includes("67列")));
+    assert.ok(side.drawnText.includes("占长 5,880mm · 余量 18mm"));
+
+    const front = createRecordingCanvas();
+    renderPlan2D({
+      canvas: front.canvas,
+      result,
+      visibleCount: result.totalBoxes,
+      viewMode: "front",
+      devicePixelRatio: 1,
+    });
+
+    assert.ok(!front.drawnText.some((text) => text.includes("35排")));
+    assert.ok(front.drawnText.includes("占宽 2,320mm · 余量 32mm"));
   });
 
   it("places the vertical guide label outside the left guide and centers it on the occupied span", () => {
