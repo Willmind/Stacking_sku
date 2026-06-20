@@ -407,7 +407,7 @@ test("labels heterogeneous multi SKU stack metrics without implying uniform laye
   await expect(page.locator("#layer-count").locator("xpath=preceding-sibling::dt")).toHaveText("堆叠层级");
 });
 
-test("backfills reusable floor space for heterogeneous multi SKU top view", async ({ page }) => {
+test("calculates heterogeneous multi SKU after face-first loading order", async ({ page }) => {
   await page.goto("/");
   await page.getByLabel("多 SKU").check();
   await page.locator("#sku-A-length").fill("250");
@@ -430,29 +430,9 @@ test("backfills reusable floor space for heterogeneous multi SKU top view", asyn
   await page.getByRole("button", { name: "计算装载" }).click();
 
   await expect(page.locator("#total-boxes")).toHaveText("200");
-  const backfillPixel = await page.locator("#plan-canvas-top").evaluate((element) => {
-    const canvas = element as HTMLCanvasElement;
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("2D canvas context is missing");
-
-    const rect = canvas.getBoundingClientRect();
-    const dpr = canvas.width / rect.width;
-    const width = rect.width;
-    const height = rect.height;
-    const compactCanvas = height < 320 || width < 520;
-    const pad = compactCanvas ? 34 : 48;
-    const scale = Math.min((width - pad * 2) / 5898, (height - pad * 2) / 2352);
-    const boxX = (width - 5898 * scale) / 2;
-    const boxY = (height - 2352 * scale) / 2 + (compactCanvas ? 4 : 10);
-    const sampleX = Math.round((boxX + 400 * scale) * dpr);
-    const sampleY = Math.round((boxY + 1760 * scale) * dpr);
-    const [red, green, blue, alpha] = context.getImageData(sampleX, sampleY, 1, 1).data;
-    return { red, green, blue, alpha };
-  });
-
-  expect(backfillPixel.alpha).toBeGreaterThan(150);
-  expect(backfillPixel.green).toBeGreaterThan(backfillPixel.red + 40);
-  expect(backfillPixel.green).toBeGreaterThan(backfillPixel.blue + 15);
+  await expect(page.locator("#pattern-name")).toHaveText("异尺寸按 SKU 顺序分区");
+  await expect(page.locator("#strategy-notes")).toContainText("水平旋转");
+  await expect(page.locator("#strategy-notes")).toContainText("SKU 策略");
 });
 
 test("imports an Excel batch and shows calculated packing results in a dialog", async ({ page }) => {
