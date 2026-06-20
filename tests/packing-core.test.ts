@@ -162,10 +162,10 @@ describe("packing core", () => {
   assert.deepEqual(
     positions.map((box) => [box.x, box.y, box.z]),
     [
-      [0, 0, 0],
       [0, 110, 0],
-      [0, 0, 100],
+      [0, 0, 0],
       [0, 110, 100],
+      [0, 0, 100],
     ],
   );
 }
@@ -181,10 +181,10 @@ describe("packing core", () => {
   assert.deepEqual(
     positions.map((box) => [box.sequenceIndex, box.faceIndex, box.stackIndex]),
     [
-      [0, 0, 0],
-      [1, 1, 0],
-      [2, 0, 1],
-      [3, 1, 1],
+      [0, 1, 0],
+      [1, 0, 0],
+      [2, 1, 1],
+      [3, 0, 1],
     ],
   );
 }
@@ -427,12 +427,12 @@ describe("packing core", () => {
   assert.deepEqual(
     positions.map((position) => [position.skuLabel, position.x, position.y, position.z]),
     [
-      ["A", 0, 0, 0],
-      ["A", 0, 100, 0],
-      ["A", 0, 200, 0],
-      ["A", 0, 300, 0],
       ["A", 0, 400, 0],
-      ["A", 0, 0, 100],
+      ["A", 0, 300, 0],
+      ["A", 0, 200, 0],
+      ["A", 0, 100, 0],
+      ["A", 0, 0, 0],
+      ["A", 0, 400, 100],
     ],
   );
 }

@@ -55,7 +55,7 @@ export type {
       groups.get(position.faceIndex).push(position);
     }
     return Array.from(groups.values()).map((group) =>
-      group.slice().sort((a, b) => a.stackIndex - b.stackIndex || a.y - b.y),
+      group.slice().sort((a, b) => a.stackIndex - b.stackIndex || b.y - a.y),
     );
   }
 
@@ -248,8 +248,12 @@ export type {
     return positions;
   }
 
-  function orderFloorPositionsForLoading(floorPositions) {
+  function orderFloorPositionsForPlacement(floorPositions) {
     return floorPositions.slice().sort((a, b) => a.x - b.x || a.y - b.y);
+  }
+
+  function orderBoxPositionsForLoading(positions) {
+    return positions.slice().sort((a, b) => a.x - b.x || a.z - b.z || b.y - a.y);
   }
 
   function groupFloorPositionsByLoadingDepth(orderedFloor) {
@@ -272,7 +276,7 @@ export type {
 
   function createOrderedPositionsFromFloor(container, carton, cornerBlock, floorPositions) {
     const layerCount = Math.floor(container.height / carton.height);
-    const orderedFloor = orderFloorPositionsForLoading(floorPositions).map((basePosition, faceIndex) => ({
+    const orderedFloor = orderFloorPositionsForPlacement(floorPositions).map((basePosition, faceIndex) => ({
       basePosition,
       faceIndex,
     }));
@@ -300,7 +304,7 @@ export type {
       }
     }
 
-    return assignSequenceIndexes(positions);
+    return assignSequenceIndexes(orderBoxPositionsForLoading(positions));
   }
 
   function evaluateCandidate(container, carton, pattern, cornerBlock) {
@@ -361,7 +365,7 @@ export type {
   function countAcceptedPositionsForStack(basePositions, stackIndex, container, cornerBlock) {
     const acceptedInStackBand = [];
 
-    for (const basePosition of orderFloorPositionsForLoading(basePositions)) {
+    for (const basePosition of orderFloorPositionsForPlacement(basePositions)) {
       const position = {
         ...basePosition,
         z: stackIndex * basePosition.dz,
@@ -788,7 +792,7 @@ export type {
       }
     }
 
-    return candidates.sort((a, b) => a.x - b.x || a.y - b.y || a.dx - b.dx || a.dy - b.dy);
+    return candidates.sort((a, b) => a.x - b.x || b.y - a.y || a.dx - b.dx || a.dy - b.dy);
   }
 
   function createHeterogeneousBackfillPositions(container, sku, target, occupiedPositions, maxLength, cornerBlock) {
