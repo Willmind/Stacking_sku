@@ -93,6 +93,10 @@ test("calculates the 488 x 380 x 291 benchmark and renders both views", async ({
   await expect(page.locator("#total-boxes")).toHaveText("1,340");
   await expect(page.locator("#status-chip")).toHaveText("已完成计算");
   await expect(page.locator("#status-chip")).toHaveClass(/status-chip--success/);
+  await expect(page.locator("#strategy-notes")).toContainText("水平旋转");
+  await expect(page.locator("#strategy-notes")).toContainText("角件避让");
+  await expect(page.locator("#strategy-notes")).toContainText("空位回填");
+  await expect(page.locator("#strategy-notes")).toContainText("SKU 策略");
   await expect(page.locator(".plan-view-card")).toHaveCount(2);
   await expect(page.locator(".plan-view-card--switchable")).toContainText("俯视图");
   await expect(page.locator(".plan-view-card--switchable .plan-view-status")).toContainText("当前显示");

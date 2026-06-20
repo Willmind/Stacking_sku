@@ -52,7 +52,7 @@
 - 页面状态集中在 `src/stores/packingStore.ts`。
 - 2D 渲染在 `src/renderers/plan2d.ts`。
 - 3D 渲染在 `src/renderers/cargo3d.ts`。
-- 迁移前的静态版本保留在 `legacy/index.static.html`，旧版 `app.js`、`packing-core.js` 仅作为兼容和回归参考。
+- 旧版静态入口和 CommonJS 算法已经清理，后续以 `src/` 下的 Vue 3 / TypeScript 实现为准。
 
 ## 开发原则
 
@@ -69,8 +69,6 @@
 ```bash
 npm run test:unit
 npm run test:e2e
-node tests/packing-core.test.js
-node tests/app-visuals.test.js
 npm run build
 ```
 

@@ -424,6 +424,24 @@ describe("packing core", () => {
     },
   );
 
+  const notes = Packing.describePackingStrategy(result);
+  assert.deepEqual(notes.map((note) => note.label), ["水平旋转", "角件避让", "空位回填", "SKU 策略"]);
+  assert.match(notes.find((note) => note.id === "backfill").detail, /复用/);
+  assert.match(notes.find((note) => note.id === "sku").detail, /异尺寸按 SKU 顺序分区/);
+}
+
+{
+  const result = Packing.calculateMultiSkuPacking(
+    Packing.CONTAINERS["20GP"],
+    [
+      sku("A", 250, 320, 260, 100, "#d8923a"),
+      sku("B", 500, 320, 260, 100, "#42d6a4"),
+    ],
+    {
+      strategy: "multi-destination",
+    },
+  );
+
   const positions = Packing.generateBoxPositions(result, result.totalBoxes);
   const bFootprints = result.layerPositions.filter((position) => position.skuLabel === "B");
   const lowerLeftCompactedB = bFootprints.filter((position) => position.x < 500 && position.y >= 1280);

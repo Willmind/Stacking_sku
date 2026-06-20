@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { describePackingStrategy } from "../../core/packing";
 import { usePackingStore } from "../../stores/packingStore";
 
 const store = usePackingStore();
@@ -14,6 +15,7 @@ const patternName = computed(() => {
   if (pattern.family === "heterogeneous-zones") return "异尺寸按 SKU 顺序分区";
   return pattern.family === "width-lanes" ? "按柜宽分区混排" : "按柜长分区混排";
 });
+const strategyNotes = computed(() => describePackingStrategy(store.result));
 
 function formatNumber(value: number) {
   return Math.round(value).toLocaleString("zh-CN");
@@ -67,6 +69,15 @@ function formatMm(value: number) {
         <dd id="blocked-count">{{ formatNumber(store.result?.blockedByCornerTotal ?? 0) }} 箱</dd>
       </div>
     </dl>
+    <section v-if="strategyNotes.length" class="strategy-notes" aria-label="本次排布说明">
+      <h2>本次排布说明</h2>
+      <ul id="strategy-notes">
+        <li v-for="note in strategyNotes" :key="note.id" :class="`strategy-note strategy-note--${note.tone}`">
+          <strong>{{ note.label }}</strong>
+          <span>{{ note.detail }}</span>
+        </li>
+      </ul>
+    </section>
   </section>
 </template>
 
@@ -130,6 +141,69 @@ dt {
   display: grid;
   gap: 8px;
   margin: 0;
+}
+
+.strategy-notes {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(104, 166, 255, 0.24);
+  border-radius: 8px;
+  background: rgba(16, 24, 33, 0.68);
+}
+
+.strategy-notes h2 {
+  margin: 0;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.strategy-notes ul {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.strategy-note {
+  display: grid;
+  grid-template-columns: minmax(64px, auto) minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 8px 9px;
+  border: 1px solid var(--strategy-note-border);
+  border-radius: 7px;
+  background: var(--strategy-note-bg);
+}
+
+.strategy-note--neutral {
+  --strategy-note-bg: rgba(161, 175, 192, 0.08);
+  --strategy-note-border: rgba(161, 175, 192, 0.18);
+}
+
+.strategy-note--success {
+  --strategy-note-bg: rgba(66, 214, 164, 0.09);
+  --strategy-note-border: rgba(66, 214, 164, 0.24);
+}
+
+.strategy-note--warning {
+  --strategy-note-bg: rgba(217, 166, 79, 0.1);
+  --strategy-note-border: rgba(217, 166, 79, 0.28);
+}
+
+.strategy-note strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.strategy-note span {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.45;
 }
 
 dd {

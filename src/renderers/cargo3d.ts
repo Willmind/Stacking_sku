@@ -1,4 +1,3 @@
-// @ts-nocheck
 import * as THREE from "three";
 import { generateBoxPositions, type BoxPosition, type PackingResult } from "../core/packing";
 import { makeSpriteLabel } from "./labels";

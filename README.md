@@ -139,8 +139,6 @@ base: "./"
 ```bash
 npm run test:unit
 npm run test:e2e
-node tests/packing-core.test.js
-node tests/app-visuals.test.js
 npm run build
 ```
 
@@ -171,11 +169,8 @@ npm run build
 │   ├── renderers/             # Canvas 2D 与 Three.js 渲染逻辑
 │   ├── stores/                # Pinia 状态管理
 │   └── styles/                # 全局样式与设计 token
-├── tests/                     # 单元测试、旧版守卫测试、E2E 测试
-├── legacy/                    # 迁移前的静态 HTML 备份
+├── tests/                     # 单元测试、可视化守卫测试、E2E 测试
 ├── dist/                      # 构建产物，运行 build 后生成
-├── app.js                     # 旧版静态程序文件，保留作兼容参考
-├── packing-core.js            # 旧版 CommonJS 算法文件，保留作回归参考
 └── README.md
 ```
 
@@ -186,7 +181,6 @@ npm run build
 - 页面状态集中在 `src/stores/packingStore.ts`，新增业务输入优先从 store 扩展。
 - 多 SKU 颜色会传递到 2D/3D 渲染，不同 SKU 应保持颜色可区分。
 - 批量导入逻辑在 `src/core/batchImport.ts`，结果导出逻辑在 `src/core/batchExport.ts`，入口组件在 `src/components/controls/BatchImportDialog.vue`。
-- `legacy/index.static.html` 和旧版 `app.js`、`packing-core.js` 用于迁移对照，不建议作为新功能入口继续扩展。
 
 ## 常见问题
 

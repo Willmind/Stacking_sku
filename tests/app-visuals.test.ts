@@ -32,6 +32,10 @@ const resultSummarySource = fs.readFileSync(
   path.join(__dirname, "..", "src/components/results/ResultSummary.vue"),
   "utf8",
 );
+const strategyDescriptionSource = fs.readFileSync(
+  path.join(__dirname, "..", "src/core/packing/strategyDescription.ts"),
+  "utf8",
+);
 const skuEditorSource = fs.readFileSync(path.join(__dirname, "..", "src/components/controls/SkuEditor.vue"), "utf8");
 const baseSelectSource = fs.readFileSync(path.join(__dirname, "..", "src/components/ui/BaseSelect.vue"), "utf8");
 const baseDialogSource = fs.existsSync(path.join(__dirname, "..", "src/components/ui/BaseDialog.vue"))
@@ -123,6 +127,16 @@ describe("control panel layout source guards", () => {
     for (const tone of ["idle", "dirty", "success", "empty", "error"]) {
       assert.match(appSource, new RegExp(`\\.status-chip--${tone}`));
     }
+  });
+
+  it("shows reusable packing strategy notes in the result summary", () => {
+    assert.match(resultSummarySource, /describePackingStrategy/);
+    assert.match(resultSummarySource, /strategy-notes/);
+    assert.match(resultSummarySource, /本次排布说明/);
+    assert.match(strategyDescriptionSource, /水平旋转/);
+    assert.match(strategyDescriptionSource, /角件避让/);
+    assert.match(strategyDescriptionSource, /空位回填/);
+    assert.match(strategyDescriptionSource, /SKU 策略/);
   });
 });
 

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import {
   generateBoxPositions,
   type BoxPosition,
@@ -148,10 +147,14 @@ function drawContainerOutline(
   ctx.strokeRect(0, 0, plane.width * scale, plane.height * scale);
 }
 
+function getGeneratedBoxPositions(result: PackingResult, visibleCount: number): BoxPosition[] {
+  return generateBoxPositions(result, visibleCount) as BoxPosition[];
+}
+
 export function getTopViewFootprintProgress(result: PackingResult, visibleCount: number) {
   const normalizedVisibleCount = Math.max(0, Math.min(result.totalBoxes, Math.floor(visibleCount)));
   const visibleFaceIndexes = new Set(
-    generateBoxPositions(result, normalizedVisibleCount)
+    getGeneratedBoxPositions(result, normalizedVisibleCount)
       .map((position) => position.faceIndex)
       .filter((faceIndex) => Number.isFinite(faceIndex)),
   );
@@ -214,13 +217,13 @@ function getVisibleProjectedRects(
   visibleCount: number,
   viewMode: Plan2DViewMode,
   options: Plan2DProjectionOptions = {},
-) {
+): ProjectedRect[] {
   const normalizedVisibleCount = Math.max(0, Math.min(result.totalBoxes, Math.floor(visibleCount)));
   const container = result.container;
 
   if (viewMode === "top") {
     const visibleFaceIndexes = new Set(
-      generateBoxPositions(result, normalizedVisibleCount)
+      getGeneratedBoxPositions(result, normalizedVisibleCount)
         .map((position) => position.faceIndex)
         .filter((faceIndex) => Number.isFinite(faceIndex)),
     );
@@ -232,13 +235,13 @@ function getVisibleProjectedRects(
 
   if (viewMode === "front") {
     return getFrontEndpointSurfaceItems(
-      generateBoxPositions(result, normalizedVisibleCount),
+      getGeneratedBoxPositions(result, normalizedVisibleCount),
       container,
       normalizeFrontViewSide(options.frontViewSide),
     ).map((item) => item.projectedRect);
   }
 
-  return generateBoxPositions(result, normalizedVisibleCount).map((position) =>
+  return getGeneratedBoxPositions(result, normalizedVisibleCount).map((position) =>
     projectBox(position, container, viewMode),
   );
 }
@@ -721,10 +724,10 @@ function projectBox(box: BoxPosition, container: PackingResult["container"], vie
   };
 }
 
-function getTopViewDrawingPositions(result: PackingResult, visibleCount: number) {
-  const visiblePositionByFace = generateBoxPositions(result, visibleCount)
+function getTopViewDrawingPositions(result: PackingResult, visibleCount: number): Plan2DDrawingPosition[] {
+  const visiblePositionByFace = getGeneratedBoxPositions(result, visibleCount)
     .reduce((positions, position) => {
-      if (Number.isFinite(position.faceIndex)) {
+      if (typeof position.faceIndex === "number" && Number.isFinite(position.faceIndex)) {
         positions.set(position.faceIndex, position);
       }
       return positions;
@@ -736,8 +739,8 @@ function getTopViewDrawingPositions(result: PackingResult, visibleCount: number)
     }));
 }
 
-function getElevationDrawingPositions(result: PackingResult, visibleCount: number) {
-  const visiblePositions = generateBoxPositions(result, visibleCount);
+function getElevationDrawingPositions(result: PackingResult, visibleCount: number): Plan2DDrawingPosition[] {
+  const visiblePositions = getGeneratedBoxPositions(result, visibleCount);
   const visibleKeys = new Set(visiblePositions.map((position) => `${position.sequenceIndex}:${keyForPosition(position)}:${position.z}`));
   return [
     ...result.orderedPositions.map((position) => ({
@@ -753,7 +756,7 @@ function getFrontEndpointDrawingPositions(
   visibleCount: number,
   frontViewSide: Plan2DFrontViewSide,
 ): Plan2DDrawingPosition[] {
-  const visiblePositions = generateBoxPositions(result, visibleCount);
+  const visiblePositions = getGeneratedBoxPositions(result, visibleCount);
   const visibleKeys = new Set(visiblePositions.map((position) => `${position.sequenceIndex}:${keyForPosition(position)}:${position.z}`));
 
   return getFrontEndpointSurfaceItems(result.orderedPositions, result.container, frontViewSide).map(({ box, projectedRect }) => ({
@@ -796,7 +799,7 @@ export function renderPlan2D({
   ctx.translate(boxX, boxY);
   drawContainerFill(ctx, plane, scale);
 
-  const drawingPositions =
+  const drawingPositions: Plan2DDrawingPosition[] =
     viewMode === "top"
       ? getTopViewDrawingPositions(result, visibleCount)
       : viewMode === "front"
