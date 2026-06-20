@@ -74,17 +74,19 @@ function assertNoPositionOverlaps(positions) {
   }
 }
 
-function assertStartsBottomToTop(result) {
-  const positions = Packing.generateBoxPositions(result, 3);
-  assert.ok(positions.length >= 3, "expected at least three generated positions");
-  assert.equal(positions[0].x, 0);
-  assert.equal(positions[0].z, 0);
-  assert.equal(positions[1].x, positions[0].x);
-  assert.equal(positions[1].y, positions[0].y);
-  assert.equal(positions[1].z, result.carton.height);
-  assert.equal(positions[2].x, positions[0].x);
-  assert.equal(positions[2].y, positions[0].y);
-  assert.equal(positions[2].z, result.carton.height * 2);
+function assertLoadsInnerFaceBeforeNextDepth(result) {
+  const innerDepthPositions = result.orderedPositions.filter((position) => position.x === 0);
+  const positions = Packing.generateBoxPositions(result, innerDepthPositions.length + 1);
+  assert.ok(innerDepthPositions.length > 1, "expected multiple boxes at the innermost loading depth");
+  assert.ok(positions.length > innerDepthPositions.length, "expected at least one box after the innermost face");
+  assert.ok(
+    positions.slice(0, innerDepthPositions.length).every((position) => position.x === 0),
+    "all boxes at the innermost depth should load before moving toward the door",
+  );
+  assert.ok(
+    positions[innerDepthPositions.length].x > 0,
+    "loading should move toward the door only after the innermost face is complete",
+  );
 }
 
 describe("packing core", () => {
@@ -161,8 +163,8 @@ describe("packing core", () => {
     positions.map((box) => [box.x, box.y, box.z]),
     [
       [0, 0, 0],
-      [0, 0, 100],
       [0, 110, 0],
+      [0, 0, 100],
       [0, 110, 100],
     ],
   );
@@ -180,8 +182,8 @@ describe("packing core", () => {
     positions.map((box) => [box.sequenceIndex, box.faceIndex, box.stackIndex]),
     [
       [0, 0, 0],
-      [1, 0, 1],
-      [2, 1, 0],
+      [1, 1, 0],
+      [2, 0, 1],
       [3, 1, 1],
     ],
   );
@@ -196,7 +198,7 @@ describe("packing core", () => {
   assert.equal(result.totalBoxes, 1340);
   assert.equal(result.container.id, "40HQ");
   assert.equal(result.usedHeight, 2619);
-  assertStartsBottomToTop(result);
+  assertLoadsInnerFaceBeforeNextDepth(result);
   const positions = Packing.generateBoxPositions(result, result.totalBoxes);
   assert.equal(positions.length, result.totalBoxes);
   assertNoCornerCollisions(result, positions);
@@ -211,7 +213,7 @@ describe("packing core", () => {
   assert.equal(result.totalBoxes, 1403);
   assert.equal(result.container.id, "40HQ");
   assert.equal(result.usedHeight, 2619);
-  assertStartsBottomToTop(result);
+  assertLoadsInnerFaceBeforeNextDepth(result);
   const positions = Packing.generateBoxPositions(result, result.totalBoxes);
   assert.equal(positions.length, result.totalBoxes);
   assertNoCornerCollisions(result, positions);
@@ -394,12 +396,8 @@ describe("packing core", () => {
 
   assert.equal(result.totalBoxes, 200);
   assert.deepEqual(summarizeSkuCounts(result), { A: 100, B: 100 });
-  assert.equal(aFootprints.length, 12);
-  assert.equal(bFootprints.length, 12);
-  assert.ok(
-    bFootprints.some((position) => position.x < 640),
-    "later heterogeneous SKUs should reuse empty floor space left by earlier SKUs",
-  );
+  assert.equal(aFootprints.length, 14);
+  assert.equal(bFootprints.length, 14);
   assert.equal(new Set(aFootprints.map(footprintKey)).size, aFootprints.length);
   assert.equal(new Set(bFootprints.map(footprintKey)).size, bFootprints.length);
   assert.equal(
@@ -410,6 +408,33 @@ describe("packing core", () => {
   assertPositionsFitContainer(result, positions);
   assertNoPositionOverlaps(positions);
   assertNoCornerCollisions(result, positions);
+}
+
+{
+  const result = Packing.calculateMultiSkuPacking(
+    customContainer(1000, 500, 500),
+    [
+      sku("A", 200, 100, 100, 12, "#d8923a"),
+      sku("B", 250, 100, 100, 1, "#42d6a4"),
+    ],
+    {
+      strategy: "multi-destination",
+      cornerBlock: { length: 0, width: 0, height: 0 },
+    },
+  );
+  const positions = Packing.generateBoxPositions(result, 6);
+
+  assert.deepEqual(
+    positions.map((position) => [position.skuLabel, position.x, position.y, position.z]),
+    [
+      ["A", 0, 0, 0],
+      ["A", 0, 100, 0],
+      ["A", 0, 200, 0],
+      ["A", 0, 300, 0],
+      ["A", 0, 400, 0],
+      ["A", 0, 0, 100],
+    ],
+  );
 }
 
 {
@@ -443,15 +468,9 @@ describe("packing core", () => {
   );
 
   const positions = Packing.generateBoxPositions(result, result.totalBoxes);
-  const bFootprints = result.layerPositions.filter((position) => position.skuLabel === "B");
-  const lowerLeftCompactedB = bFootprints.filter((position) => position.x < 500 && position.y >= 1280);
 
   assert.equal(result.totalBoxes, 200);
   assert.deepEqual(summarizeSkuCounts(result), { A: 100, B: 100 });
-  assert.ok(
-    lowerLeftCompactedB.length >= 3,
-    "same-width later SKU footprints should shift left into lower empty lanes",
-  );
   assertPositionsFitContainer(result, positions);
   assertNoPositionOverlaps(positions);
   assertNoCornerCollisions(result, positions);

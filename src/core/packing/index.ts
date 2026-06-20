@@ -199,36 +199,50 @@ export type {
     return null;
   }
 
+  function resolveAcceptedStackPosition(position, acceptedInStackBand, container, cornerBlock) {
+    const acceptedRects = acceptedInStackBand.map(floorRectFromPosition);
+
+    if (collidesCornerBlock(position, container, cornerBlock)) {
+      return findCornerSafePosition(position, acceptedInStackBand, container, cornerBlock);
+    }
+    if (acceptedInStackBand.some((accepted) => matchesPositionFootprint(position, accepted))) {
+      return findCornerDisplacedPosition(position, acceptedInStackBand, container, cornerBlock);
+    }
+    if (overlapsAnyFloorRect(position, acceptedRects)) {
+      return findCornerDisplacedPosition(position, acceptedInStackBand, container, cornerBlock);
+    }
+    return position;
+  }
+
+  function acceptStackPosition(position, container, cornerBlock, acceptedByStack) {
+    const acceptedInStackBand = acceptedByStack.get(position.stackIndex) || [];
+    const acceptedPosition = resolveAcceptedStackPosition(position, acceptedInStackBand, container, cornerBlock);
+
+    if (acceptedPosition) {
+      acceptedInStackBand.push(acceptedPosition);
+      acceptedByStack.set(position.stackIndex, acceptedInStackBand);
+    }
+
+    return acceptedPosition;
+  }
+
   function createStackedFacePositions(basePosition, faceIndex, layerCount, container, cornerBlock, acceptedByStack) {
     const positions = [];
 
     for (let stackIndex = 0; stackIndex < layerCount; stackIndex += 1) {
-      const position = {
-        ...basePosition,
-        z: stackIndex * basePosition.dz,
-        faceIndex,
-        stackIndex,
-      };
+      const acceptedPosition = acceptStackPosition(
+        {
+          ...basePosition,
+          z: stackIndex * basePosition.dz,
+          faceIndex,
+          stackIndex,
+        },
+        container,
+        cornerBlock,
+        acceptedByStack,
+      );
 
-      const acceptedInStackBand = acceptedByStack.get(stackIndex) || [];
-      const acceptedRects = acceptedInStackBand.map(floorRectFromPosition);
-      let acceptedPosition = null;
-
-      if (collidesCornerBlock(position, container, cornerBlock)) {
-        acceptedPosition = findCornerSafePosition(position, acceptedInStackBand, container, cornerBlock);
-      } else if (acceptedInStackBand.some((accepted) => matchesPositionFootprint(position, accepted))) {
-        acceptedPosition = findCornerDisplacedPosition(position, acceptedInStackBand, container, cornerBlock);
-      } else if (overlapsAnyFloorRect(position, acceptedRects)) {
-        acceptedPosition = findCornerDisplacedPosition(position, acceptedInStackBand, container, cornerBlock);
-      } else {
-        acceptedPosition = position;
-      }
-
-      if (acceptedPosition) {
-        positions.push(acceptedPosition);
-        acceptedInStackBand.push(acceptedPosition);
-        acceptedByStack.set(stackIndex, acceptedInStackBand);
-      }
+      if (acceptedPosition) positions.push(acceptedPosition);
     }
 
     return positions;
@@ -238,17 +252,53 @@ export type {
     return floorPositions.slice().sort((a, b) => a.x - b.x || a.y - b.y);
   }
 
+  function groupFloorPositionsByLoadingDepth(orderedFloor) {
+    const groups = [];
+
+    for (const item of orderedFloor) {
+      const previous = groups[groups.length - 1];
+      if (previous && previous.x === item.basePosition.x) {
+        previous.items.push(item);
+      } else {
+        groups.push({
+          x: item.basePosition.x,
+          items: [item],
+        });
+      }
+    }
+
+    return groups;
+  }
+
   function createOrderedPositionsFromFloor(container, carton, cornerBlock, floorPositions) {
     const layerCount = Math.floor(container.height / carton.height);
-    const orderedFloor = orderFloorPositionsForLoading(floorPositions);
+    const orderedFloor = orderFloorPositionsForLoading(floorPositions).map((basePosition, faceIndex) => ({
+      basePosition,
+      faceIndex,
+    }));
+    const depthGroups = groupFloorPositionsByLoadingDepth(orderedFloor);
     const positions = [];
     const acceptedByStack = new Map();
 
-    orderedFloor.forEach((basePosition, faceIndex) => {
-      positions.push(
-        ...createStackedFacePositions(basePosition, faceIndex, layerCount, container, cornerBlock, acceptedByStack),
-      );
-    });
+    for (const group of depthGroups) {
+      for (let stackIndex = 0; stackIndex < layerCount; stackIndex += 1) {
+        for (const { basePosition, faceIndex } of group.items) {
+          const acceptedPosition = acceptStackPosition(
+            {
+              ...basePosition,
+              z: stackIndex * basePosition.dz,
+              faceIndex,
+              stackIndex,
+            },
+            container,
+            cornerBlock,
+            acceptedByStack,
+          );
+
+          if (acceptedPosition) positions.push(acceptedPosition);
+        }
+      }
+    }
 
     return assignSequenceIndexes(positions);
   }
@@ -509,7 +559,7 @@ export type {
   }
 
   function compactHeterogeneousPositionsLeft(container, positions, occupiedPositions, cornerBlock) {
-    const compactedPositions = [];
+    const compactedPositionByOriginal = new Map();
     const acceptedPositions = occupiedPositions.slice();
     const acceptedRects = uniqueFloorRectsFromPositions(acceptedPositions);
 
@@ -526,12 +576,14 @@ export type {
         break;
       }
 
-      compactedPositions.push(...compactedGroup);
+      group.forEach((position, index) => {
+        compactedPositionByOriginal.set(position, compactedGroup[index]);
+      });
       acceptedPositions.push(...compactedGroup);
       acceptedRects.push(footprintRectFromPosition(compactedGroup[0]));
     }
 
-    return compactedPositions;
+    return positions.map((position) => compactedPositionByOriginal.get(position) || position);
   }
 
   function createLayersFromPositions(positions) {
