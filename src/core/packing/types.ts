@@ -33,6 +33,8 @@ export interface BoxPosition {
   dx: number;
   dy: number;
   dz: number;
+  label?: string;
+  orientationId?: string;
   orientation?: string;
   orientationLabel?: string;
   sequenceIndex?: number;
@@ -40,6 +42,15 @@ export interface BoxPosition {
   stackIndex?: number;
   skuLabel?: string;
   skuColor?: string;
+  source?: string;
+  sourceFootprint?: {
+    x: number;
+    y: number;
+    dx: number;
+    dy: number;
+  };
+  blocked?: boolean;
+  adjustedForCorner?: boolean;
 }
 
 export interface SkuSummary {
@@ -88,4 +99,11 @@ export interface PackingResult {
   strategy?: LoadingStrategy;
   skus?: SkuInput[];
   skuSummary?: SkuSummary[];
+}
+
+export interface PackingStrategyNote {
+  id: string;
+  label: string;
+  detail: string;
+  tone: "neutral" | "success" | "warning";
 }
