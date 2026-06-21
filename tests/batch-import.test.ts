@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { strFromU8, unzipSync } from "fflate";
 import { describe, it } from "vitest";
-import { calculateBatchPacking } from "../src/core/batchImport";
+import { BatchImportCancelledError, calculateBatchPacking, calculateBatchPackingAsync } from "../src/core/batchImport";
 import { createBatchResultWorkbook } from "../src/core/batchExport";
 
 describe("batch import", () => {
@@ -97,6 +97,51 @@ describe("batch import", () => {
     assert.ok(elapsed < 800, `repeated carton batch calculation took ${elapsed.toFixed(1)}ms`);
   });
 
+  it("reports progress while calculating batch rows asynchronously", async () => {
+    const progressEvents: Array<{ processed: number; total: number; progress: number }> = [];
+    const results = await calculateBatchPackingAsync(
+      [
+        { "人工码垛数量（原始）": 1740, "尺寸（长宽高 mm）": "465*360*291", 柜型: "40HQ" },
+        { "人工码垛数量（原始）": 1403, "尺寸（长宽高 mm）": "488*360*291", 柜型: "40HQ" },
+        { "人工码垛数量（原始）": 1198, "尺寸（长宽高 mm）": "465*395*290", 柜型: "40GP" },
+      ],
+      {
+        batchSize: 1,
+        onProgress: (event) => progressEvents.push(event),
+        yieldToMain: async () => undefined,
+      },
+    );
+
+    assert.equal(results.length, 3);
+    assert.deepEqual(
+      progressEvents.map((event) => event.processed),
+      [1, 2, 3],
+    );
+    assert.deepEqual(progressEvents.at(-1), { processed: 3, total: 3, progress: 1 });
+  });
+
+  it("cancels asynchronous batch calculation between row chunks", async () => {
+    const controller = new AbortController();
+
+    await assert.rejects(
+      calculateBatchPackingAsync(
+        [
+          { "人工码垛数量（原始）": 1740, "尺寸（长宽高 mm）": "465*360*291", 柜型: "40HQ" },
+          { "人工码垛数量（原始）": 1403, "尺寸（长宽高 mm）": "488*360*291", 柜型: "40HQ" },
+        ],
+        {
+          batchSize: 1,
+          signal: controller.signal,
+          onProgress: (event) => {
+            if (event.processed === 1) controller.abort();
+          },
+          yieldToMain: async () => undefined,
+        },
+      ),
+      BatchImportCancelledError,
+    );
+  });
+
   it("exports batch results as a readable xlsx workbook", () => {
     const results = calculateBatchPacking([
       { "人工码垛数量（原始）": 1740, "尺寸（长宽高 mm）": "465*360*291", 柜型: "40HQ" },
@@ -119,5 +164,54 @@ describe("batch import", () => {
     assert.match(sheetXml, /465\*360\*291/);
     assert.match(sheetXml, /1493/);
     assert.match(sheetXml, /-247/);
+  });
+
+  it("exports failed batch rows with status and error columns", () => {
+    const results = calculateBatchPacking([
+      { "人工码垛数量（原始）": 1740, "尺寸（长宽高 mm）": "465*360*291", 柜型: "40HQ" },
+      { "人工码垛数量（原始）": 1403, "尺寸（长宽高 mm）": "465-360-291", 柜型: "40HQ" },
+    ]);
+
+    const workbook = createBatchResultWorkbook(results.filter((item) => item.status !== "成功"), {
+      includeErrorDetails: true,
+      title: "批量导入失败行",
+    });
+    const entries = unzipSync(workbook);
+    const sheetXml = strFromU8(entries["xl/worksheets/sheet1.xml"]);
+
+    assert.match(sheetXml, /批量导入失败行/);
+    assert.match(sheetXml, /状态/);
+    assert.match(sheetXml, /失败原因/);
+    assert.match(sheetXml, /解析失败/);
+    assert.match(sheetXml, /尺寸格式应为/);
+    assert.doesNotMatch(sheetXml, /1740/);
+  });
+
+  it("exports rows that need review with status and error columns", () => {
+    const results = calculateBatchPacking([
+      { "人工码垛数量（原始）": 1740, "尺寸（长宽高 mm）": "465*360*291", 柜型: "40HQ" },
+      { "人工码垛数量（原始）": 1403, "尺寸（长宽高 mm）": "488*360*291", 柜型: "40HQ" },
+      { "人工码垛数量（原始）": 1403, "尺寸（长宽高 mm）": "465-360-291", 柜型: "40HQ" },
+      { "人工码垛数量（原始）": 1198, "尺寸（长宽高 mm）": "465*395*290", 柜型: "40GP" },
+    ]);
+    const reviewResults = results.filter((item) => item.status !== "成功" || (item.difference !== null && item.difference < 0));
+
+    const workbook = createBatchResultWorkbook(reviewResults, {
+      includeErrorDetails: true,
+      title: "批量导入需复核行",
+    });
+    const entries = unzipSync(workbook);
+    const sheetXml = strFromU8(entries["xl/worksheets/sheet1.xml"]);
+
+    assert.match(sheetXml, /批量导入需复核行/);
+    assert.match(sheetXml, /状态/);
+    assert.match(sheetXml, /失败原因/);
+    assert.match(sheetXml, /465\*360\*291/);
+    assert.match(sheetXml, /-247/);
+    assert.match(sheetXml, /成功/);
+    assert.match(sheetXml, /解析失败/);
+    assert.match(sheetXml, /尺寸格式应为/);
+    assert.doesNotMatch(sheetXml, /488\*360\*291/);
+    assert.doesNotMatch(sheetXml, /465\*395\*290/);
   });
 });

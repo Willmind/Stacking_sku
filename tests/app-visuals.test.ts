@@ -264,6 +264,10 @@ describe("2D plan source guards", () => {
     assert.match(baseDialogSource, /@keyframes base-dialog-content-in/);
     assert.match(baseDialogSource, /@keyframes base-dialog-content-out/);
     assert.match(baseDialogSource, /base-dialog-content--fullscreen/);
+    assert.match(baseDialogSource, /stableHeight/);
+    assert.match(baseDialogSource, /base-dialog-content--stable-height/);
+    assert.match(baseDialogSource, /\.base-dialog-content--stable-height\s*\{[\s\S]*height:\s*min\(720px,\s*calc\(100dvh - 36px\)\)/);
+    assert.match(baseDialogSource, /\.base-dialog-body--default\s*\{[\s\S]*align-content:\s*start/);
     assert.match(visualizationDialogSource, /BaseDialog/);
     assert.match(visualizationDialogSource, /open:\s*boolean/);
     assert.match(plan2dViewSource, /Maximize2/);
@@ -293,13 +297,45 @@ describe("batch import UI source guards", () => {
     assert.match(batchImportDialogSource, /v-if="isImporting" class="batch-import-loading"/);
     assert.match(batchImportDialogSource, /role="status"/);
     assert.match(batchImportDialogSource, /正在解析 Excel/);
+    assert.match(batchImportDialogSource, /calculateBatchPackingAsync/);
+    assert.match(batchImportDialogSource, /importProgress/);
+    assert.match(batchImportDialogSource, /cancelImport/);
+    assert.match(batchImportDialogSource, /取消导入/);
+    assert.match(batchImportDialogSource, /aria-valuenow/);
     assert.match(batchImportDialogSource, /\.batch-import-loading\s*\{/);
     assert.match(batchImportDialogSource, /position:\s*fixed/);
     assert.match(batchImportDialogSource, /\.batch-import-loading-card/);
+    assert.match(batchImportDialogSource, /\.batch-import-cancel/);
     assert.match(batchImportDialogSource, /\.batch-import-loading-enter-active/);
     assert.match(batchImportDialogSource, /BaseDialog/);
     assert.doesNotMatch(batchImportDialogSource, /DialogRoot/);
     assert.doesNotMatch(batchImportDialogSource, /batch-dialog-content-enter-active/);
+  });
+
+  it("keeps batch import result filtering and review-row export controls", () => {
+    assert.match(batchImportDialogSource, /BaseSelect/);
+    assert.match(batchImportDialogSource, /statusFilter/);
+    assert.match(batchImportDialogSource, /errorFilter/);
+    assert.match(batchImportDialogSource, /filteredResults/);
+    assert.match(batchImportDialogSource, /按导入状态筛选/);
+    assert.match(batchImportDialogSource, /按失败原因筛选/);
+    assert.match(batchImportDialogSource, /density="compact"/);
+    assert.match(batchImportDialogSource, /导出需复核行/);
+    assert.match(batchImportDialogSource, /reviewResults/);
+    assert.match(batchImportDialogSource, /negativeDifferenceResults/);
+    assert.match(batchImportDialogSource, /includeErrorDetails/);
+    assert.match(batchImportDialogSource, /stable-height/);
+    assert.match(batchImportDialogSource, /body-variant="flush"/);
+    assert.match(batchImportDialogSource, /--batch-result-stable-height/);
+    assert.match(batchImportDialogSource, /\.batch-result-layout\s*\{[\s\S]*height:\s*100%/);
+    assert.match(batchImportDialogSource, /\.batch-result-layout\s*\{[\s\S]*grid-template-rows:\s*auto minmax\(0,\s*1fr\)/);
+    assert.match(batchImportDialogSource, /\.batch-result-region\s*\{[\s\S]*min-height:\s*0/);
+    assert.match(batchImportDialogSource, /\.result-table-shell\s*\{[\s\S]*height:\s*100%/);
+    assert.match(batchImportDialogSource, /\.dialog-empty\s*\{[\s\S]*height:\s*100%/);
+    assert.match(batchImportDialogSource, /\.dialog-error\s*\{[\s\S]*height:\s*100%/);
+    assert.doesNotMatch(batchImportDialogSource, /导出失败行/);
+    assert.doesNotMatch(batchImportDialogSource, /导出负差值/);
+    assert.doesNotMatch(batchImportDialogSource, /<select/);
   });
 
   it("highlights only negative batch import differences as danger chips", () => {
@@ -326,6 +362,11 @@ describe("select UI source guards", () => {
       /\bSelectValue\b/,
       "Select trigger should render its own stable label instead of mirroring SelectItemText during close",
     );
+    assert.match(baseSelectSource, /ariaLabel/);
+    assert.match(baseSelectSource, /density/);
+    assert.match(baseSelectSource, /base-select-item--compact/);
+    assert.match(baseSelectSource, /\.base-select-item--compact\)\s*\{[\s\S]*min-height:\s*34px/);
+    assert.match(baseSelectSource, /z-index:\s*110/);
     assert.match(baseSelectSource, /function deferValueUpdate/);
     assert.match(baseSelectSource, /window\.setTimeout/);
     assert.doesNotMatch(baseSelectSource, /animation:\s*select-pop/);

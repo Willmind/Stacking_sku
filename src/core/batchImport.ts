@@ -14,6 +14,19 @@ const CONTAINER_TYPES = ["20GP", "40GP", "40HQ"] as const;
 export type BatchContainerType = (typeof CONTAINER_TYPES)[number];
 export type BatchImportStatus = "成功" | "解析失败" | "计算失败" | "无法装载";
 
+export interface BatchPackingProgress {
+  processed: number;
+  total: number;
+  progress: number;
+}
+
+export interface CalculateBatchPackingAsyncOptions {
+  batchSize?: number;
+  signal?: AbortSignal;
+  onProgress?: (event: BatchPackingProgress) => void;
+  yieldToMain?: () => Promise<void>;
+}
+
 export interface BatchPackingRow {
   [key: string]: unknown;
 }
@@ -135,33 +148,95 @@ function createSuccessItem(
   };
 }
 
+export class BatchImportCancelledError extends Error {
+  constructor() {
+    super("已取消导入");
+    this.name = "BatchImportCancelledError";
+  }
+}
+
+function throwIfCancelled(signal?: AbortSignal) {
+  if (signal?.aborted) {
+    throw new BatchImportCancelledError();
+  }
+}
+
+function waitForMainThread() {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}
+
+function calculateBatchRow(
+  row: BatchPackingRow,
+  index: number,
+  maxLoadCache: Map<string, number>,
+): BatchPackingItem | null {
+  const rowNumber = index + 2;
+  const manualValue = readCell(row, BATCH_MANUAL_COLUMN);
+  const sizeValue = readCell(row, BATCH_SIZE_COLUMN);
+  const containerValue = readCell(row, BATCH_CONTAINER_COLUMN);
+
+  if (isBlank(manualValue) && isBlank(sizeValue) && isBlank(containerValue)) {
+    return null;
+  }
+
+  try {
+    const carton = parseDimension(sizeValue);
+    const containerType = parseContainerType(containerValue);
+    const manualCount = parseManualCount(manualValue);
+    const container = CONTAINERS[containerType] as Required<ContainerSpec>;
+    const cacheKey = createMaxLoadCacheKey(containerType, carton);
+    let totalBoxes = maxLoadCache.get(cacheKey);
+    if (totalBoxes === undefined) {
+      totalBoxes = calculatePackingTotalBoxes(container, carton);
+      maxLoadCache.set(cacheKey, totalBoxes);
+    }
+    return createSuccessItem(rowNumber, carton, containerType, manualCount, totalBoxes);
+  } catch (caught) {
+    return createFailedItem(rowNumber, row, caught instanceof Error ? caught.message : "解析失败");
+  }
+}
+
 export function calculateBatchPacking(rows: BatchPackingRow[]): BatchPackingItem[] {
   const maxLoadCache = new Map<string, number>();
-
   return rows.flatMap((row, index) => {
-    const rowNumber = index + 2;
-    const manualValue = readCell(row, BATCH_MANUAL_COLUMN);
-    const sizeValue = readCell(row, BATCH_SIZE_COLUMN);
-    const containerValue = readCell(row, BATCH_CONTAINER_COLUMN);
-
-    if (isBlank(manualValue) && isBlank(sizeValue) && isBlank(containerValue)) {
-      return [];
-    }
-
-    try {
-      const carton = parseDimension(sizeValue);
-      const containerType = parseContainerType(containerValue);
-      const manualCount = parseManualCount(manualValue);
-      const container = CONTAINERS[containerType] as Required<ContainerSpec>;
-      const cacheKey = createMaxLoadCacheKey(containerType, carton);
-      let totalBoxes = maxLoadCache.get(cacheKey);
-      if (totalBoxes === undefined) {
-        totalBoxes = calculatePackingTotalBoxes(container, carton);
-        maxLoadCache.set(cacheKey, totalBoxes);
-      }
-      return [createSuccessItem(rowNumber, carton, containerType, manualCount, totalBoxes)];
-    } catch (caught) {
-      return [createFailedItem(rowNumber, row, caught instanceof Error ? caught.message : "解析失败")];
-    }
+    const item = calculateBatchRow(row, index, maxLoadCache);
+    return item ? [item] : [];
   });
+}
+
+export async function calculateBatchPackingAsync(
+  rows: BatchPackingRow[],
+  options: CalculateBatchPackingAsyncOptions = {},
+): Promise<BatchPackingItem[]> {
+  const batchSize = Math.max(1, Math.floor(options.batchSize ?? 20));
+  const yieldToMain = options.yieldToMain ?? waitForMainThread;
+  const maxLoadCache = new Map<string, number>();
+  const results: BatchPackingItem[] = [];
+  const total = rows.length;
+  let processed = 0;
+
+  for (let start = 0; start < rows.length; start += batchSize) {
+    throwIfCancelled(options.signal);
+    const chunk = rows.slice(start, start + batchSize);
+
+    for (let offset = 0; offset < chunk.length; offset += 1) {
+      throwIfCancelled(options.signal);
+      const item = calculateBatchRow(chunk[offset], start + offset, maxLoadCache);
+      if (item) results.push(item);
+      processed += 1;
+      options.onProgress?.({
+        processed,
+        total,
+        progress: total === 0 ? 1 : processed / total,
+      });
+    }
+
+    if (start + batchSize < rows.length) {
+      await yieldToMain();
+    }
+  }
+
+  return results;
 }
