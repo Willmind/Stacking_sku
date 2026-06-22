@@ -316,13 +316,24 @@ describe("batch import UI source guards", () => {
     assert.match(batchImportDialogSource, /BaseSelect/);
     assert.match(batchImportDialogSource, /statusFilter/);
     assert.match(batchImportDialogSource, /errorFilter/);
+    assert.match(batchImportDialogSource, /differenceFilter/);
+    assert.match(batchImportDialogSource, /reviewOnly/);
     assert.match(batchImportDialogSource, /filteredResults/);
+    assert.match(batchImportDialogSource, /sortedResults/);
+    assert.match(batchImportDialogSource, /sortKey/);
+    assert.match(batchImportDialogSource, /sortDirection/);
     assert.match(batchImportDialogSource, /按导入状态筛选/);
     assert.match(batchImportDialogSource, /按失败原因筛选/);
+    assert.match(batchImportDialogSource, /按差值筛选/);
+    assert.match(batchImportDialogSource, /只看需复核/);
     assert.match(batchImportDialogSource, /density="compact"/);
     assert.match(batchImportDialogSource, /导出需复核行/);
+    assert.match(batchImportDialogSource, /导出当前筛选/);
+    assert.match(batchImportDialogSource, /downloadCurrentFilteredResults/);
     assert.match(batchImportDialogSource, /reviewResults/);
     assert.match(batchImportDialogSource, /negativeDifferenceResults/);
+    assert.match(batchImportDialogSource, /isReviewItem/);
+    assert.match(batchImportDialogSource, /toggleSort/);
     assert.match(batchImportDialogSource, /includeErrorDetails/);
     assert.match(batchImportDialogSource, /stable-height/);
     assert.match(batchImportDialogSource, /body-variant="flush"/);
@@ -336,6 +347,7 @@ describe("batch import UI source guards", () => {
     assert.doesNotMatch(batchImportDialogSource, /导出失败行/);
     assert.doesNotMatch(batchImportDialogSource, /导出负差值/);
     assert.doesNotMatch(batchImportDialogSource, /<select/);
+    assert.match(batchImportDialogSource, /aria-sort/);
   });
 
   it("highlights only negative batch import differences as danger chips", () => {

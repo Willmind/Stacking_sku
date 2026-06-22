@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Download, FileSpreadsheet, Upload } from "@lucide/vue";
+import { ArrowDown, ArrowUp, ArrowUpDown, Download, FileSpreadsheet, Upload } from "@lucide/vue";
 import { readSheet } from "read-excel-file/browser";
 import { computed, nextTick, onBeforeUnmount, ref } from "vue";
 import templateFileUrl from "../../assets/batch-import-template.xlsx?url";
@@ -13,6 +13,16 @@ import {
 } from "../../core/batchImport";
 import BaseDialog from "../ui/BaseDialog.vue";
 import BaseSelect, { type SelectOption } from "../ui/BaseSelect.vue";
+
+type DifferenceFilter = "全部" | "负差值" | "零差值" | "正差值" | "非零差值";
+type SortDirection = "asc" | "desc";
+type SortKey = "manualCount" | "sizeText" | "containerType" | "totalBoxes" | "difference" | "status" | "error";
+
+interface SortColumn {
+  key: SortKey;
+  label: string;
+  kind: "number" | "text";
+}
 
 const inputRef = ref<HTMLInputElement | null>(null);
 const isOpen = ref(false);
@@ -29,6 +39,10 @@ const processedRows = ref(0);
 const totalRows = ref(0);
 const statusFilter = ref<BatchImportStatus | "全部">("全部");
 const errorFilter = ref("全部");
+const differenceFilter = ref<DifferenceFilter>("全部");
+const reviewOnly = ref(false);
+const sortKey = ref<SortKey | "">("");
+const sortDirection = ref<SortDirection>("asc");
 let longImportTimer: number | null = null;
 let abortController: AbortController | null = null;
 
@@ -38,6 +52,24 @@ const statusFilterOptions: SelectOption[] = [
   { value: "解析失败", label: "解析失败" },
   { value: "计算失败", label: "计算失败" },
   { value: "无法装载", label: "无法装载" },
+];
+
+const differenceFilterOptions: SelectOption[] = [
+  { value: "全部", label: "全部" },
+  { value: "负差值", label: "负差值" },
+  { value: "零差值", label: "零差值" },
+  { value: "正差值", label: "正差值" },
+  { value: "非零差值", label: "非零差值" },
+];
+
+const sortColumns: SortColumn[] = [
+  { key: "manualCount", label: "人工码垛数量（原始）", kind: "number" },
+  { key: "sizeText", label: "尺寸（长宽高 mm）", kind: "text" },
+  { key: "containerType", label: "柜型", kind: "text" },
+  { key: "totalBoxes", label: "最大装载量", kind: "number" },
+  { key: "difference", label: "差值", kind: "number" },
+  { key: "status", label: "状态", kind: "text" },
+  { key: "error", label: "失败原因", kind: "text" },
 ];
 
 const successCount = computed(() => results.value.filter((item) => item.status === "成功").length);
@@ -60,9 +92,23 @@ const filteredResults = computed(() =>
   results.value.filter((item) => {
     if (statusFilter.value !== "全部" && item.status !== statusFilter.value) return false;
     if (errorFilter.value !== "全部" && (item.error || item.status) !== errorFilter.value) return false;
+    if (!matchesDifferenceFilter(item)) return false;
+    if (reviewOnly.value && !isReviewItem(item)) return false;
     return true;
   }),
 );
+const sortedResults = computed(() => {
+  if (!sortKey.value) return filteredResults.value;
+
+  const column = sortColumns.find((item) => item.key === sortKey.value);
+  if (!column) return filteredResults.value;
+
+  return [...filteredResults.value].sort((first, second) => {
+    const comparison = compareItems(first, second, column);
+    if (comparison !== 0) return sortDirection.value === "asc" ? comparison : -comparison;
+    return first.rowNumber - second.rowNumber;
+  });
+});
 const summaryText = computed(() => {
   if (!results.value.length) return importError.value || "没有读取到可计算的数据";
   const filteredText = filteredResults.value.length === results.value.length ? "" : ` · 当前显示 ${filteredResults.value.length} 条`;
@@ -73,7 +119,9 @@ const loadingDescription = computed(() =>
 );
 const progressPercent = computed(() => Math.max(0, Math.min(100, Math.round(importProgress.value))));
 const progressStyle = computed(() => ({ width: `${progressPercent.value}%` }));
-const hasActiveFilter = computed(() => statusFilter.value !== "全部" || errorFilter.value !== "全部");
+const hasActiveFilter = computed(
+  () => statusFilter.value !== "全部" || errorFilter.value !== "全部" || differenceFilter.value !== "全部" || reviewOnly.value,
+);
 
 function clearLongImportTimer() {
   if (longImportTimer === null) return;
@@ -93,6 +141,8 @@ function openFilePicker() {
 function resetFilters() {
   statusFilter.value = "全部";
   errorFilter.value = "全部";
+  differenceFilter.value = "全部";
+  reviewOnly.value = false;
 }
 
 function updateStatusFilter(value: string) {
@@ -103,6 +153,10 @@ function updateErrorFilter(value: string) {
   errorFilter.value = value;
 }
 
+function updateDifferenceFilter(value: string) {
+  differenceFilter.value = value as DifferenceFilter;
+}
+
 function resultFileName() {
   const baseName = fileName.value.replace(/\.[^.]+$/, "").trim() || "批量导入结果";
   return `${baseName}-装载结果.xlsx`;
@@ -111,6 +165,11 @@ function resultFileName() {
 function reviewFileName() {
   const baseName = fileName.value.replace(/\.[^.]+$/, "").trim() || "批量导入结果";
   return `${baseName}-需复核行.xlsx`;
+}
+
+function currentFilteredFileName() {
+  const baseName = fileName.value.replace(/\.[^.]+$/, "").trim() || "批量导入结果";
+  return `${baseName}-当前筛选结果.xlsx`;
 }
 
 function downloadWorkbook(items: BatchPackingItem[], downloadName: string, options: BatchResultWorkbookOptions = {}) {
@@ -141,6 +200,74 @@ function downloadReviewResults() {
     title: "批量导入需复核行",
     includeErrorDetails: true,
   });
+}
+
+function downloadCurrentFilteredResults() {
+  downloadWorkbook(sortedResults.value, currentFilteredFileName(), {
+    title: "批量导入当前筛选结果",
+    includeErrorDetails: true,
+  });
+}
+
+function isReviewItem(item: BatchPackingItem) {
+  return item.status !== "成功" || (item.difference !== null && item.difference < 0);
+}
+
+function matchesDifferenceFilter(item: BatchPackingItem) {
+  if (differenceFilter.value === "全部") return true;
+  if (item.difference === null) return false;
+  if (differenceFilter.value === "负差值") return item.difference < 0;
+  if (differenceFilter.value === "零差值") return item.difference === 0;
+  if (differenceFilter.value === "正差值") return item.difference > 0;
+  return item.difference !== 0;
+}
+
+function compareNullableNumbers(first: number | null, second: number | null) {
+  const firstMissing = first === null;
+  const secondMissing = second === null;
+  if (firstMissing && secondMissing) return 0;
+  if (firstMissing) return 1;
+  if (secondMissing) return -1;
+  return first - second;
+}
+
+function compareText(first: string, second: string) {
+  const firstMissing = !first.trim();
+  const secondMissing = !second.trim();
+  if (firstMissing && secondMissing) return 0;
+  if (firstMissing) return 1;
+  if (secondMissing) return -1;
+  return first.localeCompare(second, "zh-CN");
+}
+
+function compareItems(first: BatchPackingItem, second: BatchPackingItem, column: SortColumn) {
+  if (column.kind === "number") {
+    return compareNullableNumbers(first[column.key] as number | null, second[column.key] as number | null);
+  }
+
+  const firstValue = column.key === "error" ? first.error || "" : String(first[column.key] ?? "");
+  const secondValue = column.key === "error" ? second.error || "" : String(second[column.key] ?? "");
+  return compareText(firstValue, secondValue);
+}
+
+function toggleSort(key: SortKey) {
+  if (sortKey.value === key) {
+    sortDirection.value = sortDirection.value === "asc" ? "desc" : "asc";
+    return;
+  }
+
+  sortKey.value = key;
+  sortDirection.value = "asc";
+}
+
+function sortAriaValue(key: SortKey) {
+  if (sortKey.value !== key) return "none";
+  return sortDirection.value === "asc" ? "ascending" : "descending";
+}
+
+function sortIconFor(key: SortKey) {
+  if (sortKey.value !== key) return ArrowUpDown;
+  return sortDirection.value === "asc" ? ArrowUp : ArrowDown;
 }
 
 function cancelImport() {
@@ -345,26 +472,38 @@ onBeforeUnmount(() => {
             :disabled="!failedResults.length"
             @update:model-value="updateErrorFilter"
           />
+          <BaseSelect
+            id="batch-difference-filter"
+            label="差值"
+            aria-label="按差值筛选"
+            density="compact"
+            :model-value="differenceFilter"
+            :options="differenceFilterOptions"
+            @update:model-value="updateDifferenceFilter"
+          />
+          <label class="review-only-toggle">
+            <input v-model="reviewOnly" type="checkbox" />
+            <span>只看需复核</span>
+          </label>
           <button v-if="hasActiveFilter" class="filter-reset-button" type="button" @click="resetFilters">清除筛选</button>
         </div>
       </div>
 
       <div class="batch-result-region">
-        <div v-if="results.length && filteredResults.length" class="result-table-shell">
+        <div v-if="results.length && sortedResults.length" class="result-table-shell">
           <table>
             <thead>
               <tr>
-                <th>人工码垛数量（原始）</th>
-                <th>尺寸（长宽高 mm）</th>
-                <th>柜型</th>
-                <th>最大装载量</th>
-                <th>差值</th>
-                <th>状态</th>
-                <th>失败原因</th>
+                <th v-for="column in sortColumns" :key="column.key" :aria-sort="sortAriaValue(column.key)">
+                  <button class="sort-header-button" type="button" :aria-label="`按${column.label}排序`" @click="toggleSort(column.key)">
+                    <span>{{ column.label }}</span>
+                    <component :is="sortIconFor(column.key)" :size="13" :stroke-width="2.45" aria-hidden="true" />
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in filteredResults" :key="item.rowNumber" :class="{ failed: item.status !== '成功' }">
+              <tr v-for="item in sortedResults" :key="item.rowNumber" :class="{ failed: item.status !== '成功' }">
                 <td>{{ formatNumber(item.manualCount) }}</td>
                 <td>{{ item.sizeText || "-" }}</td>
                 <td>{{ item.containerType || "-" }}</td>
@@ -388,6 +527,10 @@ onBeforeUnmount(() => {
     </div>
 
     <template #footer>
+      <button v-if="hasActiveFilter && sortedResults.length" class="dialog-action" type="button" @click="downloadCurrentFilteredResults">
+        <Download :size="15" :stroke-width="2.35" aria-hidden="true" />
+        导出当前筛选
+      </button>
       <button v-if="reviewResults.length" class="dialog-action" type="button" @click="downloadReviewResults">
         <Download :size="15" :stroke-width="2.35" aria-hidden="true" />
         导出需复核行
@@ -648,10 +791,47 @@ onBeforeUnmount(() => {
 
 .batch-result-toolbar {
   display: grid;
-  grid-template-columns: minmax(140px, 180px) minmax(180px, 260px) auto;
+  grid-template-columns: minmax(130px, 160px) minmax(170px, 230px) minmax(120px, 150px) auto auto;
   gap: 10px;
   align-items: end;
   justify-content: start;
+}
+
+.review-only-toggle {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid rgba(174, 184, 201, 0.18);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 900;
+  padding: 0 11px;
+  white-space: nowrap;
+}
+
+.review-only-toggle:hover {
+  border-color: rgba(66, 214, 164, 0.42);
+}
+
+.review-only-toggle input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.review-only-toggle:has(input:focus-visible) {
+  box-shadow: var(--focus-ring);
+}
+
+.review-only-toggle:has(input:checked) {
+  border-color: rgba(66, 214, 164, 0.42);
+  background: rgba(66, 214, 164, 0.1);
+  color: var(--accent);
 }
 
 .filter-reset-button {
@@ -729,6 +909,36 @@ th {
   background: #17212c;
   color: var(--muted);
   font-weight: 900;
+}
+
+.sort-header-button {
+  display: inline-flex;
+  width: 100%;
+  min-height: 24px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 5px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 0;
+}
+
+.sort-header-button:hover {
+  color: var(--text);
+}
+
+.sort-header-button:focus-visible {
+  border-radius: 5px;
+  outline: 0;
+  box-shadow: var(--focus-ring);
+}
+
+.sort-header-button svg {
+  flex: 0 0 auto;
+  opacity: 0.78;
 }
 
 td {

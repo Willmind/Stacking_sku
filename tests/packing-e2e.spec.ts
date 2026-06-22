@@ -536,6 +536,8 @@ test("imports an Excel batch and shows calculated packing results in a dialog", 
   await expect(dialog).not.toContainText("占用高度");
   await expect(dialog.getByLabel("按导入状态筛选")).toBeVisible();
   await expect(dialog.getByLabel("按失败原因筛选")).toBeDisabled();
+  await expect(dialog.getByLabel("按差值筛选")).toBeVisible();
+  await expect(dialog.getByLabel("只看需复核")).toBeVisible();
   await expect(dialog).toContainText("状态");
   await expect(dialog).toContainText("失败原因");
   await expect(dialog).not.toContainText("导出失败行");
@@ -559,6 +561,40 @@ test("imports an Excel batch and shows calculated packing results in a dialog", 
   expect(tableToFooterGap).toBeLessThanOrEqual(24);
 
   const initialDialogHeight = await dialog.evaluate((element) => Math.round(element.getBoundingClientRect().height));
+
+  await dialog.getByRole("button", { name: "按差值排序" }).click();
+  await expect(dialog.locator("tbody tr").first()).toContainText("-247");
+  await dialog.getByRole("button", { name: "按差值排序" }).click();
+  await expect(dialog.locator("tbody tr").first()).toContainText("2");
+
+  await dialog.getByLabel("按差值筛选").click();
+  await page.getByRole("option", { name: "负差值" }).click();
+  await expect(dialog.locator("tbody tr")).toHaveCount(1);
+  await expect(dialog).toContainText("当前显示 1 条");
+  await expect(dialog.locator("tbody tr").first()).toContainText("-247");
+  await expect(dialog.getByRole("button", { name: "导出当前筛选" })).toBeVisible();
+
+  const filteredDownloadPromise = page.waitForEvent("download");
+  await dialog.getByRole("button", { name: "导出当前筛选" }).click();
+  const filteredDownload = await filteredDownloadPromise;
+  expect(filteredDownload.suggestedFilename()).toBe("batch-import-sample-当前筛选结果.xlsx");
+  const filteredDownloadedPath = await filteredDownload.path();
+  if (!filteredDownloadedPath) throw new Error("Downloaded filtered batch file is missing");
+  const filteredRows = await readSheet(filteredDownloadedPath);
+  expect(filteredRows[0]?.[0]).toBe("批量导入当前筛选结果");
+  expect(filteredRows[1]).toEqual(["人工码垛数量（原始）", "尺寸（长宽高 mm）", "柜型", "最大装载量", "差值", "状态", "失败原因"]);
+  expect(filteredRows).toHaveLength(3);
+  expect(filteredRows[2]?.[1]).toBe("465*360*291");
+  expect(filteredRows[2]?.[4]).toBe(-247);
+
+  await dialog.getByRole("button", { name: "清除筛选" }).click();
+  await expect(dialog.locator("tbody tr")).toHaveCount(4);
+  await dialog.getByLabel("只看需复核").check();
+  await expect(dialog.locator("tbody tr")).toHaveCount(1);
+  await expect(dialog.locator("tbody tr").first()).toContainText("-247");
+  await dialog.getByLabel("只看需复核").uncheck();
+  await expect(dialog.locator("tbody tr")).toHaveCount(4);
+
   await dialog.getByLabel("按导入状态筛选").click();
   await page.getByRole("option", { name: "解析失败" }).click();
   await expect(dialog).toContainText("当前筛选没有结果");
