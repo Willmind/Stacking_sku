@@ -20,6 +20,7 @@ const props = withDefaults(
     closeLabel?: string;
     size?: "default" | "large" | "fullscreen";
     bodyVariant?: "default" | "grid" | "flush";
+    stableHeight?: boolean;
   }>(),
   {
     description: "",
@@ -27,6 +28,7 @@ const props = withDefaults(
     closeLabel: "关闭弹框",
     size: "default",
     bodyVariant: "default",
+    stableHeight: false,
   },
 );
 
@@ -87,7 +89,13 @@ onBeforeUnmount(clearCloseTimer);
       <DialogOverlay class="base-dialog-overlay" :class="{ 'base-dialog-overlay--closing': isClosing }" />
       <DialogContent
         class="base-dialog-content"
-        :class="[`base-dialog-content--${size}`, { 'base-dialog-content--closing': isClosing }]"
+        :class="[
+          `base-dialog-content--${size}`,
+          {
+            'base-dialog-content--closing': isClosing,
+            'base-dialog-content--stable-height': stableHeight,
+          },
+        ]"
         :aria-describedby="description ? undefined : undefined"
       >
         <header class="base-dialog-header">
@@ -159,9 +167,17 @@ onBeforeUnmount(clearCloseTimer);
   animation: base-dialog-content-out 200ms ease both;
 }
 
+.base-dialog-content--stable-height {
+  height: min(720px, calc(100dvh - 36px));
+}
+
 .base-dialog-content--large {
   width: min(1180px, calc(100vw - 36px));
   max-height: min(820px, calc(100dvh - 36px));
+}
+
+.base-dialog-content--large.base-dialog-content--stable-height {
+  height: min(820px, calc(100dvh - 36px));
 }
 
 .base-dialog-content--fullscreen {
@@ -261,6 +277,7 @@ onBeforeUnmount(clearCloseTimer);
 
 .base-dialog-body--default {
   display: grid;
+  align-content: start;
   gap: 14px;
 }
 

@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import { strToU8, zipSync } from "fflate";
 import { readSheet } from "read-excel-file/node";
 
 declare global {
@@ -20,6 +21,84 @@ async function calculateSingleSku(page: Page, length: string, width: string, hei
   await page.fill("#carton-width", width);
   await page.fill("#carton-height", height);
   await page.getByRole("button", { name: "计算装载" }).click();
+}
+
+type WorkbookCell = string | number | null;
+
+const batchImportHeaders = ["人工码垛数量（原始）", "尺寸（长宽高 mm）", "柜型"];
+
+function escapeXml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function columnName(index: number) {
+  let value = index + 1;
+  let name = "";
+  while (value > 0) {
+    const remainder = (value - 1) % 26;
+    name = String.fromCharCode(65 + remainder) + name;
+    value = Math.floor((value - 1) / 26);
+  }
+  return name;
+}
+
+function workbookCellXml(value: WorkbookCell, columnIndex: number, rowIndex: number) {
+  const reference = `${columnName(columnIndex)}${rowIndex}`;
+  if (value === null || value === "") return `<c r="${reference}"/>`;
+  if (typeof value === "number") return `<c r="${reference}"><v>${value}</v></c>`;
+  return `<c r="${reference}" t="inlineStr"><is><t>${escapeXml(value)}</t></is></c>`;
+}
+
+function workbookSheetXml(rows: WorkbookCell[][]) {
+  const lastRow = Math.max(1, rows.length);
+  const lastColumn = columnName(batchImportHeaders.length - 1);
+  const rowXml = rows
+    .map((row, rowIndex) => {
+      const rowNumber = rowIndex + 1;
+      return `<row r="${rowNumber}">${row.map((value, columnIndex) => workbookCellXml(value, columnIndex, rowNumber)).join("")}</row>`;
+    })
+    .join("");
+
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <dimension ref="A1:${lastColumn}${lastRow}"/>
+  <sheetData>${rowXml}</sheetData>
+</worksheet>`;
+}
+
+function createBatchImportWorkbook(rows: WorkbookCell[][]) {
+  const worksheetRows = [batchImportHeaders, ...rows];
+  return Buffer.from(
+    zipSync(
+      {
+        "[Content_Types].xml": strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>`),
+        "_rels/.rels": strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`),
+        "xl/workbook.xml": strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets><sheet name="批量导入" sheetId="1" r:id="rId1"/></sheets>
+</workbook>`),
+        "xl/_rels/workbook.xml.rels": strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+</Relationships>`),
+        "xl/worksheets/sheet1.xml": strToU8(workbookSheetXml(worksheetRows)),
+      },
+      { level: 6 },
+    ),
+  );
 }
 
 async function readSceneCanvasScreenshotFrame(page: Page) {
@@ -455,6 +534,89 @@ test("imports an Excel batch and shows calculated packing results in a dialog", 
   await expect(dialog).toContainText("2");
   await expect(dialog).not.toContainText("每层数量");
   await expect(dialog).not.toContainText("占用高度");
+  await expect(dialog.getByLabel("按导入状态筛选")).toBeVisible();
+  await expect(dialog.getByLabel("按失败原因筛选")).toBeDisabled();
+  await expect(dialog.getByLabel("按差值筛选")).toBeVisible();
+  await expect(dialog.getByLabel("只看需复核")).toBeVisible();
+  await expect(dialog).toContainText("状态");
+  await expect(dialog).toContainText("失败原因");
+  await expect(dialog).not.toContainText("导出失败行");
+  await expect(dialog).not.toContainText("导出负差值");
+  await expect(dialog.getByRole("button", { name: "导出需复核行" })).toBeVisible();
+
+  const fileToFilterGap = await dialog.evaluate((element) => {
+    const fileLine = element.querySelector(".file-line");
+    const statusLabel = element.querySelector("#batch-status-filter-label");
+    if (!fileLine || !statusLabel) throw new Error("Batch import filter layout anchors are missing");
+    return Math.round(statusLabel.getBoundingClientRect().top - fileLine.getBoundingClientRect().bottom);
+  });
+  expect(fileToFilterGap).toBeLessThanOrEqual(24);
+
+  const tableToFooterGap = await dialog.evaluate((element) => {
+    const tableShell = element.querySelector(".result-table-shell");
+    const footer = element.querySelector(".base-dialog-footer");
+    if (!tableShell || !footer) throw new Error("Batch import table layout anchors are missing");
+    return Math.round(footer.getBoundingClientRect().top - tableShell.getBoundingClientRect().bottom);
+  });
+  expect(tableToFooterGap).toBeLessThanOrEqual(24);
+
+  const initialDialogHeight = await dialog.evaluate((element) => Math.round(element.getBoundingClientRect().height));
+
+  await dialog.getByRole("button", { name: "按差值排序" }).click();
+  await expect(dialog.locator("tbody tr").first()).toContainText("-247");
+  await dialog.getByRole("button", { name: "按差值排序" }).click();
+  await expect(dialog.locator("tbody tr").first()).toContainText("2");
+
+  await dialog.getByLabel("按差值筛选").click();
+  await page.getByRole("option", { name: "负差值" }).click();
+  await expect(dialog.locator("tbody tr")).toHaveCount(1);
+  await expect(dialog).toContainText("当前显示 1 条");
+  await expect(dialog.locator("tbody tr").first()).toContainText("-247");
+  await expect(dialog.getByRole("button", { name: "导出当前筛选" })).toBeVisible();
+
+  const filteredDownloadPromise = page.waitForEvent("download");
+  await dialog.getByRole("button", { name: "导出当前筛选" }).click();
+  const filteredDownload = await filteredDownloadPromise;
+  expect(filteredDownload.suggestedFilename()).toBe("batch-import-sample-当前筛选结果.xlsx");
+  const filteredDownloadedPath = await filteredDownload.path();
+  if (!filteredDownloadedPath) throw new Error("Downloaded filtered batch file is missing");
+  const filteredRows = await readSheet(filteredDownloadedPath);
+  expect(filteredRows[0]?.[0]).toBe("批量导入当前筛选结果");
+  expect(filteredRows[1]).toEqual(["人工码垛数量（原始）", "尺寸（长宽高 mm）", "柜型", "最大装载量", "差值", "状态", "失败原因"]);
+  expect(filteredRows).toHaveLength(3);
+  expect(filteredRows[2]?.[1]).toBe("465*360*291");
+  expect(filteredRows[2]?.[4]).toBe(-247);
+
+  await dialog.getByRole("button", { name: "清除筛选" }).click();
+  await expect(dialog.locator("tbody tr")).toHaveCount(4);
+  await dialog.getByLabel("只看需复核").check();
+  await expect(dialog.locator("tbody tr")).toHaveCount(1);
+  await expect(dialog.locator("tbody tr").first()).toContainText("-247");
+  await dialog.getByLabel("只看需复核").uncheck();
+  await expect(dialog.locator("tbody tr")).toHaveCount(4);
+
+  await dialog.getByLabel("按导入状态筛选").click();
+  await page.getByRole("option", { name: "解析失败" }).click();
+  await expect(dialog).toContainText("当前筛选没有结果");
+  const emptyFilterDialogHeight = await dialog.evaluate((element) => Math.round(element.getBoundingClientRect().height));
+  expect(Math.abs(emptyFilterDialogHeight - initialDialogHeight)).toBeLessThanOrEqual(8);
+  await dialog.getByLabel("按导入状态筛选").click();
+  await page.getByRole("option", { name: "全部", exact: true }).click();
+  await expect(dialog.locator("tbody tr")).toHaveCount(4);
+
+  const negativeDownloadPromise = page.waitForEvent("download");
+  await dialog.getByRole("button", { name: "导出需复核行" }).click();
+  const negativeDownload = await negativeDownloadPromise;
+  expect(negativeDownload.suggestedFilename()).toBe("batch-import-sample-需复核行.xlsx");
+  const negativeDownloadedPath = await negativeDownload.path();
+  if (!negativeDownloadedPath) throw new Error("Downloaded negative-difference file is missing");
+  const negativeRows = await readSheet(negativeDownloadedPath);
+  expect(negativeRows[0]?.[0]).toBe("批量导入需复核行");
+  expect(negativeRows[1]).toEqual(["人工码垛数量（原始）", "尺寸（长宽高 mm）", "柜型", "最大装载量", "差值", "状态", "失败原因"]);
+  expect(negativeRows[2]?.[1]).toBe("465*360*291");
+  expect(negativeRows[2]?.[4]).toBe(-247);
+  expect(negativeRows[2]?.[5]).toBe("成功");
+  expect(negativeRows).toHaveLength(3);
 
   const downloadPromise = page.waitForEvent("download");
   await dialog.getByRole("button", { name: "下载结果" }).click();
@@ -473,6 +635,42 @@ test("imports an Excel batch and shows calculated packing results in a dialog", 
 
   await dialog.getByRole("button", { name: "关闭", exact: true }).click();
   await expect(dialog).toBeHidden();
+});
+
+test("keeps the batch import dialog height stable for empty and large results", async ({ page }) => {
+  await page.goto("/");
+
+  const largeWorkbook = createBatchImportWorkbook(
+    Array.from({ length: 80 }, (_, index) => [
+      3300 + index,
+      index % 2 === 0 ? "315*258*250" : "385*260*255",
+      "40HQ",
+    ]),
+  );
+  await page.setInputFiles("#batch-excel-input", {
+    name: "large-batch.xlsx",
+    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    buffer: largeWorkbook,
+  });
+
+  const dialog = page.getByRole("dialog", { name: "批量导入结果" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator("tbody tr")).toHaveCount(80);
+  const largeDialogHeight = await dialog.evaluate((element) => Math.round(element.getBoundingClientRect().height));
+  await dialog.getByRole("button", { name: "关闭", exact: true }).click();
+  await expect(dialog).toBeHidden();
+
+  const emptyWorkbook = createBatchImportWorkbook([]);
+  await page.setInputFiles("#batch-excel-input", {
+    name: "empty-batch.xlsx",
+    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    buffer: emptyWorkbook,
+  });
+
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("没有读取到可计算的数据");
+  const emptyDialogHeight = await dialog.evaluate((element) => Math.round(element.getBoundingClientRect().height));
+  expect(Math.abs(emptyDialogHeight - largeDialogHeight)).toBeLessThanOrEqual(8);
 });
 
 test("downloads the batch import template workbook", async ({ page }) => {

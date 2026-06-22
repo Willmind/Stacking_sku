@@ -28,10 +28,14 @@ const props = withDefaults(
     label: string;
     modelValue: string;
     options: SelectOption[];
+    ariaLabel?: string;
+    density?: "default" | "compact";
     disabled?: boolean;
     showSelectedDescription?: boolean;
   }>(),
   {
+    ariaLabel: "",
+    density: "default",
     disabled: false,
     showSelectedDescription: false,
   },
@@ -60,9 +64,13 @@ function updateValue(value: unknown) {
     <SelectRoot :model-value="props.modelValue" :name="props.id" :disabled="props.disabled" @update:model-value="updateValue">
       <SelectTrigger
         class="base-select-trigger"
-        :class="{ 'base-select-trigger--with-description': props.showSelectedDescription }"
+        :class="{
+          'base-select-trigger--with-description': props.showSelectedDescription,
+          'base-select-trigger--compact': props.density === 'compact',
+        }"
         :id="props.id"
-        :aria-labelledby="`${props.id}-label`"
+        :aria-label="props.ariaLabel || undefined"
+        :aria-labelledby="props.ariaLabel ? undefined : `${props.id}-label`"
       >
         <span class="base-select-trigger-copy">
           <span class="base-select-trigger-value">{{ selectedLabel }}</span>
@@ -79,12 +87,21 @@ function updateValue(value: unknown) {
       </SelectTrigger>
 
       <SelectPortal>
-        <SelectContent class="base-select-content" position="popper" :side-offset="7">
-          <SelectViewport class="base-select-viewport">
+        <SelectContent
+          class="base-select-content"
+          :class="{ 'base-select-content--compact': props.density === 'compact' }"
+          position="popper"
+          :side-offset="7"
+        >
+          <SelectViewport
+            class="base-select-viewport"
+            :class="{ 'base-select-viewport--compact': props.density === 'compact' }"
+          >
             <SelectItem
               v-for="option in props.options"
               :key="option.value"
               class="base-select-item"
+              :class="{ 'base-select-item--compact': props.density === 'compact' }"
               :value="option.value"
               :text-value="option.label"
               :disabled="option.disabled"
@@ -142,6 +159,12 @@ function updateValue(value: unknown) {
 .base-select-trigger--with-description {
   height: 58px;
   padding-block: 8px;
+}
+
+.base-select-trigger--compact {
+  min-height: 36px;
+  font-size: 12px;
+  padding-inline: 10px;
 }
 
 .base-select-trigger:hover {
@@ -214,7 +237,7 @@ function updateValue(value: unknown) {
 }
 
 :global(.base-select-content) {
-  z-index: 50;
+  z-index: 110;
   min-width: var(--reka-select-trigger-width);
   overflow: hidden;
   border: 1px solid var(--popover-border);
@@ -231,6 +254,11 @@ function updateValue(value: unknown) {
   padding: 5px;
 }
 
+:global(.base-select-viewport--compact) {
+  gap: 1px;
+  padding: 4px;
+}
+
 :global(.base-select-item) {
   position: relative;
   display: grid;
@@ -245,6 +273,14 @@ function updateValue(value: unknown) {
   padding: 8px 10px 8px 8px;
   outline: 0;
   user-select: none;
+}
+
+:global(.base-select-item--compact) {
+  min-height: 34px;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  padding: 5px 9px 5px 7px;
 }
 
 :global(.base-select-item[data-highlighted]) {
@@ -268,6 +304,10 @@ function updateValue(value: unknown) {
   justify-content: center;
 }
 
+:global(.base-select-item--compact .base-select-item-check-slot) {
+  min-height: 18px;
+}
+
 :global(.base-select-item-indicator) {
   display: inline-flex;
   align-items: center;
@@ -280,6 +320,11 @@ function updateValue(value: unknown) {
   min-width: 0;
   gap: 3px;
   line-height: 1.28;
+}
+
+:global(.base-select-item--compact .base-select-item-copy) {
+  gap: 1px;
+  line-height: 1.18;
 }
 
 :global(.base-select-item-label) {
