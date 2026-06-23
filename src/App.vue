@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Boxes, Calculator } from "@lucide/vue";
-import { computed } from "vue";
+import { Boxes, Calculator, LoaderCircle } from "@lucide/vue";
+import { computed, nextTick, ref } from "vue";
 import BatchImportDialog from "./components/controls/BatchImportDialog.vue";
 import ContainerForm from "./components/controls/ContainerForm.vue";
 import PackingModeSwitch from "./components/controls/PackingModeSwitch.vue";
@@ -25,6 +25,19 @@ const statusToneByLabel: Record<string, StatusTone> = {
 };
 
 const statusChipClass = computed(() => `status-chip--${statusToneByLabel[store.status] ?? "idle"}`);
+const isCalculating = ref(false);
+
+async function handleCalculate() {
+  if (isCalculating.value) return;
+  isCalculating.value = true;
+  await nextTick();
+  await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+  try {
+    store.calculate();
+  } finally {
+    isCalculating.value = false;
+  }
+}
 </script>
 
 <template>
@@ -45,9 +58,23 @@ const statusChipClass = computed(() => `status-chip--${statusToneByLabel[store.s
       <SingleSkuForm v-if="store.mode === 'single'" />
       <SkuEditor v-else />
 
-      <button class="calculate-button" type="button" @click="store.calculate">
-        <Calculator :size="17" :stroke-width="2.35" aria-hidden="true" />
-        计算装载
+      <button
+        class="calculate-button"
+        :class="{ 'calculate-button--loading': isCalculating }"
+        type="button"
+        :disabled="isCalculating"
+        :aria-busy="isCalculating"
+        @click="handleCalculate"
+      >
+        <LoaderCircle
+          v-if="isCalculating"
+          class="calculate-button__spinner"
+          :size="17"
+          :stroke-width="2.45"
+          aria-hidden="true"
+        />
+        <Calculator v-else :size="17" :stroke-width="2.35" aria-hidden="true" />
+        {{ isCalculating ? "计算中" : "计算装载" }}
       </button>
       <p v-if="store.error" class="error">{{ store.error }}</p>
 
@@ -149,15 +176,37 @@ p {
   box-shadow: 0 16px 34px rgba(47, 189, 148, 0.2);
 }
 
-.calculate-button:hover {
+.calculate-button:not(:disabled):hover {
   border-color: rgba(92, 237, 193, 0.82);
   background: linear-gradient(180deg, #68e8c2, #35cba0);
   box-shadow: 0 18px 40px rgba(47, 189, 148, 0.26);
 }
 
-.calculate-button:active {
+.calculate-button:not(:disabled):active {
   background: linear-gradient(180deg, #35cba0, #279e7d);
   box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.24);
+}
+
+.calculate-button:disabled {
+  cursor: wait;
+}
+
+.calculate-button--loading {
+  border-color: rgba(92, 237, 193, 0.72);
+  background: linear-gradient(180deg, #55dfb7, #31c59b);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+    0 16px 34px rgba(47, 189, 148, 0.2);
+}
+
+.calculate-button__spinner {
+  animation: calculate-spin 0.86s linear infinite;
+}
+
+@keyframes calculate-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .error {

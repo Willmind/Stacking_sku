@@ -15,27 +15,30 @@ function getPatternGroups(result: PackingResult): PatternGroup[] {
   return Array.isArray(groups) ? (groups as PatternGroup[]) : [];
 }
 
-function getOrientationNote(result: PackingResult): PackingStrategyNote {
-  const groups = getPatternGroups(result);
-  const orientationLabels = Array.from(new Set(groups.map((group) => group.label).filter(Boolean)));
-  const hasHorizontalRotation =
-    result.pattern?.family === "heterogeneous-zones"
-      ? result.orderedPositions.some((position) => position.dx !== result.carton.length || position.dy !== result.carton.width)
-      : orientationLabels.length > 1;
+function getUsedOrientationLabels(result: PackingResult) {
+  if (result.pattern?.family === "heterogeneous-zones") {
+    return Array.from(new Set(result.orderedPositions.map((position) => position.label).filter(Boolean)));
+  }
+  return Array.from(new Set(getPatternGroups(result).map((group) => group.label).filter(Boolean)));
+}
 
-  if (hasHorizontalRotation) {
+function getOrientationNote(result: PackingResult): PackingStrategyNote {
+  const orientationLabels = getUsedOrientationLabels(result);
+  const hasMultipleOrientations = orientationLabels.length > 1;
+
+  if (hasMultipleOrientations) {
     return {
       id: "orientation",
-      label: "水平旋转",
-      detail: orientationLabels.length > 0 ? `已组合 ${orientationLabels.join("、")} 朝向` : "已按各 SKU 尝试长宽两种水平朝向",
+      label: "朝向规则",
+      detail: `已组合 ${orientationLabels.join("、")} 朝向`,
       tone: "success",
     };
   }
 
   return {
     id: "orientation",
-    label: "水平旋转",
-    detail: orientationLabels[0] ? `仅使用 ${orientationLabels[0]} 朝向` : "仅使用当前纸箱朝向",
+    label: "朝向规则",
+    detail: orientationLabels[0] ? `仅使用 ${orientationLabels[0]} 朝向` : "已按允许朝向尝试排布",
     tone: "neutral",
   };
 }

@@ -523,7 +523,7 @@ describe("packing core", () => {
   );
 
   const notes = Packing.describePackingStrategy(result);
-  assert.deepEqual(notes.map((note) => note.label), ["水平旋转", "车厢公差", "角件避让", "空位回填", "SKU 策略"]);
+  assert.deepEqual(notes.map((note) => note.label), ["朝向规则", "车厢公差", "角件避让", "空位回填", "SKU 策略"]);
   assert.match(notes.find((note) => note.id === "backfill").detail, /复用/);
   assert.match(notes.find((note) => note.id === "sku").detail, /异尺寸按 SKU 顺序分区/);
 }
@@ -654,5 +654,55 @@ assert.throws(
   /公差扣减后的有效柜体长度必须为正数/,
 );
 
+  });
+
+  it("supports selected full-free carton orientations", () => {
+    const container = customContainer(240, 120, 100);
+    const sideOnlyCarton = carton(120, 80, 110);
+    const defaultResult = Packing.calculatePacking(container, sideOnlyCarton, {
+      cornerBlock: { length: 0, width: 0, height: 0 },
+    });
+
+    assert.equal(defaultResult.totalBoxes, 0);
+
+    const sideFaceResult = Packing.calculatePacking(container, sideOnlyCarton, {
+      allowedOrientations: ["length-height-width"],
+      cornerBlock: { length: 0, width: 0, height: 0 },
+    });
+
+    assert.equal(sideFaceResult.totalBoxes, 2);
+    assert.deepEqual(
+      sideFaceResult.orderedPositions.map((position) => [position.dx, position.dy, position.dz]),
+      [
+        [120, 110, 80],
+        [120, 110, 80],
+      ],
+    );
+    assert.deepEqual(
+      [...new Set(sideFaceResult.orderedPositions.map((position) => position.orientationId))],
+      ["length-height-width"],
+    );
+    assert.match(
+      Packing.describePackingStrategy(sideFaceResult).find((note) => note.id === "orientation").detail,
+      /长×高×宽/,
+    );
+  });
+
+  it("validates orientation selections", () => {
+    assert.throws(
+      () =>
+        Packing.calculatePacking(customContainer(500, 330, 250), carton(100, 100, 100), {
+          allowedOrientations: [],
+        }),
+      /至少选择一种纸箱朝向/,
+    );
+
+    assert.throws(
+      () =>
+        Packing.calculatePacking(customContainer(500, 330, 250), carton(100, 100, 100), {
+          allowedOrientations: ["bad-orientation"],
+        }),
+      /纸箱朝向不支持/,
+    );
   });
 });

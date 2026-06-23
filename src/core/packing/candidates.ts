@@ -5,45 +5,37 @@ import {
   overlapsAnyFloorRect,
   positionFitsFloor,
 } from "./geometry";
+import { getOrientations, type CartonOrientation, type CartonOrientationId } from "./orientations";
 import type { BoxPosition, CartonSpec, ContainerSpec } from "./types";
 
-type OrientationId = "length" | "width";
 type PatternFamily = "length-segments" | "width-lanes";
 type CandidateOrder = "length-first" | "width-first";
 
-interface Orientation {
-  id: OrientationId;
-  label: string;
-  axisLabel: string;
-  x: number;
-  y: number;
-}
-
-type OrientationSet = Record<OrientationId, Orientation>;
-
 interface CandidateUnit {
   family: PatternFamily;
-  orientationId: OrientationId;
+  orientationId: CartonOrientationId;
   label: string;
   x: number;
   y: number;
   dx: number;
   dy: number;
+  dz: number;
   acrossCount: number;
 }
 
 interface CandidateGroup {
-  orientationId: OrientationId;
+  orientationId: CartonOrientationId;
   label: string;
   axisLabel: string;
   count: number;
   occupiedLength: number;
   occupiedWidth: number;
+  occupiedHeight: number;
   boxesPerUnit: number;
 }
 
 export type CandidateBoxPosition = BoxPosition & {
-  orientationId?: OrientationId;
+  orientationId?: CartonOrientationId;
   label?: string;
   source?: string;
 };
@@ -62,50 +54,32 @@ export interface CandidatePattern {
   remainderCount?: number;
 }
 
-export function getOrientations(carton: CartonSpec): OrientationSet {
-  return {
-    length: {
-      id: "length",
-      label: "长向",
-      axisLabel: "纸箱长度沿柜长",
-      x: carton.length,
-      y: carton.width,
-    },
-    width: {
-      id: "width",
-      label: "宽向",
-      axisLabel: "纸箱宽度沿柜长",
-      x: carton.width,
-      y: carton.length,
-    },
-  };
-}
-
 function makeSequence(
-  lengthCount: number,
-  widthCount: number,
+  primaryCount: number,
+  secondaryCount: number,
   order: CandidateOrder,
-  orientations: OrientationSet,
-): Orientation[] {
-  const sequence: Orientation[] = [];
-  const pushUnits = (orientation: Orientation, count: number) => {
+  primaryOrientation: CartonOrientation,
+  secondaryOrientation?: CartonOrientation,
+): CartonOrientation[] {
+  const sequence: CartonOrientation[] = [];
+  const pushUnits = (orientation: CartonOrientation, count: number) => {
     for (let index = 0; index < count; index += 1) {
       sequence.push(orientation);
     }
   };
 
-  if (order === "width-first") {
-    pushUnits(orientations.width, widthCount);
-    pushUnits(orientations.length, lengthCount);
+  if (order === "width-first" && secondaryOrientation) {
+    pushUnits(secondaryOrientation, secondaryCount);
+    pushUnits(primaryOrientation, primaryCount);
   } else {
-    pushUnits(orientations.length, lengthCount);
-    pushUnits(orientations.width, widthCount);
+    pushUnits(primaryOrientation, primaryCount);
+    if (secondaryOrientation) pushUnits(secondaryOrientation, secondaryCount);
   }
 
   return sequence;
 }
 
-function summarizeGroups(sequence: Orientation[], family: PatternFamily, container: ContainerSpec): CandidateGroup[] {
+function summarizeGroups(sequence: CartonOrientation[], family: PatternFamily, container: ContainerSpec): CandidateGroup[] {
   const groups: CandidateGroup[] = [];
   for (const orientation of sequence) {
     const previous = groups[groups.length - 1];
@@ -119,16 +93,14 @@ function summarizeGroups(sequence: Orientation[], family: PatternFamily, contain
         count: 1,
         occupiedLength: 0,
         occupiedWidth: 0,
+        occupiedHeight: orientation.z,
         boxesPerUnit: 0,
       });
     }
   }
 
   for (const group of groups) {
-    const orientation =
-      group.orientationId === "length"
-        ? sequence.find((item) => item.id === "length")
-        : sequence.find((item) => item.id === "width");
+    const orientation = sequence.find((item) => item.id === group.orientationId);
     if (!orientation) continue;
 
     if (family === "length-segments") {
@@ -140,17 +112,18 @@ function summarizeGroups(sequence: Orientation[], family: PatternFamily, contain
       group.occupiedWidth = group.count * orientation.y;
       group.boxesPerUnit = Math.floor(container.length / orientation.x);
     }
+    group.occupiedHeight = orientation.z;
   }
 
   return groups;
 }
 
-function summarizeGroupsFromUnits(units: CandidateUnit[], orientations: OrientationSet): CandidateGroup[] {
+function summarizeGroupsFromUnits(units: CandidateUnit[], orientations: CartonOrientation[]): CandidateGroup[] {
   const groups: CandidateGroup[] = [];
 
   for (const unit of units) {
     const previous = groups[groups.length - 1];
-    const orientation = orientations[unit.orientationId];
+    const orientation = orientations.find((item) => item.id === unit.orientationId);
     const occupiedLength = unit.family === "length-segments" ? unit.dx : unit.acrossCount * unit.dx;
     const occupiedWidth = unit.family === "length-segments" ? unit.acrossCount * unit.dy : unit.dy;
 
@@ -162,6 +135,7 @@ function summarizeGroupsFromUnits(units: CandidateUnit[], orientations: Orientat
       previous.occupiedWidth += unit.family === "width-lanes" ? occupiedWidth : 0;
       previous.occupiedWidth =
         unit.family === "length-segments" ? Math.max(previous.occupiedWidth, occupiedWidth) : previous.occupiedWidth;
+      previous.occupiedHeight = Math.max(previous.occupiedHeight, unit.dz);
       previous.boxesPerUnit = Math.max(previous.boxesPerUnit, unit.acrossCount);
     } else {
       groups.push({
@@ -171,6 +145,7 @@ function summarizeGroupsFromUnits(units: CandidateUnit[], orientations: Orientat
         count: 1,
         occupiedLength,
         occupiedWidth,
+        occupiedHeight: unit.dz,
         boxesPerUnit: unit.acrossCount,
       });
     }
@@ -181,12 +156,13 @@ function summarizeGroupsFromUnits(units: CandidateUnit[], orientations: Orientat
 
 function createLengthCandidate(
   container: ContainerSpec,
-  orientations: OrientationSet,
-  lengthCount: number,
-  widthCount: number,
+  primaryOrientation: CartonOrientation,
+  secondaryOrientation: CartonOrientation | undefined,
+  primaryCount: number,
+  secondaryCount: number,
   order: CandidateOrder,
 ): CandidatePattern {
-  const sequence = makeSequence(lengthCount, widthCount, order, orientations);
+  const sequence = makeSequence(primaryCount, secondaryCount, order, primaryOrientation, secondaryOrientation);
   let x = 0;
   let occupiedWidth = 0;
   let perLayerBoxCount = 0;
@@ -202,6 +178,7 @@ function createLengthCandidate(
       y: 0,
       dx: orientation.x,
       dy: orientation.y,
+      dz: orientation.z,
       acrossCount,
     });
     x += orientation.x;
@@ -214,8 +191,8 @@ function createLengthCandidate(
     order,
     units,
     groups: summarizeGroups(sequence, "length-segments", container),
-    lengthFacingCount: lengthCount,
-    widthFacingCount: widthCount,
+    lengthFacingCount: primaryCount,
+    widthFacingCount: secondaryCount,
     occupiedLength: x,
     occupiedWidth,
     perLayerBoxCount,
@@ -224,12 +201,13 @@ function createLengthCandidate(
 
 function createWidthCandidate(
   container: ContainerSpec,
-  orientations: OrientationSet,
-  lengthCount: number,
-  widthCount: number,
+  primaryOrientation: CartonOrientation,
+  secondaryOrientation: CartonOrientation | undefined,
+  primaryCount: number,
+  secondaryCount: number,
   order: CandidateOrder,
 ): CandidatePattern {
-  const sequence = makeSequence(lengthCount, widthCount, order, orientations);
+  const sequence = makeSequence(primaryCount, secondaryCount, order, primaryOrientation, secondaryOrientation);
   let y = 0;
   let occupiedLength = 0;
   let perLayerBoxCount = 0;
@@ -245,6 +223,7 @@ function createWidthCandidate(
       y,
       dx: orientation.x,
       dy: orientation.y,
+      dz: orientation.z,
       acrossCount,
     });
     y += orientation.y;
@@ -257,8 +236,8 @@ function createWidthCandidate(
     order,
     units,
     groups: summarizeGroups(sequence, "width-lanes", container),
-    lengthFacingCount: lengthCount,
-    widthFacingCount: widthCount,
+    lengthFacingCount: primaryCount,
+    widthFacingCount: secondaryCount,
     occupiedLength,
     occupiedWidth: y,
     perLayerBoxCount,
@@ -273,11 +252,11 @@ function addWidthLaneCandidateVariants(
   candidates: CandidatePattern[],
   container: ContainerSpec,
   carton: CartonSpec,
-  orientations: OrientationSet,
+  orientations: CartonOrientation[],
   candidate: CandidatePattern,
   minDoorSideClearance = 0,
 ) {
-  const basePositions = createLayerPositions(candidate, carton.height);
+  const basePositions = createLayerPositions(candidate);
   const normalizedCandidate: CandidatePattern = {
     ...candidate,
     groups: summarizeGroupsFromUnits(candidate.units, orientations),
@@ -290,6 +269,7 @@ function addWidthLaneCandidateVariants(
     container,
     carton,
     basePositions,
+    orientations,
     minDoorSideClearance,
   );
   if (extraPositions.length === 0) {
@@ -310,24 +290,43 @@ function addWidthLaneCandidates(
   candidates: CandidatePattern[],
   container: ContainerSpec,
   carton: CartonSpec,
-  orientations: OrientationSet,
-  lengthCount: number,
-  widthCount: number,
+  orientations: CartonOrientation[],
+  primaryOrientation: CartonOrientation,
+  secondaryOrientation: CartonOrientation | undefined,
+  primaryCount: number,
+  secondaryCount: number,
   order: CandidateOrder,
 ) {
-  const baseCandidate = createWidthCandidate(container, orientations, lengthCount, widthCount, order);
+  const baseCandidate = createWidthCandidate(
+    container,
+    primaryOrientation,
+    secondaryOrientation,
+    primaryCount,
+    secondaryCount,
+    order,
+  );
   addWidthLaneCandidateVariants(candidates, container, carton, orientations, baseCandidate);
 
-  if (!baseCandidate.units.some((unit) => unit.orientationId === "width" && unit.acrossCount > 0)) {
+  if (
+    !secondaryOrientation ||
+    !baseCandidate.units.some((unit) => unit.orientationId === secondaryOrientation.id && unit.acrossCount > 0)
+  ) {
     return;
   }
 
   const seenReducedUnits = new Set<string>();
   for (let reduceWidthLaneDepth = 1; reduceWidthLaneDepth <= 2; reduceWidthLaneDepth += 1) {
-    const reduced = createWidthCandidate(container, orientations, lengthCount, widthCount, order);
+    const reduced = createWidthCandidate(
+      container,
+      primaryOrientation,
+      secondaryOrientation,
+      primaryCount,
+      secondaryCount,
+      order,
+    );
     let reducedAnyUnit = false;
     const reducedUnits = reduced.units.map((unit) => {
-      if (unit.orientationId !== "width") return unit;
+      if (unit.orientationId !== secondaryOrientation.id) return unit;
       const acrossCount = Math.max(0, unit.acrossCount - reduceWidthLaneDepth);
       reducedAnyUnit = reducedAnyUnit || acrossCount !== unit.acrossCount;
       return {
@@ -348,40 +347,141 @@ function addWidthLaneCandidates(
   }
 }
 
-export function enumerateCandidates(container: ContainerSpec, carton: CartonSpec): CandidatePattern[] {
-  const orientations = getOrientations(carton);
-  const candidates: CandidatePattern[] = [];
-  const lengthMax = Math.floor(container.length / orientations.length.x);
-  const widthByLengthMax = Math.floor(container.length / orientations.width.x);
-  const widthLaneLengthMax = Math.floor(container.width / orientations.length.y);
-  const widthLaneWidthMax = Math.floor(container.width / orientations.width.y);
+function pushCandidate(candidates: CandidatePattern[], candidate: CandidatePattern) {
+  const key = candidate.units
+    .map((unit) => `${unit.family}:${unit.orientationId}:${unit.x}:${unit.y}:${unit.dx}:${unit.dy}:${unit.dz}:${unit.acrossCount}`)
+    .join("|");
+  if (candidates.some((item) => item.units
+    .map((unit) => `${unit.family}:${unit.orientationId}:${unit.x}:${unit.y}:${unit.dx}:${unit.dy}:${unit.dz}:${unit.acrossCount}`)
+    .join("|") === key)) {
+    return;
+  }
+  candidates.push(candidate);
+}
 
-  for (let lengthCount = 0; lengthCount <= lengthMax; lengthCount += 1) {
-    const remaining = container.length - lengthCount * orientations.length.x;
-    const widthCount = Math.floor(remaining / orientations.width.x);
-    if (lengthCount + widthCount > 0 && widthCount <= widthByLengthMax) {
-      candidates.push(createLengthCandidate(container, orientations, lengthCount, widthCount, "length-first"));
-      if (lengthCount > 0 && widthCount > 0) {
-        candidates.push(createLengthCandidate(container, orientations, lengthCount, widthCount, "width-first"));
+function enumerateSingleOrientationCandidates(
+  candidates: CandidatePattern[],
+  container: ContainerSpec,
+  carton: CartonSpec,
+  orientations: CartonOrientation[],
+  orientation: CartonOrientation,
+) {
+  const lengthMax = Math.floor(container.length / orientation.x);
+  for (let count = 1; count <= lengthMax; count += 1) {
+    pushCandidate(candidates, createLengthCandidate(container, orientation, undefined, count, 0, "length-first"));
+  }
+
+  const widthMax = Math.floor(container.width / orientation.y);
+  for (let count = 1; count <= widthMax; count += 1) {
+    addWidthLaneCandidates(candidates, container, carton, orientations, orientation, undefined, count, 0, "length-first");
+  }
+}
+
+function enumerateMixedOrientationCandidates(
+  candidates: CandidatePattern[],
+  container: ContainerSpec,
+  carton: CartonSpec,
+  orientations: CartonOrientation[],
+  primaryOrientation: CartonOrientation,
+  secondaryOrientation: CartonOrientation,
+) {
+  const primaryLengthMax = Math.floor(container.length / primaryOrientation.x);
+  const secondaryLengthMax = Math.floor(container.length / secondaryOrientation.x);
+  for (let primaryCount = 0; primaryCount <= primaryLengthMax; primaryCount += 1) {
+    const remaining = container.length - primaryCount * primaryOrientation.x;
+    const secondaryCount = Math.floor(remaining / secondaryOrientation.x);
+    if (primaryCount + secondaryCount > 0 && secondaryCount <= secondaryLengthMax) {
+      pushCandidate(
+        candidates,
+        createLengthCandidate(
+          container,
+          primaryOrientation,
+          secondaryOrientation,
+          primaryCount,
+          secondaryCount,
+          "length-first",
+        ),
+      );
+      if (primaryCount > 0 && secondaryCount > 0) {
+        pushCandidate(
+          candidates,
+          createLengthCandidate(
+            container,
+            primaryOrientation,
+            secondaryOrientation,
+            primaryCount,
+            secondaryCount,
+            "width-first",
+          ),
+        );
       }
     }
   }
 
-  for (let lengthCount = 0; lengthCount <= widthLaneLengthMax; lengthCount += 1) {
-    const remaining = container.width - lengthCount * orientations.length.y;
-    const widthCount = Math.floor(remaining / orientations.width.y);
-    if (lengthCount + widthCount > 0 && widthCount <= widthLaneWidthMax) {
-      addWidthLaneCandidates(candidates, container, carton, orientations, lengthCount, widthCount, "length-first");
-      if (lengthCount > 0 && widthCount > 0) {
-        addWidthLaneCandidates(candidates, container, carton, orientations, lengthCount, widthCount, "width-first");
+  const primaryWidthMax = Math.floor(container.width / primaryOrientation.y);
+  const secondaryWidthMax = Math.floor(container.width / secondaryOrientation.y);
+  for (let primaryCount = 0; primaryCount <= primaryWidthMax; primaryCount += 1) {
+    const remaining = container.width - primaryCount * primaryOrientation.y;
+    const secondaryCount = Math.floor(remaining / secondaryOrientation.y);
+    if (primaryCount + secondaryCount > 0 && secondaryCount <= secondaryWidthMax) {
+      addWidthLaneCandidates(
+        candidates,
+        container,
+        carton,
+        orientations,
+        primaryOrientation,
+        secondaryOrientation,
+        primaryCount,
+        secondaryCount,
+        "length-first",
+      );
+      if (primaryCount > 0 && secondaryCount > 0) {
+        addWidthLaneCandidates(
+          candidates,
+          container,
+          carton,
+          orientations,
+          primaryOrientation,
+          secondaryOrientation,
+          primaryCount,
+          secondaryCount,
+          "width-first",
+        );
       }
+    }
+  }
+}
+
+export function enumerateCandidates(
+  container: ContainerSpec,
+  carton: CartonSpec,
+  allowedOrientations?: readonly unknown[] | null,
+): CandidatePattern[] {
+  const orientations = getOrientations(carton, allowedOrientations);
+  const candidates: CandidatePattern[] = [];
+
+  for (const orientation of orientations) {
+    enumerateSingleOrientationCandidates(candidates, container, carton, orientations, orientation);
+  }
+
+  for (const primaryOrientation of orientations) {
+    for (const secondaryOrientation of orientations) {
+      if (primaryOrientation.id === secondaryOrientation.id) continue;
+      enumerateMixedOrientationCandidates(
+        candidates,
+        container,
+        carton,
+        orientations,
+        primaryOrientation,
+        secondaryOrientation,
+      );
     }
   }
 
   return candidates.filter((candidate) => candidate.perLayerBoxCount > 0);
 }
 
-export function createLayerPositions(pattern: CandidatePattern, cartonHeight: number): CandidateBoxPosition[] {
+export function createLayerPositions(pattern: CandidatePattern): CandidateBoxPosition[] {
   const positions: CandidateBoxPosition[] = [];
 
   for (const unit of pattern.units) {
@@ -393,7 +493,7 @@ export function createLayerPositions(pattern: CandidatePattern, cartonHeight: nu
           z: 0,
           dx: unit.dx,
           dy: unit.dy,
-          dz: cartonHeight,
+          dz: unit.dz,
           orientationId: unit.orientationId,
           label: unit.label,
         });
@@ -406,7 +506,7 @@ export function createLayerPositions(pattern: CandidatePattern, cartonHeight: nu
           z: 0,
           dx: unit.dx,
           dy: unit.dy,
-          dz: cartonHeight,
+          dz: unit.dz,
           orientationId: unit.orientationId,
           label: unit.label,
         });
@@ -421,9 +521,9 @@ function createDoorSideRemainderPositions(
   container: ContainerSpec,
   carton: CartonSpec,
   occupiedPositions: CandidateBoxPosition[],
+  orientations: CartonOrientation[] = getOrientations(carton),
   minDoorSideClearance = 0,
 ): CandidateBoxPosition[] {
-  const orientations = Object.values(getOrientations(carton));
   const occupiedRects = occupiedPositions.map(floorRectFromPosition);
   const candidates: CandidateBoxPosition[] = [];
 
@@ -444,7 +544,7 @@ function createDoorSideRemainderPositions(
           z: 0,
           dx: orientation.x,
           dy: orientation.y,
-          dz: carton.height,
+          dz: orientation.z,
           orientationId: orientation.id,
           label: orientation.label,
           source: "door-remainder",
