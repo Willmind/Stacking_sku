@@ -11,15 +11,16 @@
 | 集装箱规格 | 是 | 左侧「集装箱规格」下拉框 | 决定可装载空间长宽高 |
 | 车厢公差 | 是 | 左侧「车厢公差」数字输入 | 扣减有效装载空间，预留防潮纸皮、装柜间隙等空间 |
 | 码垛模式 | 是 | 左侧「码垛模式」单选切换 | 决定使用单 SKU 最大装载或多 SKU 目标装载 |
-| 纸箱 / SKU 规格 | 是 | 单 SKU 表单或多 SKU 卡片 | 决定纸箱尺寸、目标数量、SKU 颜色和顺序 |
+| 纸箱 / SKU 规格与朝向 | 是 | 单 SKU 表单或多 SKU 卡片 | 决定纸箱尺寸、允许朝向、目标数量、SKU 颜色和顺序 |
 | 批量导入 Excel | 是 | 「批量导入 Excel」文件选择 | 批量计算多行纸箱的最大装载量和差值 |
 | 展示控制 | 否，只影响可视化 | 进度条、2D 视角、3D 交互、放大弹窗 | 控制当前显示多少箱、从哪个视角查看结果 |
 
 当前算法共同前提：
 
 - 尺寸单位默认为 `mm`。
-- 单 SKU 和多 SKU 都只允许水平旋转，即底面只考虑 `长 × 宽` 和 `宽 × 长` 两种朝向。
-- 不支持侧放、倒放、高向旋转。
+- 单 SKU 和多 SKU 支持纸箱朝向勾选；默认只启用 `长 × 宽 × 高`、`宽 × 长 × 高` 两种水平旋转朝向。
+- 开启侧放朝向后，算法可在 `长 × 宽 × 高`、`宽 × 长 × 高`、`长 × 高 × 宽`、`高 × 长 × 宽`、`宽 × 高 × 长`、`高 × 宽 × 长` 六种朝向中按勾选项尝试排布。
+- 批量导入 Excel 当前仍使用默认水平旋转朝向，暂未开放每行朝向列。
 - 当前支持车厢级公差，用于扣减有效装载空间；不输入承重、重心、纸箱压缩、层间稳定、纸箱公差、装卸通道等约束。
 - 集装箱内侧顶部角件固定按 `110 × 110 × 80 mm` 避让，当前页面不开放角件尺寸编辑。
 
@@ -113,9 +114,30 @@
 | 纸箱长 | `singleCarton.length` | 数字输入 | `480` | 最小 `1`，步进 `1` | 是 | 单位 `mm` |
 | 纸箱宽 | `singleCarton.width` | 数字输入 | `320` | 最小 `1`，步进 `1` | 是 | 单位 `mm` |
 | 纸箱高 | `singleCarton.height` | 数字输入 | `260` | 最小 `1`，步进 `1` | 是 | 单位 `mm` |
+| 允许朝向 | `singleAllowedOrientations` | 复选项 | `长×宽×高`、`宽×长×高` | 至少选择 1 项 | 是 | 控制单 SKU 可用摆放姿态 |
 | 箱体颜色 | `singleColor` | 色板 / HEX / 系统取色器 | `#D8923A` | `#RRGGBB` | 是 | 用于 2D/3D 渲染，不影响装载量 |
 
-### 4.2 颜色输入规则
+### 4.2 朝向输入规则
+
+朝向字段使用 `柜长方向 × 柜宽方向 × 柜高方向` 表达，例如 `长×高×宽` 表示纸箱长度沿柜长、纸箱高度沿柜宽、纸箱宽度沿柜高。
+
+| 朝向 | 代码值 | 当前默认 | 说明 |
+| --- | --- | --- | --- |
+| `长×宽×高` | `length-width-height` | 是 | 当前默认长向 |
+| `宽×长×高` | `width-length-height` | 是 | 当前默认水平 90° 旋转 |
+| `长×高×宽` | `length-height-width` | 否 | 侧放，纸箱宽度变为垂直高度 |
+| `高×长×宽` | `height-length-width` | 否 | 侧放并在水平面旋转 |
+| `宽×高×长` | `width-height-length` | 否 | 侧放，纸箱长度变为垂直高度 |
+| `高×宽×长` | `height-width-length` | 否 | 侧放并在水平面旋转 |
+
+约束：
+
+- 至少必须保留 1 种朝向。
+- 单 SKU 使用 `singleAllowedOrientations`。
+- 多 SKU 每个 SKU 使用自己的 `sku.allowedOrientations`，拖拽排序时朝向配置跟随 SKU 一起移动。
+- 算法会在勾选朝向内选择装载结果更优的排布；勾选侧放不等于一定会采用侧放。
+
+### 4.3 颜色输入规则
 
 颜色支持：
 
@@ -130,7 +152,7 @@
 - 非法颜色不会提交。
 - 颜色会统一显示为大写，例如 `#D8923A`。
 
-### 4.3 计算触发
+### 4.4 计算触发
 
 用户修改任意单 SKU 字段后，状态会变为：
 
@@ -166,6 +188,7 @@
 | 纸箱宽 | `sku.width` | 数字输入 | `320` | 最小 `1`，步进 `1` | 是 | 单位 `mm` |
 | 纸箱高 | `sku.height` | 数字输入 | `260` | 最小 `1`，步进 `1` | 是 | 单位 `mm` |
 | 目标数量 | `sku.target` | 数字输入 | `100` | 最小 `1`，步进 `1`，算法校验为整数 | 是 | 期望装载数量 |
+| 允许朝向 | `sku.allowedOrientations` | 复选项 | `长×宽×高`、`宽×长×高` | 至少选择 1 项 | 是 | 控制该 SKU 可用摆放姿态 |
 | 箱体颜色 | `sku.color` | 色板 / HEX / 系统取色器 | 按 SKU 预设色 | `#RRGGBB` | 是 | 用于 2D/3D 区分 SKU |
 
 ### 5.4 SKU 默认颜色
@@ -199,6 +222,8 @@ SKU 顺序通过拖拽卡片调整：
 - 每个 SKU 的 `target` 必须为正数。
 - 每个 SKU 的 `target` 必须为整数。
 - 每个 SKU 的 `length`、`width`、`height` 必须为正数。
+- 每个 SKU 至少必须保留 1 种允许朝向。
+- SKU 朝向必须来自系统支持的 6 种朝向代码。
 - SKU 名称不能重复。
 - 颜色为空时，算法层可兜底为 `#d8923a`，但页面正常都会提供颜色。
 
@@ -252,6 +277,8 @@ SKU 顺序通过拖拽卡片调整：
 | 人工码垛数量不能转成数字 | 生成解析失败结果 |
 | 算法算出 `totalBoxes > 0` | 状态为 `成功` |
 | 算法算出 `totalBoxes <= 0` | 状态为 `无法装载` |
+
+批量导入当前不读取朝向列，计算时按默认 `长×宽×高`、`宽×长×高` 两种水平旋转朝向处理。
 
 ### 6.5 批量导入输出字段
 
@@ -418,6 +445,8 @@ type LoadingStrategy = "multi-destination" | "same-destination";
 - `纸箱长度必须为正数`
 - `纸箱宽度必须为正数`
 - `纸箱高度必须为正数`
+- `至少选择一种纸箱朝向`
+- `纸箱朝向不支持：xxx`
 - `前公差必须为非负数`
 - `公差扣减后的有效柜体长度必须为正数`
 - `多 SKU 模式只支持 2 到 5 个 SKU`
@@ -434,7 +463,7 @@ type LoadingStrategy = "multi-destination" | "same-destination";
 | 纸箱重量 | 未输入 | 如用于机器人仿真或安全评估，应加入重量和承重约束 |
 | 重心 | 未输入 | 后续可按 SKU / 箱体重量计算重心偏移 |
 | 承重层数 | 未输入 | 可增加单箱最大承压、最大堆叠层数 |
-| 纸箱朝向限制 | 仅默认允许水平旋转 | 如有“不可旋转”或“只能某一面朝上”，需要增加朝向规则 |
+| 纸箱朝向限制 | 页面支持 6 种朝向混合勾选 | 后续如进入机器人仿真，应继续补充抓取面、标签面、禁止倒置等语义 |
 | 混装规则 | 多 SKU 只按策略启发式处理 | 需补充是否允许跨 SKU 填空、是否必须按客户分区 |
 | 卸货顺序 | 仅通过 SKU 顺序和策略间接表达 | 可显式增加卸货地、优先级、装车顺序字段 |
 | 纸箱公差 / 额外安全通道 | 未输入 | 车厢公差已支持；如需更精细控制，可增加纸箱公差、装卸通道、门端专项预留 |
@@ -453,7 +482,7 @@ type LoadingStrategy = "multi-destination" | "same-destination";
 | 高 | 多 SKU 是否允许跨 SKU 填空 | 这是异尺寸多 SKU 算法正确性的核心业务输入 |
 | 中 | 自定义柜体尺寸 | 适配非标准柜或不同供应商内尺寸 |
 | 中 | 车厢公差模板 / 按柜型保存 | 当前只保存一组本地公差；后续可按柜型或客户场景保存常用公差方案 |
-| 中 | 朝向规则 | 支持不可旋转、仅长向、仅宽向等更真实场景 |
+| 中 | 批量导入朝向列 | 让 Excel 每行也能指定水平旋转、侧放或全自由朝向 |
 | 中 | Excel 模板版本号 | 防止导入旧模板导致列语义混乱 |
 | 低 | 纸箱重量、承重、重心 | 对最大装载量计算影响大，但需要真实业务数据支撑 |
 
@@ -467,6 +496,7 @@ type LoadingStrategy = "multi-destination" | "same-destination";
 | 单 SKU 表单 | `src/components/controls/SingleSkuForm.vue` |
 | 多 SKU 编辑器 | `src/components/controls/SkuEditor.vue` |
 | SKU 卡片 | `src/components/controls/SkuCard.vue` |
+| 朝向选择组件 | `src/components/controls/OrientationSelector.vue` |
 | 数字输入组件 | `src/components/ui/BaseNumberField.vue` |
 | 颜色输入组件 | `src/components/ui/BaseColorPicker.vue` |
 | 下拉组件 | `src/components/ui/BaseSelect.vue` |
@@ -476,6 +506,8 @@ type LoadingStrategy = "multi-destination" | "same-destination";
 | 页面状态 | `src/stores/packingStore.ts` |
 | 算法类型 | `src/core/packing/types.ts` |
 | 算法常量 | `src/core/packing/constants.ts` |
+| 朝向定义 | `src/core/packing/orientations.ts` |
+| 朝向候选枚举 | `src/core/packing/candidates.ts` |
 | 算法校验 | `src/core/packing/validation.ts` |
 | 2D 展示控制 | `src/components/visualizations/Plan2DView.vue` |
 | 3D 展示控制 | `src/components/visualizations/Cargo3DView.vue` |

@@ -2,6 +2,7 @@
 import { usePackingStore } from "../../stores/packingStore";
 import BaseColorPicker from "../ui/BaseColorPicker.vue";
 import BaseNumberField from "../ui/BaseNumberField.vue";
+import OrientationSelector from "./OrientationSelector.vue";
 
 const store = usePackingStore();
 </script>
@@ -26,14 +27,21 @@ const store = usePackingStore();
         />
       </span>
     </div>
+    <OrientationSelector
+      class="single-orientation-selector"
+      id-prefix="single-orientation"
+      label="允许朝向"
+      :model-value="store.singleAllowedOrientations"
+      @update:model-value="store.updateSingleAllowedOrientations"
+    />
   </section>
 </template>
 
 <style scoped>
 .field-group {
   display: grid;
-  gap: 12px;
-  padding: 14px;
+  gap: 16px;
+  padding: 16px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.042), rgba(255, 255, 255, 0.022));
@@ -47,7 +55,7 @@ h2 {
 
 .color-field {
   display: grid;
-  gap: 7px;
+  gap: 9px;
 }
 
 .field-label {
@@ -59,12 +67,36 @@ h2 {
 .triple-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
 .color-row {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.single-orientation-selector {
+  gap: 14px;
+  margin-top: 2px;
+}
+
+.single-orientation-selector :deep(.orientation-grid) {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.single-orientation-selector :deep(.orientation-option) {
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 7px;
+  min-height: 42px;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+@media (max-width: 520px) {
+  .single-orientation-selector :deep(.orientation-grid) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 </style>

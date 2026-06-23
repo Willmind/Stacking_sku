@@ -2,9 +2,11 @@ import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import {
   CONTAINERS,
+  DEFAULT_ALLOWED_ORIENTATION_IDS,
   calculateMultiSkuPacking,
   calculatePacking,
   type BoxPosition,
+  type CartonOrientationId,
   type CartonSpec,
   type ContainerClearanceSpec,
   type ContainerSpec,
@@ -18,6 +20,7 @@ export type PackingMode = "single" | "multi";
 const SKU_COLORS = ["#d8923a", "#42d6a4", "#6e8bff", "#ff7066", "#b7e35f"];
 const DEFAULT_CARTON: CartonSpec = { length: 480, width: 320, height: 260 };
 const DEFAULT_CONTAINER_CLEARANCE = { front: 0, rear: 0, left: 0, right: 0, top: 0 };
+const DEFAULT_ALLOWED_ORIENTATIONS = [...DEFAULT_ALLOWED_ORIENTATION_IDS];
 const STACKING_SKU_CLEARANCE = "STACKING_SKU_CLEARANCE";
 type ContainerType = keyof typeof CONTAINERS;
 type ContainerClearanceKey = keyof typeof DEFAULT_CONTAINER_CLEARANCE;
@@ -81,6 +84,7 @@ function createSku(index: number, carton: CartonSpec = DEFAULT_CARTON): SkuInput
     height: carton.height,
     target: 100,
     color: SKU_COLORS[index % SKU_COLORS.length],
+    allowedOrientations: [...DEFAULT_ALLOWED_ORIENTATIONS],
   };
 }
 
@@ -109,6 +113,7 @@ export const usePackingStore = defineStore("packing", () => {
   const mode = ref<PackingMode>("single");
   const containerClearance = ref(loadStoredContainerClearance());
   const singleCarton = ref<CartonSpec>({ ...DEFAULT_CARTON });
+  const singleAllowedOrientations = ref<CartonOrientationId[]>([...DEFAULT_ALLOWED_ORIENTATIONS]);
   const singleColor = ref("#d8923a");
   const skuCount = ref(2);
   const strategy = ref<LoadingStrategy>("multi-destination");
@@ -175,6 +180,11 @@ export const usePackingStore = defineStore("packing", () => {
     markDirty();
   }
 
+  function updateSingleAllowedOrientations(nextOrientations: CartonOrientationId[]) {
+    singleAllowedOrientations.value = nextOrientations.slice();
+    markDirty();
+  }
+
   function moveSku(fromIndex: number, toIndex: number) {
     if (fromIndex === toIndex) return;
     if (fromIndex < 0 || fromIndex >= skus.value.length) return;
@@ -192,7 +202,10 @@ export const usePackingStore = defineStore("packing", () => {
       const next: PackingResult =
         mode.value === "single"
           ? applySingleColor(
-              calculatePacking(container.value, singleCarton.value, { clearance: containerClearance.value }),
+              calculatePacking(container.value, singleCarton.value, {
+                clearance: containerClearance.value,
+                allowedOrientations: singleAllowedOrientations.value,
+              }),
               singleColor.value,
             )
           : (calculateMultiSkuPacking(container.value, skus.value, {
@@ -216,6 +229,7 @@ export const usePackingStore = defineStore("packing", () => {
     containerClearance,
     mode,
     singleCarton,
+    singleAllowedOrientations,
     singleColor,
     skuCount,
     strategy,
@@ -235,6 +249,7 @@ export const usePackingStore = defineStore("packing", () => {
     setMode,
     setSkuCount,
     updateContainerClearance,
+    updateSingleAllowedOrientations,
     updateSku,
   };
 });

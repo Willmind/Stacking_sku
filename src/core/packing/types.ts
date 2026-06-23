@@ -1,3 +1,5 @@
+import type { CartonOrientationId } from "./orientations";
+
 export type LoadingStrategy = "multi-destination" | "same-destination";
 
 export interface ContainerSpec {
@@ -40,6 +42,7 @@ export interface SkuInput extends CartonSpec {
   label: string;
   target: number;
   color: string;
+  allowedOrientations?: CartonOrientationId[];
 }
 
 export interface BoxPosition {
@@ -81,6 +84,7 @@ export interface PackingOptions {
   cornerBlock?: CornerBlockSpec;
   clearance?: ContainerClearanceSpec;
   strategy?: LoadingStrategy;
+  allowedOrientations?: CartonOrientationId[];
 }
 
 export interface PackingLayer {

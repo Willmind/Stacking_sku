@@ -194,7 +194,7 @@ test("calculates the 488 x 380 x 291 benchmark and renders both views", async ({
   await expect(page.locator("#total-boxes")).toHaveText("1,340");
   await expect(page.locator("#status-chip")).toHaveText("已完成计算");
   await expect(page.locator("#status-chip")).toHaveClass(/status-chip--success/);
-  await expect(page.locator("#strategy-notes")).toContainText("水平旋转");
+  await expect(page.locator("#strategy-notes")).toContainText("朝向规则");
   await expect(page.locator("#strategy-notes")).toContainText("角件避让");
   await expect(page.locator("#strategy-notes")).toContainText("空位回填");
   await expect(page.locator("#strategy-notes")).toContainText("SKU 策略");
@@ -580,7 +580,7 @@ test("calculates heterogeneous multi SKU after face-first loading order", async 
 
   await expect(page.locator("#total-boxes")).toHaveText("200");
   await expect(page.locator("#pattern-name")).toHaveText("异尺寸按 SKU 顺序分区");
-  await expect(page.locator("#strategy-notes")).toContainText("水平旋转");
+  await expect(page.locator("#strategy-notes")).toContainText("朝向规则");
   await expect(page.locator("#strategy-notes")).toContainText("SKU 策略");
 });
 

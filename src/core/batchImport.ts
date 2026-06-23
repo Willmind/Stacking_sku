@@ -207,7 +207,7 @@ function calculateBatchRow(
     const cacheKey = createMaxLoadCacheKey(containerType, carton, options);
     let totalBoxes = maxLoadCache.get(cacheKey);
     if (totalBoxes === undefined) {
-      totalBoxes = calculatePackingTotalBoxes(container, carton, { clearance: options.clearance });
+      totalBoxes = Number(calculatePackingTotalBoxes(container, carton, { clearance: options.clearance }));
       maxLoadCache.set(cacheKey, totalBoxes);
     }
     return createSuccessItem(rowNumber, carton, containerType, manualCount, totalBoxes);

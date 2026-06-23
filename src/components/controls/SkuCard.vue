@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { GripVertical } from "@lucide/vue";
-import type { SkuInput } from "../../core/packing";
+import type { CartonOrientationId, SkuInput } from "../../core/packing";
 import BaseColorPicker from "../ui/BaseColorPicker.vue";
 import BaseNumberField from "../ui/BaseNumberField.vue";
+import OrientationSelector from "./OrientationSelector.vue";
 
 const props = defineProps<{
   sku: SkuInput;
@@ -32,6 +33,10 @@ function updateSkuHeight(value: number) {
   emit("update", props.index, { height: value });
 }
 
+function updateSkuOrientations(value: CartonOrientationId[]) {
+  emit("update", props.index, { allowedOrientations: value });
+}
+
 function startDrag(event: PointerEvent) {
   if (event.button !== 0) return;
   event.preventDefault();
@@ -55,6 +60,18 @@ function startDrag(event: PointerEvent) {
         <GripVertical :size="16" :stroke-width="2.45" aria-hidden="true" />
       </button>
       <strong>SKU {{ sku.label }}</strong>
+      <details class="orientation-menu">
+        <summary>朝向 {{ (sku.allowedOrientations || []).length }}/6</summary>
+        <div class="orientation-menu-panel">
+          <OrientationSelector
+            :id-prefix="`sku-${sku.label}-orientation`"
+            label="允许朝向"
+            compact
+            :model-value="sku.allowedOrientations || []"
+            @update:model-value="updateSkuOrientations"
+          />
+        </div>
+      </details>
       <BaseColorPicker
         :id="`sku-${sku.label}-color`"
         class="card-color-field"
@@ -122,7 +139,7 @@ function startDrag(event: PointerEvent) {
 
 .sku-card-header {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) 54px;
+  grid-template-columns: 42px minmax(0, 1fr) 78px 54px;
   gap: 12px;
   align-items: center;
 }
@@ -164,6 +181,50 @@ function startDrag(event: PointerEvent) {
   justify-self: end;
 }
 
+.orientation-menu {
+  position: relative;
+  min-width: 0;
+}
+
+.orientation-menu summary {
+  display: inline-flex;
+  width: 78px;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--control-border);
+  border-radius: 7px;
+  background: linear-gradient(180deg, var(--control-bg), var(--control-bg-strong));
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  list-style: none;
+  cursor: pointer;
+}
+
+.orientation-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.orientation-menu[open] summary {
+  border-color: rgba(66, 214, 164, 0.58);
+  color: var(--accent);
+  background: rgba(66, 214, 164, 0.12);
+}
+
+.orientation-menu-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  width: 294px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(18, 27, 38, 0.98);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.34);
+}
+
 .sku-fields {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -197,7 +258,7 @@ function startDrag(event: PointerEvent) {
   }
 
   .sku-card-header {
-    grid-template-columns: 40px minmax(0, 1fr) 50px;
+    grid-template-columns: 40px minmax(0, 1fr) 74px 50px;
   }
 
   .drag-handle {
@@ -207,6 +268,15 @@ function startDrag(event: PointerEvent) {
 
   .sku-fields {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .orientation-menu summary {
+    width: 74px;
+  }
+
+  .orientation-menu-panel {
+    right: -62px;
+    width: min(292px, calc(100vw - 34px));
   }
 }
 </style>

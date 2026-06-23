@@ -1,4 +1,5 @@
 import { CONTAINERS, POSITIVE_NUMBER_LABELS, type ContainerType } from "./constants";
+import { normalizeAllowedOrientations } from "./orientations";
 import type { CartonSpec, ContainerClearanceSpec, ContainerSpec, NormalizedContainerClearance, SkuInput } from "./types";
 
 type PositiveNumberLabel = keyof typeof POSITIVE_NUMBER_LABELS;
@@ -86,6 +87,9 @@ function normalizeSku(input: unknown, index: number): SkuInput {
     throw new Error(`${label} 目标数量必须为整数`);
   }
 
+  const allowedOrientations =
+    source.allowedOrientations === undefined ? undefined : normalizeAllowedOrientations(source.allowedOrientations);
+
   return {
     label,
     length: positiveNumber(source.length, `${label} carton length`),
@@ -93,6 +97,7 @@ function normalizeSku(input: unknown, index: number): SkuInput {
     height: positiveNumber(source.height, `${label} carton height`),
     target,
     color: source.color || "#d8923a",
+    ...(allowedOrientations ? { allowedOrientations } : {}),
   };
 }
 

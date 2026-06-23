@@ -185,11 +185,21 @@ describe("control panel layout source guards", () => {
     }
   });
 
+  it("shows a loading state while calculation is running", () => {
+    assert.match(appSource, /isCalculating/);
+    assert.match(appSource, /handleCalculate/);
+    assert.match(appSource, /:disabled="isCalculating"/);
+    assert.match(appSource, /aria-busy/);
+    assert.match(appSource, /计算中/);
+    assert.match(appSource, /calculate-button--loading/);
+    assert.match(appSource, /calculate-button__spinner/);
+  });
+
   it("shows reusable packing strategy notes in the result summary", () => {
     assert.match(resultSummarySource, /describePackingStrategy/);
     assert.match(resultSummarySource, /strategy-notes/);
     assert.match(resultSummarySource, /本次排布说明/);
-    assert.match(strategyDescriptionSource, /水平旋转/);
+    assert.match(strategyDescriptionSource, /朝向规则/);
     assert.match(strategyDescriptionSource, /角件避让/);
     assert.match(strategyDescriptionSource, /空位回填/);
     assert.match(strategyDescriptionSource, /SKU 策略/);

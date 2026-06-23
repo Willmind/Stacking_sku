@@ -2,7 +2,6 @@
 import {
   createLayerPositions,
   enumerateCandidates,
-  getOrientations,
 } from "./candidates";
 import {
   CONTAINERS,
@@ -18,6 +17,7 @@ import {
   positionFitsFloor,
   rectanglesOverlap,
 } from "./geometry";
+import { getOrientations, normalizeAllowedOrientations } from "./orientations";
 import {
   createEffectiveContainer,
   hasSameSkuDimensions,
@@ -27,6 +27,13 @@ import {
   normalizeSkus,
 } from "./validation";
 export { describePackingStrategy } from "./strategyDescription";
+export {
+  CARTON_ORIENTATION_OPTIONS,
+  DEFAULT_ALLOWED_ORIENTATION_IDS,
+  getOrientations,
+  normalizeAllowedOrientations,
+} from "./orientations";
+export type { CartonOrientationId } from "./orientations";
 
 export type {
   BoxPosition,
@@ -344,8 +351,11 @@ export type {
     return groups;
   }
 
-  function createOrderedPositionsFromFloor(container, carton, cornerBlock, floorPositions) {
-    const layerCount = Math.floor(container.height / carton.height);
+  function createOrderedPositionsFromFloor(container, cornerBlock, floorPositions) {
+    const maxStackCount = floorPositions.reduce(
+      (maxCount, position) => Math.max(maxCount, Math.floor(container.height / position.dz)),
+      0,
+    );
     const orderedFloor = orderFloorPositionsForPlacement(floorPositions).map((basePosition, faceIndex) => ({
       basePosition,
       faceIndex,
@@ -355,8 +365,9 @@ export type {
     const acceptedByStack = new Map();
 
     for (const group of depthGroups) {
-      for (let stackIndex = 0; stackIndex < layerCount; stackIndex += 1) {
+      for (let stackIndex = 0; stackIndex < maxStackCount; stackIndex += 1) {
         for (const { basePosition, faceIndex } of group.items) {
+          if (stackIndex * basePosition.dz + basePosition.dz > container.height) continue;
           const acceptedPosition = acceptStackPosition(
             {
               ...basePosition,
@@ -379,30 +390,21 @@ export type {
 
   function evaluateCandidate(container, carton, pattern, cornerBlock) {
     const basePositions = [
-      ...createLayerPositions(pattern, carton.height),
+      ...createLayerPositions(pattern),
       ...(pattern.extraLayerPositions || []),
     ].sort((a, b) => a.x - b.x || a.y - b.y);
-    const layerCount = Math.floor(container.height / carton.height);
     const orderedPositions = createOrderedPositionsFromFloor(
       container,
-      carton,
       cornerBlock,
       basePositions,
     );
     const totalBoxes = orderedPositions.length;
-    const blockedByCornerTotal = basePositions.length * layerCount - totalBoxes;
-    const layers = [];
-
-    for (let index = 0; index < layerCount; index += 1) {
-      const z = index * carton.height;
-      const boxCount = orderedPositions.filter((box) => box.stackIndex === index).length;
-      layers.push({
-        index,
-        z,
-        boxCount,
-        blockedByCorner: basePositions.length - boxCount,
-      });
-    }
+    const potentialBoxCount = basePositions.reduce(
+      (sum, position) => sum + Math.floor(container.height / position.dz),
+      0,
+    );
+    const blockedByCornerTotal = potentialBoxCount - totalBoxes;
+    const layers = createLayersFromPositions(orderedPositions);
 
     const volumeLoaded = totalBoxes * carton.length * carton.width * carton.height;
     const containerVolume = container.length * container.width * container.height;
@@ -418,7 +420,7 @@ export type {
       layers,
       totalBoxes,
       blockedByCornerTotal,
-      usedHeight: layerCount * carton.height,
+      usedHeight: calculateUsedHeight(orderedPositions),
       utilizationRatio: containerVolume > 0 ? volumeLoaded / containerVolume : 0,
     };
   }
@@ -464,28 +466,45 @@ export type {
 
   function evaluateCandidateTotal(container, carton, pattern, cornerBlock) {
     const basePositions = [
-      ...createLayerPositions(pattern, carton.height),
+      ...createLayerPositions(pattern),
       ...(pattern.extraLayerPositions || []),
     ].sort((a, b) => a.x - b.x || a.y - b.y);
-    const layerCount = Math.floor(container.height / carton.height);
-    const perLayerBoxCount = basePositions.length;
-    const affectedStackIndexes = [];
+    const uniqueHeights = new Set(basePositions.map((position) => position.dz));
 
-    for (let index = 0; index < layerCount; index += 1) {
-      if (layerCollidesWithTopBand(index, carton.height, container, cornerBlock)) {
-        affectedStackIndexes.push(index);
+    if (uniqueHeights.size === 1) {
+      const [cartonHeight] = Array.from(uniqueHeights);
+      const layerCount = Math.floor(container.height / cartonHeight);
+      const perLayerBoxCount = basePositions.length;
+      const affectedStackIndexes = [];
+
+      for (let index = 0; index < layerCount; index += 1) {
+        if (layerCollidesWithTopBand(index, cartonHeight, container, cornerBlock)) {
+          affectedStackIndexes.push(index);
+        }
       }
+
+      let totalBoxes = perLayerBoxCount * (layerCount - affectedStackIndexes.length);
+      for (const stackIndex of affectedStackIndexes) {
+        totalBoxes += countAcceptedPositionsForStack(basePositions, stackIndex, container, cornerBlock);
+      }
+
+      return {
+        totalBoxes,
+        blockedByCornerTotal: perLayerBoxCount * layerCount - totalBoxes,
+        perLayerBoxCount,
+      };
     }
 
-    let totalBoxes = perLayerBoxCount * (layerCount - affectedStackIndexes.length);
-    for (const stackIndex of affectedStackIndexes) {
-      totalBoxes += countAcceptedPositionsForStack(basePositions, stackIndex, container, cornerBlock);
-    }
-
+    const orderedPositions = createOrderedPositionsFromFloor(container, cornerBlock, basePositions);
+    const totalBoxes = orderedPositions.length;
+    const potentialBoxCount = basePositions.reduce(
+      (sum, position) => sum + Math.floor(container.height / position.dz),
+      0,
+    );
     return {
       totalBoxes,
-      blockedByCornerTotal: perLayerBoxCount * layerCount - totalBoxes,
-      perLayerBoxCount,
+      blockedByCornerTotal: potentialBoxCount - totalBoxes,
+      perLayerBoxCount: basePositions.length,
     };
   }
 
@@ -701,6 +720,22 @@ export type {
     };
   }
 
+  function getEffectiveAllowedOrientations(sku, options = {}) {
+    return normalizeAllowedOrientations(sku.allowedOrientations || options.allowedOrientations);
+  }
+
+  function getSkuPackingOptions(sku, options = {}) {
+    return {
+      ...options,
+      allowedOrientations: getEffectiveAllowedOrientations(sku, options),
+    };
+  }
+
+  function hasSameSkuOrientationRules(skus, options = {}) {
+    const first = getEffectiveAllowedOrientations(skus[0], options).join("|");
+    return skus.every((sku) => getEffectiveAllowedOrientations(sku, options).join("|") === first);
+  }
+
   function createZoneCornerBlock(cornerBlock, offsetX) {
     return {
       ...cornerBlock,
@@ -830,7 +865,7 @@ export type {
     if (maxLength <= 0) return [];
 
     const occupiedRects = uniqueFloorRectsFromPositions(occupiedPositions);
-    const orientations = Object.values(getOrientations(sku));
+    const orientations = getOrientations(sku, sku.allowedOrientations);
     const candidates = [];
     const seen = new Set();
 
@@ -846,7 +881,7 @@ export type {
             z: 0,
             dx: orientation.x,
             dy: orientation.y,
-            dz: sku.height,
+            dz: orientation.z,
             orientationId: orientation.id,
             label: orientation.label,
             source: "heterogeneous-backfill",
@@ -868,7 +903,6 @@ export type {
   function createHeterogeneousBackfillPositions(container, sku, target, occupiedPositions, maxLength, cornerBlock) {
     if (target <= 0 || occupiedPositions.length === 0 || maxLength <= 0) return [];
 
-    const layerCount = Math.floor(container.height / sku.height);
     const acceptedByStack = createAcceptedByStackFromPositions(occupiedPositions);
     const acceptedPositions = occupiedPositions.slice();
     const acceptedFloorRects = uniqueFloorRectsFromPositions(occupiedPositions);
@@ -880,6 +914,7 @@ export type {
       if (overlapsAnyFloorRect(candidate, acceptedFloorRects)) return;
 
       const candidateAcceptedByStack = cloneAcceptedByStack(acceptedByStack);
+      const layerCount = Math.floor(container.height / candidate.dz);
       const stackPositions = createStackedFacePositions(
         candidate,
         candidateIndex,
@@ -923,10 +958,11 @@ export type {
 
   function calculateSameDimensionMultiSkuPacking(containerInput, skus, options, strategy) {
     const firstSku = skus[0];
+    const firstSkuOptions = getSkuPackingOptions(firstSku, options);
     const baseResult = calculatePacking(
       containerInput,
       { length: firstSku.length, width: firstSku.width, height: firstSku.height },
-      options,
+      firstSkuOptions,
     );
     const sourcePositions = baseResult.orderedPositions || [];
     const assignedPositions =
@@ -966,12 +1002,17 @@ export type {
     let blockedByCornerTotal = 0;
 
     for (const sku of skus) {
+      const skuPackingOptions = getSkuPackingOptions(sku, options);
+      const effectiveSku = {
+        ...sku,
+        allowedOrientations: skuPackingOptions.allowedOrientations,
+      };
       const skuPositions = [];
       let remainingTarget = sku.target;
 
       const backfillPositions = createHeterogeneousBackfillPositions(
         container,
-        sku,
+        effectiveSku,
         remainingTarget,
         assignedPositions,
         cursorX,
@@ -997,7 +1038,7 @@ export type {
           zoneContainer,
           { length: sku.length, width: sku.width, height: sku.height },
           {
-            ...options,
+            ...skuPackingOptions,
             cornerBlock: zoneCornerBlock,
           },
         );
@@ -1081,8 +1122,9 @@ export type {
     const container = packingSpace.effectiveContainer;
     const carton = normalizeCarton(cartonInput);
     const cornerBlock = packingSpace.effectiveCornerBlock;
+    const allowedOrientations = normalizeAllowedOrientations(options.allowedOrientations);
 
-    const candidates = enumerateCandidates(container, carton);
+    const candidates = enumerateCandidates(container, carton, allowedOrientations);
     let best = null;
 
     for (const candidate of candidates) {
@@ -1119,8 +1161,9 @@ export type {
     const container = packingSpace.effectiveContainer;
     const carton = normalizeCarton(cartonInput);
     const cornerBlock = packingSpace.effectiveCornerBlock;
+    const allowedOrientations = normalizeAllowedOrientations(options.allowedOrientations);
 
-    const candidates = enumerateCandidates(container, carton);
+    const candidates = enumerateCandidates(container, carton, allowedOrientations);
     let best = null;
 
     for (const candidate of candidates) {
@@ -1140,7 +1183,7 @@ export type {
       throw new Error("装载策略必须为 multi-destination 或 same-destination");
     }
 
-    return hasSameSkuDimensions(skus)
+    return hasSameSkuDimensions(skus) && hasSameSkuOrientationRules(skus, options)
       ? calculateSameDimensionMultiSkuPacking(containerInput, skus, options, strategy)
       : calculateHeterogeneousMultiSkuPacking(containerInput, skus, options, strategy);
   }
