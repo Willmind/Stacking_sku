@@ -8,6 +8,22 @@ export interface ContainerSpec {
   height: number;
 }
 
+export interface ContainerClearanceSpec {
+  front?: number;
+  rear?: number;
+  left?: number;
+  right?: number;
+  top?: number;
+}
+
+export interface NormalizedContainerClearance {
+  front: number;
+  rear: number;
+  left: number;
+  right: number;
+  top: number;
+}
+
 export interface CartonSpec {
   length: number;
   width: number;
@@ -63,6 +79,7 @@ export interface SkuSummary {
 
 export interface PackingOptions {
   cornerBlock?: CornerBlockSpec;
+  clearance?: ContainerClearanceSpec;
   strategy?: LoadingStrategy;
 }
 
@@ -84,6 +101,8 @@ export interface PackingPattern {
 
 export interface PackingResult {
   container: Required<ContainerSpec>;
+  effectiveContainer: Required<ContainerSpec>;
+  clearance: NormalizedContainerClearance;
   carton: CartonSpec;
   cornerBlock: CornerBlockSpec;
   pattern: PackingPattern | null;

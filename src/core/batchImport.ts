@@ -2,6 +2,7 @@ import {
   CONTAINERS,
   calculatePackingTotalBoxes,
   type CartonSpec,
+  type ContainerClearanceSpec,
   type ContainerSpec,
 } from "./packing";
 
@@ -22,9 +23,14 @@ export interface BatchPackingProgress {
 
 export interface CalculateBatchPackingAsyncOptions {
   batchSize?: number;
+  clearance?: ContainerClearanceSpec;
   signal?: AbortSignal;
   onProgress?: (event: BatchPackingProgress) => void;
   yieldToMain?: () => Promise<void>;
+}
+
+export interface CalculateBatchPackingOptions {
+  clearance?: ContainerClearanceSpec;
 }
 
 export interface BatchPackingRow {
@@ -107,8 +113,19 @@ function formatSize({ length, width, height }: CartonSpec) {
   return `${length}*${width}*${height}`;
 }
 
-function createMaxLoadCacheKey(containerType: BatchContainerType, carton: CartonSpec) {
-  return `${containerType}:${carton.length}:${carton.width}:${carton.height}`;
+function createMaxLoadCacheKey(containerType: BatchContainerType, carton: CartonSpec, options: CalculateBatchPackingOptions) {
+  const clearance = options.clearance || {};
+  return [
+    containerType,
+    carton.length,
+    carton.width,
+    carton.height,
+    clearance.front || 0,
+    clearance.rear || 0,
+    clearance.left || 0,
+    clearance.right || 0,
+    clearance.top || 0,
+  ].join(":");
 }
 
 function createFailedItem(rowNumber: number, row: BatchPackingRow, error: string): BatchPackingItem {
@@ -171,6 +188,7 @@ function calculateBatchRow(
   row: BatchPackingRow,
   index: number,
   maxLoadCache: Map<string, number>,
+  options: CalculateBatchPackingOptions,
 ): BatchPackingItem | null {
   const rowNumber = index + 2;
   const manualValue = readCell(row, BATCH_MANUAL_COLUMN);
@@ -186,10 +204,10 @@ function calculateBatchRow(
     const containerType = parseContainerType(containerValue);
     const manualCount = parseManualCount(manualValue);
     const container = CONTAINERS[containerType] as Required<ContainerSpec>;
-    const cacheKey = createMaxLoadCacheKey(containerType, carton);
+    const cacheKey = createMaxLoadCacheKey(containerType, carton, options);
     let totalBoxes = maxLoadCache.get(cacheKey);
     if (totalBoxes === undefined) {
-      totalBoxes = calculatePackingTotalBoxes(container, carton);
+      totalBoxes = calculatePackingTotalBoxes(container, carton, { clearance: options.clearance });
       maxLoadCache.set(cacheKey, totalBoxes);
     }
     return createSuccessItem(rowNumber, carton, containerType, manualCount, totalBoxes);
@@ -198,10 +216,13 @@ function calculateBatchRow(
   }
 }
 
-export function calculateBatchPacking(rows: BatchPackingRow[]): BatchPackingItem[] {
+export function calculateBatchPacking(
+  rows: BatchPackingRow[],
+  options: CalculateBatchPackingOptions = {},
+): BatchPackingItem[] {
   const maxLoadCache = new Map<string, number>();
   return rows.flatMap((row, index) => {
-    const item = calculateBatchRow(row, index, maxLoadCache);
+    const item = calculateBatchRow(row, index, maxLoadCache, options);
     return item ? [item] : [];
   });
 }
@@ -223,7 +244,7 @@ export async function calculateBatchPackingAsync(
 
     for (let offset = 0; offset < chunk.length; offset += 1) {
       throwIfCancelled(options.signal);
-      const item = calculateBatchRow(chunk[offset], start + offset, maxLoadCache);
+      const item = calculateBatchRow(chunk[offset], start + offset, maxLoadCache, options);
       if (item) results.push(item);
       processed += 1;
       options.onProgress?.({

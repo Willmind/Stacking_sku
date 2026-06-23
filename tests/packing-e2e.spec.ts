@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { strToU8, zipSync } from "fflate";
 import { readSheet } from "read-excel-file/node";
 
@@ -12,6 +12,28 @@ declare global {
 async function selectDropdownOption(page: Page, label: string, option: string) {
   await page.getByRole("combobox", { name: label }).click();
   await page.getByRole("option", { name: option }).click();
+}
+
+async function expectNumberStepperIconsCentered(field: Locator) {
+  const deltas = await field.locator(".base-number-actions").evaluate((actions) => {
+    const actionsRect = actions.getBoundingClientRect();
+    return Array.from(actions.querySelectorAll<HTMLElement>(".base-number-stepper")).map((stepper, index) => {
+      const svg = stepper.querySelector("svg");
+      if (!svg) throw new Error("Number stepper icon is missing");
+      const svgRect = svg.getBoundingClientRect();
+      const expectedX = actionsRect.left + actionsRect.width / 2;
+      const expectedY = actionsRect.top + (actionsRect.height * (index + 0.5)) / 2;
+      return {
+        x: Math.abs(svgRect.left + svgRect.width / 2 - expectedX),
+        y: Math.abs(svgRect.top + svgRect.height / 2 - expectedY),
+      };
+    });
+  });
+
+  for (const delta of deltas) {
+    expect(delta.x).toBeLessThanOrEqual(0.75);
+    expect(delta.y).toBeLessThanOrEqual(0.75);
+  }
 }
 
 async function calculateSingleSku(page: Page, length: string, width: string, height: string) {
@@ -325,6 +347,42 @@ test("adjusts number fields with styled steppers", async ({ page }) => {
   await cartonLength.blur();
   await expect(cartonSection.getByRole("button", { name: "减少 长 mm" })).toBeDisabled();
   await expect(cartonLength).toHaveValue("1");
+});
+
+test("keeps compact number field stepper icons visually centered", async ({ page }) => {
+  await page.goto("/");
+
+  await expectNumberStepperIconsCentered(page.locator(".clearance-number-field").first());
+
+  await page.getByLabel("多 SKU").check();
+  await expectNumberStepperIconsCentered(page.locator(".sku-number-field").first());
+});
+
+test("applies and persists container clearance inputs", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => localStorage.removeItem("STACKING_SKU_CLEARANCE"));
+  await page.reload();
+
+  await expect(page.getByText("车厢公差")).toBeVisible();
+  await expect(page.getByText("按站在柜口正视柜内为基准")).toBeVisible();
+  await expect(page.locator("#clearance-front")).toHaveValue("0");
+  await page.locator("#clearance-front").fill("100");
+  await page.locator("#clearance-front").blur();
+  await page.locator("#carton-length").fill("2900");
+  await page.locator("#carton-length").blur();
+  await page.locator("#carton-width").fill("1150");
+  await page.locator("#carton-width").blur();
+  await page.locator("#carton-height").fill("1150");
+  await page.locator("#carton-height").blur();
+
+  await page.getByRole("button", { name: "计算装载" }).click();
+
+  await expect(page.locator("#total-boxes")).toHaveText("4");
+  await expect(page.locator("#effective-size")).toContainText("5,798 × 2,352 × 2,393 mm");
+  await expect(page.locator("#strategy-notes")).toContainText("车厢公差");
+
+  await page.reload();
+  await expect(page.locator("#clearance-front")).toHaveValue("100");
 });
 
 test("uses styled dropdown popovers for container and strategy selection", async ({ page }) => {

@@ -147,6 +147,70 @@ function drawContainerOutline(
   ctx.strokeRect(0, 0, plane.width * scale, plane.height * scale);
 }
 
+function hasActiveClearance(result: PackingResult) {
+  const clearance = result.clearance;
+  return Boolean(
+    clearance &&
+      (clearance.front > 0 || clearance.rear > 0 || clearance.left > 0 || clearance.right > 0 || clearance.top > 0),
+  );
+}
+
+function getEffectiveSpaceProjectionRect(
+  result: PackingResult,
+  viewMode: Plan2DViewMode,
+  options: Plan2DProjectionOptions = {},
+): ProjectedRect | null {
+  if (!hasActiveClearance(result)) return null;
+  const clearance = result.clearance;
+  const effectiveContainer = result.effectiveContainer;
+  const frontViewSide = normalizeFrontViewSide(options.frontViewSide);
+
+  if (viewMode === "side") {
+    return {
+      x: clearance.front,
+      y: clearance.top,
+      dx: effectiveContainer.length,
+      dy: effectiveContainer.height,
+    };
+  }
+
+  if (viewMode === "front") {
+    return {
+      x: clearance.left,
+      y: clearance.top,
+      dx: effectiveContainer.width,
+      dy: effectiveContainer.height,
+    };
+  }
+
+  return {
+    x: frontViewSide === "door" ? clearance.rear : clearance.front,
+    y: clearance.left,
+    dx: effectiveContainer.length,
+    dy: effectiveContainer.width,
+  };
+}
+
+function drawEffectiveSpaceBoundary(
+  ctx: CanvasRenderingContext2D,
+  rect: ProjectedRect | null,
+  scale: number,
+) {
+  if (!rect) return;
+  ctx.save();
+  ctx.setLineDash([7, 5]);
+  ctx.strokeStyle = "rgba(66, 214, 164, 0.82)";
+  ctx.lineWidth = Math.max(1, Math.min(1.7, scale * 12));
+  ctx.strokeRect(rect.x * scale, rect.y * scale, rect.dx * scale, rect.dy * scale);
+  ctx.setLineDash([]);
+  ctx.fillStyle = "rgba(66, 214, 164, 0.96)";
+  ctx.font = "800 10.5px Inter, sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "bottom";
+  ctx.fillText("有效装载空间", rect.x * scale + 6, Math.max(14, rect.y * scale - 5));
+  ctx.restore();
+}
+
 function getGeneratedBoxPositions(result: PackingResult, visibleCount: number): BoxPosition[] {
   return generateBoxPositions(result, visibleCount) as BoxPosition[];
 }
@@ -794,6 +858,9 @@ export function renderPlan2D({
   const scale = Math.min((width - pad * 2) / plane.width, (height - pad * 2) / plane.height);
   const boxX = (width - plane.width * scale) / 2;
   const boxY = (height - plane.height * scale) / 2 + (showLabels ? (compactCanvas ? 4 : 10) : 0);
+  const effectiveSpaceRect = getEffectiveSpaceProjectionRect(result, viewMode, {
+    frontViewSide: normalizedFrontViewSide,
+  });
 
   ctx.save();
   ctx.translate(boxX, boxY);
@@ -824,6 +891,7 @@ export function renderPlan2D({
     ctx.strokeRect(rect.x * scale, rect.y * scale, rect.dx * scale, rect.dy * scale);
   }
 
+  drawEffectiveSpaceBoundary(ctx, effectiveSpaceRect, scale);
   drawContainerOutline(ctx, plane, scale);
   ctx.restore();
   drawOuterAxisGuides(ctx, result, visibleCount, viewMode, plane, scale, boxX, boxY, width, height);

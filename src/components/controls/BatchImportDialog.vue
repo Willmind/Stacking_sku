@@ -11,6 +11,7 @@ import {
   type BatchPackingItem,
   type BatchPackingRow,
 } from "../../core/batchImport";
+import { usePackingStore } from "../../stores/packingStore";
 import BaseDialog from "../ui/BaseDialog.vue";
 import BaseSelect, { type SelectOption } from "../ui/BaseSelect.vue";
 
@@ -24,6 +25,7 @@ interface SortColumn {
   kind: "number" | "text";
 }
 
+const store = usePackingStore();
 const inputRef = ref<HTMLInputElement | null>(null);
 const isOpen = ref(false);
 const isImporting = ref(false);
@@ -122,6 +124,11 @@ const progressStyle = computed(() => ({ width: `${progressPercent.value}%` }));
 const hasActiveFilter = computed(
   () => statusFilter.value !== "全部" || errorFilter.value !== "全部" || differenceFilter.value !== "全部" || reviewOnly.value,
 );
+const hasActiveClearance = computed(() => Object.values(store.containerClearance).some((value) => value > 0));
+const clearanceSummary = computed(() => {
+  const clearance = store.containerClearance;
+  return `公差：前 ${clearance.front}mm · 后 ${clearance.rear}mm · 左 ${clearance.left}mm · 右 ${clearance.right}mm · 顶部 ${clearance.top}mm`;
+});
 
 function clearLongImportTimer() {
   if (longImportTimer === null) return;
@@ -336,6 +343,7 @@ async function handleFileChange(event: Event) {
     totalRows.value = rows.length;
     importStage.value = rows.length ? `正在计算 0 / ${rows.length} 行` : "正在计算导入数据";
     results.value = await calculateBatchPackingAsync(rows, {
+      clearance: store.containerClearance,
       signal: controller.signal,
       batchSize: 20,
       onProgress: ({ processed, total, progress }) => {
@@ -450,7 +458,10 @@ onBeforeUnmount(() => {
 
     <div class="batch-result-layout">
       <div class="batch-result-head">
-        <div v-if="fileName" class="file-line">文件：{{ fileName }}</div>
+        <div v-if="fileName" class="file-line">
+          <span>文件：{{ fileName }}</span>
+          <span v-if="results.length && hasActiveClearance" class="file-line-meta">{{ clearanceSummary }}</span>
+        </div>
 
         <div v-if="results.length" class="batch-result-toolbar">
           <BaseSelect
@@ -760,12 +771,20 @@ onBeforeUnmount(() => {
 }
 
 .file-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
   min-height: 28px;
+  align-items: center;
   align-content: center;
   padding: 6px 9px;
   border: 1px solid rgba(174, 184, 201, 0.16);
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.04);
+}
+
+.file-line-meta {
+  color: var(--accent);
 }
 
 .batch-result-layout {

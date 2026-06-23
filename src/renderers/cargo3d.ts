@@ -112,6 +112,48 @@ function addDoorMarker(group: THREE.Group, length: number, height: number, width
   group.add(doorPlane, doorEdges);
 }
 
+function hasActiveClearance(result: PackingResult) {
+  const clearance = result.clearance;
+  return Boolean(
+    clearance &&
+      (clearance.front > 0 || clearance.rear > 0 || clearance.left > 0 || clearance.right > 0 || clearance.top > 0),
+  );
+}
+
+function createEffectiveSpaceFrame(result: PackingResult) {
+  if (!hasActiveClearance(result)) return null;
+  const { container, clearance, effectiveContainer } = result;
+  const length = effectiveContainer.length * 0.001;
+  const height = effectiveContainer.height * 0.001;
+  const width = effectiveContainer.width * 0.001;
+  const frameGeometry = new THREE.BoxGeometry(length, height, width);
+  const frame = new THREE.LineSegments(
+    new THREE.EdgesGeometry(frameGeometry),
+    new THREE.LineBasicMaterial({
+      color: 0x42d6a4,
+      transparent: true,
+      opacity: 0.92,
+      depthTest: false,
+    }),
+  );
+
+  frame.position.set(
+    (clearance.front + effectiveContainer.length / 2 - container.length / 2) * 0.001,
+    (effectiveContainer.height / 2 - container.height / 2) * 0.001,
+    (clearance.left + effectiveContainer.width / 2 - container.width / 2) * 0.001,
+  );
+  frame.renderOrder = 32;
+
+  const labelWidth = Math.min(1.6, Math.max(0.58, length * 0.2));
+  const labelHeight = Math.min(0.36, Math.max(0.18, labelWidth * 0.24));
+  const label = makeSpriteLabel("有效装载空间", "#42d6a4", labelWidth, labelHeight);
+  label.position.set(frame.position.x, container.height * 0.0005 + labelHeight * 1.35, frame.position.z);
+
+  const wrapper = new THREE.Group();
+  wrapper.add(frame, label);
+  return wrapper;
+}
+
 function addContainer(group: THREE.Group, result: PackingResult) {
   const { container, cornerBlock } = result;
   const length = container.length * 0.001;
@@ -134,6 +176,8 @@ function addContainer(group: THREE.Group, result: PackingResult) {
     new THREE.LineBasicMaterial({ color: 0xe7f8f5, transparent: true, opacity: 0.72 }),
   );
   group.add(shell, shellEdges);
+  const effectiveSpaceFrame = createEffectiveSpaceFrame(result);
+  if (effectiveSpaceFrame) group.add(effectiveSpaceFrame);
 
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(length, width),

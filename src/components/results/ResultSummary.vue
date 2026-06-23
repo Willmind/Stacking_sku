@@ -16,6 +16,10 @@ const patternName = computed(() => {
   return pattern.family === "width-lanes" ? "按柜宽分区混排" : "按柜长分区混排";
 });
 const strategyNotes = computed(() => describePackingStrategy(store.result));
+const effectiveSizeText = computed(() => {
+  const effectiveContainer = store.result?.effectiveContainer ?? store.container;
+  return `${formatNumber(effectiveContainer.length)} × ${formatNumber(effectiveContainer.width)} × ${formatNumber(effectiveContainer.height)} mm`;
+});
 
 function formatNumber(value: number) {
   return Math.round(value).toLocaleString("zh-CN");
@@ -55,6 +59,10 @@ function formatMm(value: number) {
       <div>
         <dt>排布模式</dt>
         <dd id="pattern-name">{{ patternName }}</dd>
+      </div>
+      <div>
+        <dt>有效尺寸</dt>
+        <dd id="effective-size">{{ effectiveSizeText }}</dd>
       </div>
       <div>
         <dt>占用长度</dt>

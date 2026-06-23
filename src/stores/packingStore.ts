@@ -6,6 +6,7 @@ import {
   calculatePacking,
   type BoxPosition,
   type CartonSpec,
+  type ContainerClearanceSpec,
   type ContainerSpec,
   type LoadingStrategy,
   type PackingResult,
@@ -16,7 +17,10 @@ export type PackingMode = "single" | "multi";
 
 const SKU_COLORS = ["#d8923a", "#42d6a4", "#6e8bff", "#ff7066", "#b7e35f"];
 const DEFAULT_CARTON: CartonSpec = { length: 480, width: 320, height: 260 };
+const DEFAULT_CONTAINER_CLEARANCE = { front: 0, rear: 0, left: 0, right: 0, top: 0 };
+const STACKING_SKU_CLEARANCE = "STACKING_SKU_CLEARANCE";
 type ContainerType = keyof typeof CONTAINERS;
+type ContainerClearanceKey = keyof typeof DEFAULT_CONTAINER_CLEARANCE;
 
 function isContainerType(type: string): type is ContainerType {
   return Object.prototype.hasOwnProperty.call(CONTAINERS, type);
@@ -31,6 +35,42 @@ function cloneContainer(type: ContainerType): Required<ContainerSpec> {
     width: preset.width,
     height: preset.height,
   };
+}
+
+function normalizeClearanceValue(value: unknown) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 0;
+  return Math.max(0, Math.round(number));
+}
+
+function normalizeContainerClearanceInput(input: Partial<ContainerClearanceSpec> = {}) {
+  return {
+    front: normalizeClearanceValue(input.front),
+    rear: normalizeClearanceValue(input.rear),
+    left: normalizeClearanceValue(input.left),
+    right: normalizeClearanceValue(input.right),
+    top: normalizeClearanceValue(input.top),
+  };
+}
+
+function loadStoredContainerClearance() {
+  if (typeof window === "undefined") return { ...DEFAULT_CONTAINER_CLEARANCE };
+  try {
+    const rawValue = window.localStorage.getItem(STACKING_SKU_CLEARANCE);
+    if (!rawValue) return { ...DEFAULT_CONTAINER_CLEARANCE };
+    return normalizeContainerClearanceInput(JSON.parse(rawValue) as Partial<ContainerClearanceSpec>);
+  } catch {
+    return { ...DEFAULT_CONTAINER_CLEARANCE };
+  }
+}
+
+function persistContainerClearance(clearance: typeof DEFAULT_CONTAINER_CLEARANCE) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STACKING_SKU_CLEARANCE, JSON.stringify(clearance));
+  } catch {
+    // localStorage may be unavailable in restricted browser contexts.
+  }
 }
 
 function createSku(index: number, carton: CartonSpec = DEFAULT_CARTON): SkuInput {
@@ -67,6 +107,7 @@ export const usePackingStore = defineStore("packing", () => {
   const containerType = ref<ContainerType>("20GP");
   const container = ref<Required<ContainerSpec>>(cloneContainer("20GP"));
   const mode = ref<PackingMode>("single");
+  const containerClearance = ref(loadStoredContainerClearance());
   const singleCarton = ref<CartonSpec>({ ...DEFAULT_CARTON });
   const singleColor = ref("#d8923a");
   const skuCount = ref(2);
@@ -92,6 +133,15 @@ export const usePackingStore = defineStore("packing", () => {
     if (!isContainerType(type)) return;
     containerType.value = type;
     container.value = cloneContainer(type);
+    markDirty();
+  }
+
+  function updateContainerClearance(field: ContainerClearanceKey, value: number) {
+    containerClearance.value = {
+      ...containerClearance.value,
+      [field]: normalizeClearanceValue(value),
+    };
+    persistContainerClearance(containerClearance.value);
     markDirty();
   }
 
@@ -133,8 +183,14 @@ export const usePackingStore = defineStore("packing", () => {
     try {
       const next: PackingResult =
         mode.value === "single"
-          ? applySingleColor(calculatePacking(container.value, singleCarton.value), singleColor.value)
-          : (calculateMultiSkuPacking(container.value, skus.value, { strategy: strategy.value }) as PackingResult);
+          ? applySingleColor(
+              calculatePacking(container.value, singleCarton.value, { clearance: containerClearance.value }),
+              singleColor.value,
+            )
+          : (calculateMultiSkuPacking(container.value, skus.value, {
+              strategy: strategy.value,
+              clearance: containerClearance.value,
+            }) as PackingResult);
       result.value = next;
       visibleCount.value = next.totalBoxes;
       status.value = next.totalBoxes > 0 ? "已完成计算" : "无法装载";
@@ -149,6 +205,7 @@ export const usePackingStore = defineStore("packing", () => {
   return {
     containerType,
     container,
+    containerClearance,
     mode,
     singleCarton,
     singleColor,
@@ -167,6 +224,7 @@ export const usePackingStore = defineStore("packing", () => {
     setContainerType,
     setMode,
     setSkuCount,
+    updateContainerClearance,
     updateSku,
   };
 });

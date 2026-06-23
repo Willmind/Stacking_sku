@@ -39,6 +39,20 @@ describe("batch import", () => {
     );
   });
 
+  it("applies the current container clearance to batch calculations", () => {
+    const rows = [
+      { "人工码垛数量（原始）": 8, "尺寸（长宽高 mm）": "2900*1150*1150", 柜型: "20GP" },
+    ];
+    const withoutClearance = calculateBatchPacking(rows);
+    const withClearance = calculateBatchPacking(rows, {
+      clearance: { front: 100 },
+    });
+
+    assert.equal(withoutClearance[0].totalBoxes, 8);
+    assert.equal(withClearance[0].totalBoxes, 4);
+    assert.equal(withClearance[0].difference, -4);
+  });
+
   it("skips blank rows and reports row-level parse errors", () => {
     const results = calculateBatchPacking([
       { "人工码垛数量（原始）": "", "尺寸（长宽高 mm）": "", 柜型: "" },
