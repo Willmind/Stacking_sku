@@ -33,7 +33,18 @@ const clearanceFields = [
     />
     <section class="clearance-panel" aria-label="车厢公差">
       <div class="clearance-heading">
-        <h3>车厢公差</h3>
+        <div class="clearance-title-row">
+          <h3>车厢公差</h3>
+          <button
+            class="clearance-reset-button"
+            type="button"
+            aria-label="重置公差"
+            :disabled="!store.hasActiveContainerClearance"
+            @click="store.resetContainerClearance"
+          >
+            重置
+          </button>
+        </div>
         <p>按站在柜口正视柜内为基准，输入需要预留的间隙。</p>
       </div>
       <div class="clearance-grid">
@@ -90,6 +101,13 @@ h2 {
   gap: 4px;
 }
 
+.clearance-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 h3,
 .clearance-heading p {
   margin: 0;
@@ -106,6 +124,29 @@ h3 {
   font-size: 11px;
   font-weight: 760;
   line-height: 1.45;
+}
+
+.clearance-reset-button {
+  min-height: 24px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(174, 184, 201, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  padding: 0 9px;
+}
+
+.clearance-reset-button:hover:not(:disabled) {
+  border-color: rgba(66, 214, 164, 0.45);
+  background: rgba(66, 214, 164, 0.09);
+  color: var(--accent);
+}
+
+.clearance-reset-button:disabled {
+  opacity: 0.46;
 }
 
 .clearance-grid {

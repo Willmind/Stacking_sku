@@ -124,6 +124,7 @@ export const usePackingStore = defineStore("packing", () => {
   });
 
   const totalBoxesText = computed(() => (result.value?.totalBoxes ?? 0).toLocaleString("zh-CN"));
+  const hasActiveContainerClearance = computed(() => Object.values(containerClearance.value).some((value) => value > 0));
 
   function markDirty() {
     status.value = result.value ? "待重新计算" : "待计算";
@@ -141,6 +142,13 @@ export const usePackingStore = defineStore("packing", () => {
       ...containerClearance.value,
       [field]: normalizeClearanceValue(value),
     };
+    persistContainerClearance(containerClearance.value);
+    markDirty();
+  }
+
+  function resetContainerClearance() {
+    if (!hasActiveContainerClearance.value) return;
+    containerClearance.value = { ...DEFAULT_CONTAINER_CLEARANCE };
     persistContainerClearance(containerClearance.value);
     markDirty();
   }
@@ -218,9 +226,11 @@ export const usePackingStore = defineStore("packing", () => {
     error,
     progressText,
     totalBoxesText,
+    hasActiveContainerClearance,
     calculate,
     markDirty,
     moveSku,
+    resetContainerClearance,
     setContainerType,
     setMode,
     setSkuCount,

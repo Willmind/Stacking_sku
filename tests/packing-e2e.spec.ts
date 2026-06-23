@@ -383,6 +383,18 @@ test("applies and persists container clearance inputs", async ({ page }) => {
 
   await page.reload();
   await expect(page.locator("#clearance-front")).toHaveValue("100");
+  await expect(page.getByRole("button", { name: "重置公差" })).toBeEnabled();
+
+  await page.getByRole("button", { name: "重置公差" }).click();
+  for (const field of ["front", "rear", "left", "right", "top"]) {
+    await expect(page.locator(`#clearance-${field}`)).toHaveValue("0");
+  }
+  await expect(page.getByRole("button", { name: "重置公差" })).toBeDisabled();
+
+  await page.reload();
+  for (const field of ["front", "rear", "left", "right", "top"]) {
+    await expect(page.locator(`#clearance-${field}`)).toHaveValue("0");
+  }
 });
 
 test("uses styled dropdown popovers for container and strategy selection", async ({ page }) => {
