@@ -115,22 +115,30 @@ function updateValue(value: number) {
 .base-number-actions {
   display: grid;
   width: 26px;
+  min-height: 0;
+  align-items: stretch;
+  justify-items: stretch;
   grid-template-rows: repeat(2, minmax(0, 1fr));
   border-left: 1px solid var(--control-border);
   background: rgba(255, 255, 255, 0.025);
 }
 
 .base-number-stepper {
-  display: inline-flex;
-  min-width: 26px;
-  min-height: 20px;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  place-items: center;
   border: 0;
   border-top: 1px solid rgba(190, 205, 224, 0.08);
   background: transparent;
   color: var(--muted);
+  line-height: 0;
   padding: 0;
+}
+
+.base-number-stepper svg {
+  display: block;
 }
 
 .base-number-stepper:first-child {

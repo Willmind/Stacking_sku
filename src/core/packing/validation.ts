@@ -1,5 +1,5 @@
 import { CONTAINERS, POSITIVE_NUMBER_LABELS, type ContainerType } from "./constants";
-import type { CartonSpec, ContainerSpec, SkuInput } from "./types";
+import type { CartonSpec, ContainerClearanceSpec, ContainerSpec, NormalizedContainerClearance, SkuInput } from "./types";
 
 type PositiveNumberLabel = keyof typeof POSITIVE_NUMBER_LABELS;
 
@@ -16,6 +16,14 @@ export function positiveNumber(value: unknown, name: string): number {
   const number = Number(value);
   if (!Number.isFinite(number) || number <= 0) {
     throw new Error(`${formatInputName(name)}必须为正数`);
+  }
+  return number;
+}
+
+export function nonNegativeNumber(value: unknown, name: string): number {
+  const number = Number(value ?? 0);
+  if (!Number.isFinite(number) || number < 0) {
+    throw new Error(`${formatInputName(name)}必须为非负数`);
   }
   return number;
 }
@@ -40,6 +48,29 @@ export function normalizeCarton(input: CartonSpec): CartonSpec {
     length: positiveNumber(input.length, "carton length"),
     width: positiveNumber(input.width, "carton width"),
     height: positiveNumber(input.height, "carton height"),
+  };
+}
+
+export function normalizeContainerClearance(input: ContainerClearanceSpec = {}): NormalizedContainerClearance {
+  return {
+    front: nonNegativeNumber(input.front, "front clearance"),
+    rear: nonNegativeNumber(input.rear, "rear clearance"),
+    left: nonNegativeNumber(input.left, "left clearance"),
+    right: nonNegativeNumber(input.right, "right clearance"),
+    top: nonNegativeNumber(input.top, "top clearance"),
+  };
+}
+
+export function createEffectiveContainer(
+  container: Required<ContainerSpec>,
+  clearance: NormalizedContainerClearance,
+): Required<ContainerSpec> {
+  return {
+    id: container.id,
+    name: `${container.name} 有效装载空间`,
+    length: positiveNumber(container.length - clearance.front - clearance.rear, "effective container length"),
+    width: positiveNumber(container.width - clearance.left - clearance.right, "effective container width"),
+    height: positiveNumber(container.height - clearance.top, "effective container height"),
   };
 }
 

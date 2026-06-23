@@ -24,6 +24,13 @@ const batchImportDialogSource = fs.readFileSync(
   path.join(__dirname, "..", "src/components/controls/BatchImportDialog.vue"),
   "utf8",
 );
+const containerFormSource = fs.readFileSync(
+  path.join(__dirname, "..", "src/components/controls/ContainerForm.vue"),
+  "utf8",
+);
+const packingStoreSource = fs.readFileSync(path.join(__dirname, "..", "src/stores/packingStore.ts"), "utf8");
+const packingTypesSource = fs.readFileSync(path.join(__dirname, "..", "src/core/packing/types.ts"), "utf8");
+const packingValidationSource = fs.readFileSync(path.join(__dirname, "..", "src/core/packing/validation.ts"), "utf8");
 const progressControlSource = fs.readFileSync(
   path.join(__dirname, "..", "src/components/controls/ProgressControl.vue"),
   "utf8",
@@ -38,6 +45,10 @@ const strategyDescriptionSource = fs.readFileSync(
 );
 const skuEditorSource = fs.readFileSync(path.join(__dirname, "..", "src/components/controls/SkuEditor.vue"), "utf8");
 const baseSelectSource = fs.readFileSync(path.join(__dirname, "..", "src/components/ui/BaseSelect.vue"), "utf8");
+const baseNumberFieldSource = fs.readFileSync(
+  path.join(__dirname, "..", "src/components/ui/BaseNumberField.vue"),
+  "utf8",
+);
 const baseDialogSource = fs.existsSync(path.join(__dirname, "..", "src/components/ui/BaseDialog.vue"))
   ? fs.readFileSync(path.join(__dirname, "..", "src/components/ui/BaseDialog.vue"), "utf8")
   : "";
@@ -103,6 +114,51 @@ describe("3D visual rendering source guards", () => {
 });
 
 describe("control panel layout source guards", () => {
+  it("exposes persisted container clearance inputs for real cargo spacing", () => {
+    assert.match(containerFormSource, /车厢公差/);
+    assert.match(containerFormSource, /按站在柜口正视柜内为基准/);
+    assert.match(containerFormSource, /`clearance-\$\{field\.key\}`/);
+    for (const field of ["front", "rear", "left", "right", "top"]) {
+      assert.match(containerFormSource, new RegExp(`key: "${field}"`));
+      assert.match(packingStoreSource, new RegExp(`${field}:\\s*0`));
+    }
+    for (const label of ["前 mm", "后 mm", "左 mm", "右 mm", "顶部 mm"]) {
+      assert.match(containerFormSource, new RegExp(label));
+    }
+
+    assert.match(packingStoreSource, /STACKING_SKU_CLEARANCE/);
+    assert.match(packingStoreSource, /loadStoredContainerClearance/);
+    assert.match(packingStoreSource, /persistContainerClearance/);
+    assert.match(packingStoreSource, /updateContainerClearance/);
+    assert.match(packingStoreSource, /clearance:\s*containerClearance\.value/);
+    assert.match(packingTypesSource, /ContainerClearanceSpec/);
+    assert.match(packingTypesSource, /effectiveContainer/);
+    assert.match(packingTypesSource, /clearance/);
+    assert.match(packingValidationSource, /normalizeContainerClearance/);
+  });
+
+  it("keeps container clearance inputs aligned with three-column spec inputs", () => {
+    assert.match(containerFormSource, /\.clearance-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
+    assert.doesNotMatch(containerFormSource, /\.clearance-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(5,\s*minmax\(0,\s*1fr\)\)/);
+    assert.doesNotMatch(containerFormSource, /clearance-number-field--top/);
+    assert.doesNotMatch(containerFormSource, /grid-column:\s*1\s*\/\s*-1/);
+  });
+
+  it("keeps number field stepper icons centered in compact controls", () => {
+    assert.match(baseNumberFieldSource, /\.base-number-actions\s*\{[\s\S]*min-height:\s*0/);
+    assert.match(baseNumberFieldSource, /\.base-number-actions\s*\{[\s\S]*align-items:\s*stretch/);
+    assert.match(baseNumberFieldSource, /\.base-number-actions\s*\{[\s\S]*justify-items:\s*stretch/);
+    assert.match(baseNumberFieldSource, /\.base-number-stepper\s*\{[\s\S]*display:\s*grid/);
+    assert.match(baseNumberFieldSource, /\.base-number-stepper\s*\{[\s\S]*width:\s*100%/);
+    assert.match(baseNumberFieldSource, /\.base-number-stepper\s*\{[\s\S]*min-width:\s*0/);
+    assert.match(baseNumberFieldSource, /\.base-number-stepper\s*\{[\s\S]*min-height:\s*0/);
+    assert.match(baseNumberFieldSource, /\.base-number-stepper\s*\{[\s\S]*place-items:\s*center/);
+    assert.match(baseNumberFieldSource, /\.base-number-stepper\s*\{[\s\S]*line-height:\s*0/);
+    assert.match(baseNumberFieldSource, /\.base-number-stepper svg\s*\{[\s\S]*display:\s*block/);
+    assert.doesNotMatch(baseNumberFieldSource, /\.base-number-stepper\s*\{[\s\S]*min-width:\s*26px/);
+    assert.doesNotMatch(baseNumberFieldSource, /\.base-number-stepper\s*\{[\s\S]*min-height:\s*20px/);
+  });
+
   it("keeps the primary result summary above batch import actions", () => {
     const resultIndex = appSource.indexOf("<ResultSummary />");
     const batchIndex = appSource.indexOf("<BatchImportDialog />");
@@ -212,9 +268,16 @@ describe("2D plan source guards", () => {
 
   it("does not draw a separate occupied boundary over 2D cargo views", () => {
     assert.doesNotMatch(plan2dSource, /function getOccupiedProjectionRect/);
-    assert.doesNotMatch(plan2dSource, /occupiedRect/);
     assert.doesNotMatch(plan2dSource, /rgba\(66,\s*214,\s*164,\s*0\.95\)/);
     assert.doesNotMatch(plan2dSource, /plane\.occupiedWidth \* scale,\s*plane\.occupiedHeight \* scale/);
+  });
+
+  it("draws effective loading space boundaries when container clearance is applied", () => {
+    assert.match(plan2dSource, /getEffectiveSpaceProjectionRect/);
+    assert.match(plan2dSource, /drawEffectiveSpaceBoundary/);
+    assert.match(plan2dSource, /有效装载空间/);
+    assert.match(rendererSource, /createEffectiveSpaceFrame/);
+    assert.match(rendererSource, /有效装载空间/);
   });
 
   it("draws the container outline after cargo boxes", () => {
@@ -348,6 +411,14 @@ describe("batch import UI source guards", () => {
     assert.doesNotMatch(batchImportDialogSource, /导出负差值/);
     assert.doesNotMatch(batchImportDialogSource, /<select/);
     assert.match(batchImportDialogSource, /aria-sort/);
+  });
+
+  it("uses the current container clearance when calculating batch imports", () => {
+    assert.match(batchImportDialogSource, /usePackingStore/);
+    assert.match(batchImportDialogSource, /store\.containerClearance/);
+    assert.match(batchImportDialogSource, /公差：/);
+    assert.match(batchImportDialogSource, /calculateBatchPackingAsync\(rows,\s*\{/);
+    assert.match(batchImportDialogSource, /clearance:\s*store\.containerClearance/);
   });
 
   it("highlights only negative batch import differences as danger chips", () => {

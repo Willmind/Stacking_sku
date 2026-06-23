@@ -125,11 +125,36 @@ function getSkuNote(result: PackingResult): PackingStrategyNote {
   };
 }
 
+function getClearanceNote(result: PackingResult): PackingStrategyNote {
+  const clearance = result.clearance;
+  const hasClearance = Boolean(
+    clearance &&
+      (clearance.front > 0 || clearance.rear > 0 || clearance.left > 0 || clearance.right > 0 || clearance.top > 0),
+  );
+
+  if (!hasClearance) {
+    return {
+      id: "clearance",
+      label: "车厢公差",
+      detail: "未启用额外间隙扣减",
+      tone: "neutral",
+    };
+  }
+
+  return {
+    id: "clearance",
+    label: "车厢公差",
+    detail: `有效空间 ${formatNumber(result.effectiveContainer.length)} × ${formatNumber(result.effectiveContainer.width)} × ${formatNumber(result.effectiveContainer.height)} mm`,
+    tone: "warning",
+  };
+}
+
 export function describePackingStrategy(result: PackingResult | null): PackingStrategyNote[] {
   if (!result?.pattern) return [];
 
   return [
     getOrientationNote(result),
+    getClearanceNote(result),
     getCornerAvoidanceNote(result),
     getBackfillNote(result),
     getSkuNote(result),

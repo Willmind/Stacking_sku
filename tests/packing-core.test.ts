@@ -62,6 +62,27 @@ function assertPositionsFitContainer(result, positions) {
   }
 }
 
+function assertPositionsRespectClearance(result, positions) {
+  const clearance = result.clearance;
+  assert.ok(clearance, "result should expose normalized container clearance");
+  for (const position of positions) {
+    assert.ok(position.x >= clearance.front, "box should respect front clearance");
+    assert.ok(position.y >= clearance.left, "box should respect left clearance");
+    assert.ok(
+      position.x + position.dx <= result.container.length - clearance.rear,
+      "box should respect rear clearance",
+    );
+    assert.ok(
+      position.y + position.dy <= result.container.width - clearance.right,
+      "box should respect right clearance",
+    );
+    assert.ok(
+      position.z + position.dz <= result.container.height - clearance.top,
+      "box should respect top clearance",
+    );
+  }
+}
+
 function assertNoPositionOverlaps(positions) {
   for (let index = 0; index < positions.length; index += 1) {
     for (let nextIndex = index + 1; nextIndex < positions.length; nextIndex += 1) {
@@ -187,6 +208,58 @@ describe("packing core", () => {
       [3, 0, 1],
     ],
   );
+}
+
+{
+  const result = Packing.calculatePacking(
+    customContainer(1020, 520, 510),
+    carton(200, 100, 100),
+    {
+      cornerBlock: { length: 0, width: 0, height: 0 },
+      clearance: { front: 10, rear: 10, left: 10, right: 10, top: 10 },
+    },
+  );
+  const positions = Packing.generateBoxPositions(result, result.totalBoxes);
+
+  assert.equal(result.totalBoxes, 125);
+  assert.deepEqual(result.clearance, { front: 10, rear: 10, left: 10, right: 10, top: 10 });
+  assert.equal(result.container.length, 1020);
+  assert.equal(result.effectiveContainer.length, 1000);
+  assert.equal(result.effectiveContainer.width, 500);
+  assert.equal(result.effectiveContainer.height, 500);
+  assert.equal(result.pattern.occupiedLength, 1000);
+  assert.equal(result.pattern.occupiedWidth, 500);
+  assert.deepEqual(
+    positions.slice(0, 2).map((position) => [position.x, position.y, position.z]),
+    [
+      [10, 410, 0],
+      [10, 310, 0],
+    ],
+  );
+  assertPositionsFitContainer(result, positions);
+  assertPositionsRespectClearance(result, positions);
+}
+
+{
+  const result = Packing.calculateMultiSkuPacking(
+    customContainer(1020, 520, 510),
+    [
+      sku("A", 200, 100, 100, 12, "#d8923a"),
+      sku("B", 200, 100, 100, 8, "#42d6a4"),
+    ],
+    {
+      strategy: "multi-destination",
+      cornerBlock: { length: 0, width: 0, height: 0 },
+      clearance: { front: 10, rear: 10, left: 10, right: 10, top: 10 },
+    },
+  );
+  const positions = Packing.generateBoxPositions(result, result.totalBoxes);
+
+  assert.equal(result.totalBoxes, 20);
+  assert.deepEqual(summarizeSkuCounts(result), { A: 12, B: 8 });
+  assertPositionsFitContainer(result, positions);
+  assertPositionsRespectClearance(result, positions);
+  assertNoPositionOverlaps(positions);
 }
 
 {
@@ -450,7 +523,7 @@ describe("packing core", () => {
   );
 
   const notes = Packing.describePackingStrategy(result);
-  assert.deepEqual(notes.map((note) => note.label), ["水平旋转", "角件避让", "空位回填", "SKU 策略"]);
+  assert.deepEqual(notes.map((note) => note.label), ["水平旋转", "车厢公差", "角件避让", "空位回填", "SKU 策略"]);
   assert.match(notes.find((note) => note.id === "backfill").detail, /复用/);
   assert.match(notes.find((note) => note.id === "sku").detail, /异尺寸按 SKU 顺序分区/);
 }
@@ -559,6 +632,26 @@ assert.throws(
       carton(0, 100, 100),
     ),
   /纸箱长度必须为正数/,
+);
+
+assert.throws(
+  () =>
+    Packing.calculatePacking(
+      customContainer(500, 330, 250),
+      carton(100, 100, 100),
+      { clearance: { front: -1 } },
+    ),
+  /前公差必须为非负数/,
+);
+
+assert.throws(
+  () =>
+    Packing.calculatePacking(
+      customContainer(500, 330, 250),
+      carton(100, 100, 100),
+      { clearance: { front: 300, rear: 200 } },
+    ),
+  /公差扣减后的有效柜体长度必须为正数/,
 );
 
   });

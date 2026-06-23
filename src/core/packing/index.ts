@@ -19,9 +19,11 @@ import {
   rectanglesOverlap,
 } from "./geometry";
 import {
+  createEffectiveContainer,
   hasSameSkuDimensions,
   normalizeCarton,
   normalizeContainer,
+  normalizeContainerClearance,
   normalizeSkus,
 } from "./validation";
 export { describePackingStrategy } from "./strategyDescription";
@@ -29,9 +31,11 @@ export { describePackingStrategy } from "./strategyDescription";
 export type {
   BoxPosition,
   CartonSpec,
+  ContainerClearanceSpec,
   ContainerSpec,
   CornerBlockSpec,
   LoadingStrategy,
+  NormalizedContainerClearance,
   PackingLayer,
   PackingOptions,
   PackingPattern,
@@ -40,6 +44,72 @@ export type {
   SkuInput,
   SkuSummary,
 } from "./types";
+
+  function createPackingSpace(containerInput, options = {}) {
+    const container = normalizeContainer(containerInput);
+    const clearance = normalizeContainerClearance(options.clearance);
+    const effectiveContainer = createEffectiveContainer(container, clearance);
+    const cornerBlock = {
+      ...DEFAULT_CORNER_BLOCK,
+      ...(options.cornerBlock || {}),
+    };
+    const effectiveCornerBlock = {
+      length: Math.max(0, cornerBlock.length - clearance.front),
+      width: Math.max(0, cornerBlock.width - Math.min(clearance.left, clearance.right)),
+      height: Math.max(0, cornerBlock.height - clearance.top),
+    };
+
+    return {
+      container,
+      effectiveContainer,
+      clearance,
+      cornerBlock,
+      effectiveCornerBlock,
+    };
+  }
+
+  function shiftPositionByClearance(position, clearance) {
+    const shiftedPosition = {
+      ...position,
+      x: position.x + clearance.front,
+      y: position.y + clearance.left,
+    };
+
+    if (position.sourceFootprint) {
+      shiftedPosition.sourceFootprint = {
+        ...position.sourceFootprint,
+        x: position.sourceFootprint.x + clearance.front,
+        y: position.sourceFootprint.y + clearance.left,
+      };
+    }
+
+    return shiftedPosition;
+  }
+
+  function applyPackingSpaceToResult(result, packingSpace) {
+    const shiftedLayerPositions = result.layerPositions.map((position) =>
+      shiftPositionByClearance(position, packingSpace.clearance),
+    );
+    const shiftedOrderedPositions = result.orderedPositions.map((position) =>
+      shiftPositionByClearance(position, packingSpace.clearance),
+    );
+
+    return {
+      ...result,
+      container: packingSpace.container,
+      effectiveContainer: packingSpace.effectiveContainer,
+      clearance: packingSpace.clearance,
+      cornerBlock: packingSpace.cornerBlock,
+      layerPositions: shiftedLayerPositions,
+      orderedPositions: shiftedOrderedPositions,
+      pattern: result.pattern
+        ? {
+            ...result.pattern,
+            floorPositions: shiftedLayerPositions,
+          }
+        : null,
+    };
+  }
 
   function assignSequenceIndexes(positions) {
     return positions.map((position, sequenceIndex) => ({
@@ -868,7 +938,8 @@ export type {
       ...layer,
       boxCount: assignedPositions.filter((position) => position.stackIndex === layer.index).length,
     }));
-    const containerVolume = baseResult.container.length * baseResult.container.width * baseResult.container.height;
+    const volumeContainer = baseResult.effectiveContainer || baseResult.container;
+    const containerVolume = volumeContainer.length * volumeContainer.width * volumeContainer.height;
     const volumeLoaded = calculatePositionsVolume(assignedPositions);
 
     return {
@@ -886,11 +957,9 @@ export type {
   }
 
   function calculateHeterogeneousMultiSkuPacking(containerInput, skus, options, strategy) {
-    const container = normalizeContainer(containerInput);
-    const cornerBlock = {
-      ...DEFAULT_CORNER_BLOCK,
-      ...(options.cornerBlock || {}),
-    };
+    const packingSpace = createPackingSpace(containerInput, options);
+    const container = packingSpace.effectiveContainer;
+    const cornerBlock = packingSpace.effectiveCornerBlock;
     const assignedPositions = [];
     const groups = [];
     let cursorX = 0;
@@ -972,8 +1041,10 @@ export type {
     const containerVolume = container.length * container.width * container.height;
     const volumeLoaded = calculatePositionsVolume(orderedPositions);
 
-    return {
+    return applyPackingSpaceToResult({
       container,
+      effectiveContainer: container,
+      clearance: packingSpace.clearance,
       carton: {
         length: skus[0].length,
         width: skus[0].width,
@@ -1002,16 +1073,14 @@ export type {
       strategy,
       skus,
       skuSummary: summarizeSkuAllocation(skus, orderedPositions),
-    };
+    }, packingSpace);
   }
 
   function calculatePacking(containerInput, cartonInput, options = {}) {
-    const container = normalizeContainer(containerInput);
+    const packingSpace = createPackingSpace(containerInput, options);
+    const container = packingSpace.effectiveContainer;
     const carton = normalizeCarton(cartonInput);
-    const cornerBlock = {
-      ...DEFAULT_CORNER_BLOCK,
-      ...(options.cornerBlock || {}),
-    };
+    const cornerBlock = packingSpace.effectiveCornerBlock;
 
     const candidates = enumerateCandidates(container, carton);
     let best = null;
@@ -1024,8 +1093,10 @@ export type {
     }
 
     if (!best) {
-      return {
+      return applyPackingSpaceToResult({
         container,
+        effectiveContainer: container,
+        clearance: packingSpace.clearance,
         carton,
         cornerBlock,
         pattern: null,
@@ -1037,19 +1108,17 @@ export type {
         blockedByCornerTotal: 0,
         usedHeight: 0,
         utilizationRatio: 0,
-      };
+      }, packingSpace);
     }
 
-    return best;
+    return applyPackingSpaceToResult(best, packingSpace);
   }
 
   function calculatePackingTotalBoxes(containerInput, cartonInput, options = {}) {
-    const container = normalizeContainer(containerInput);
+    const packingSpace = createPackingSpace(containerInput, options);
+    const container = packingSpace.effectiveContainer;
     const carton = normalizeCarton(cartonInput);
-    const cornerBlock = {
-      ...DEFAULT_CORNER_BLOCK,
-      ...(options.cornerBlock || {}),
-    };
+    const cornerBlock = packingSpace.effectiveCornerBlock;
 
     const candidates = enumerateCandidates(container, carton);
     let best = null;
