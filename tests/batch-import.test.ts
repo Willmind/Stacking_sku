@@ -15,7 +15,7 @@ describe("batch import", () => {
 
     assert.deepEqual(
       results.map((result) => result.totalBoxes),
-      [1493, 1403, 1200, 1340],
+      [1493, 1403, 1200, 1349],
     );
     assert.deepEqual(
       results.map((result) => result.rowNumber),
@@ -35,7 +35,28 @@ describe("batch import", () => {
     );
     assert.deepEqual(
       results.map((result) => result.difference),
-      [-247, 0, 2, 0],
+      [-247, 0, 2, 9],
+    );
+  });
+
+  it("uses tail-optimized maximum loads in batch calculations", () => {
+    const results = calculateBatchPacking([
+      { "人工码垛数量（原始）": 1349, "尺寸（长宽高 mm）": "488*380*291", 柜型: "40HQ" },
+      { "人工码垛数量（原始）": 889, "尺寸（长宽高 mm）": "509*418*338", 柜型: "40HQ" },
+      { "人工码垛数量（原始）": 927, "尺寸（长宽高 mm）": "536*436*330", 柜型: "40HQ" },
+    ]);
+
+    assert.deepEqual(
+      results.map((result) => result.totalBoxes),
+      [1349, 889, 927],
+    );
+    assert.deepEqual(
+      results.map((result) => result.difference),
+      [0, 0, 0],
+    );
+    assert.deepEqual(
+      results.map((result) => result.status),
+      ["成功", "成功", "成功"],
     );
   });
 
