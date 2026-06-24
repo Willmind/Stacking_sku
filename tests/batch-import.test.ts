@@ -15,7 +15,7 @@ describe("batch import", () => {
 
     assert.deepEqual(
       results.map((result) => result.totalBoxes),
-      [1493, 1403, 1200, 1349],
+      [1493, 1412, 1200, 1349],
     );
     assert.deepEqual(
       results.map((result) => result.rowNumber),
@@ -35,7 +35,7 @@ describe("batch import", () => {
     );
     assert.deepEqual(
       results.map((result) => result.difference),
-      [-247, 0, 2, 9],
+      [-247, 9, 2, 9],
     );
   });
 

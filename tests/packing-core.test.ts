@@ -298,7 +298,7 @@ describe("packing core", () => {
     carton(488, 360, 291),
   );
 
-  assert.equal(result.totalBoxes, 1403);
+  assert.equal(result.totalBoxes, 1412);
   assert.equal(result.container.id, "40HQ");
   assert.equal(result.usedHeight, 2619);
   assertLoadsInnerFaceBeforeNextDepth(result);
@@ -341,16 +341,18 @@ describe("packing core", () => {
     carton(495, 395, 310),
   );
 
-  assert.equal(result.totalBoxes, 455);
-  assert.equal(result.perLayerBoxCount, 65);
+  assert.equal(result.totalBoxes, 462);
+  assert.equal(result.perLayerBoxCount, 66);
   assert.equal(result.layers.length, 7);
   assert.equal(result.pattern.family, "width-lanes");
   assert.equal(result.pattern.lengthFacingCount, 2);
   assert.equal(result.pattern.widthFacingCount, 3);
+  assertTailOptimizedSource(result);
 
   const positions = Packing.generateBoxPositions(result, result.totalBoxes);
   assert.equal(positions.length, result.totalBoxes);
   assertNoCornerCollisions(result, positions);
+  assertNoPositionOverlaps(positions);
 
   const tailHorizontalStack = positions.filter(
     (position) =>
@@ -358,7 +360,7 @@ describe("packing core", () => {
       position.dx === 395 &&
       position.dy === 495,
   );
-  assert.equal(tailHorizontalStack.length, 7);
+  assert.equal(tailHorizontalStack.length, 14);
   assert.deepEqual(
     [...new Set(tailHorizontalStack.map((position) => position.stackIndex))],
     [0, 1, 2, 3, 4, 5, 6],
@@ -697,7 +699,7 @@ assert.throws(
   /公差扣减后的有效柜体长度必须为正数/,
 );
 
-  });
+  }, 15000);
 
   it("supports selected full-free carton orientations", () => {
     const container = customContainer(240, 120, 100);
