@@ -20,7 +20,7 @@ interface TailOptimizerOptions {
 }
 
 interface ReductionPlan {
-  [orientationId: string]: number;
+  unitReductions: number[];
 }
 
 interface SearchResult {
@@ -31,7 +31,6 @@ interface SearchResult {
 
 const DEFAULT_MAX_REDUCTION_DEPTH = 4;
 const DEFAULT_MAX_SEARCH_STATES = 20000;
-const MAX_BITMASK_CANDIDATES = 30;
 
 function createLayerPositionsFromUnits(units: CandidateUnit[]): CandidateBoxPosition[] {
   const positions: CandidateBoxPosition[] = [];
@@ -56,10 +55,6 @@ function createLayerPositionsFromUnits(units: CandidateUnit[]): CandidateBoxPosi
 
 function getOccupiedLength(positions: CandidateBoxPosition[]): number {
   return positions.reduce((max, position) => Math.max(max, position.x + position.dx), 0);
-}
-
-function getDistinctOrientationIds(units: CandidateUnit[]): string[] {
-  return Array.from(new Set(units.map((unit) => unit.orientationId)));
 }
 
 function summarizeGroupsFromUnits(units: CandidateUnit[], orientations: CartonOrientation[]): CandidateGroup[] {
@@ -100,33 +95,67 @@ function summarizeGroupsFromUnits(units: CandidateUnit[], orientations: CartonOr
   return groups;
 }
 
-function createReductionPlans(orientationIds: string[], maxReductionDepth: number): ReductionPlan[] {
+function createReductionPlans(units: CandidateUnit[], maxReductionDepth: number): ReductionPlan[] {
   const plans: ReductionPlan[] = [];
+  const seen = new Set<string>();
 
-  function visit(index: number, current: ReductionPlan) {
+  function addPlan(unitReductions: number[]) {
+    if (!unitReductions.some((depth) => depth > 0)) return;
+    const key = unitReductions.join(":");
+    if (seen.has(key)) return;
+    seen.add(key);
+    plans.push({ unitReductions });
+  }
+
+  const orientationIds = Array.from(new Set(units.map((unit) => unit.orientationId)));
+  const orientationDepths = orientationIds.map(() => 0);
+
+  function visitOrientationPlans(index: number) {
     if (index >= orientationIds.length) {
-      if (Object.values(current).some((depth) => depth > 0)) {
-        plans.push({ ...current });
-      }
+      addPlan(units.map((unit) => {
+        const orientationIndex = orientationIds.indexOf(unit.orientationId);
+        return Math.min(orientationDepths[orientationIndex], unit.acrossCount - 1);
+      }));
       return;
     }
 
     const orientationId = orientationIds[index];
-    for (let depth = 0; depth <= maxReductionDepth; depth += 1) {
-      current[orientationId] = depth;
-      visit(index + 1, current);
+    const maxDepth = Math.min(
+      maxReductionDepth,
+      ...units.filter((unit) => unit.orientationId === orientationId).map((unit) => unit.acrossCount - 1),
+    );
+    for (let depth = 0; depth <= maxDepth; depth += 1) {
+      orientationDepths[index] = depth;
+      visitOrientationPlans(index + 1);
     }
-    delete current[orientationId];
+    orientationDepths[index] = 0;
   }
 
-  visit(0, {});
+  visitOrientationPlans(0);
+
+  for (let start = 0; start < units.length; start += 1) {
+    for (let end = start; end < units.length; end += 1) {
+      const maxDepth = Math.min(
+        maxReductionDepth,
+        ...units.slice(start, end + 1).map((unit) => unit.acrossCount - 1),
+      );
+      for (let depth = 1; depth <= maxDepth; depth += 1) {
+        const unitReductions = units.map(() => 0);
+        for (let index = start; index <= end; index += 1) {
+          unitReductions[index] = depth;
+        }
+        addPlan(unitReductions);
+      }
+    }
+  }
+
   return plans;
 }
 
 function reduceUnits(units: CandidateUnit[], plan: ReductionPlan): CandidateUnit[] {
-  return units.map((unit) => ({
+  return units.map((unit, index) => ({
     ...unit,
-    acrossCount: Math.max(0, unit.acrossCount - (plan[unit.orientationId] || 0)),
+    acrossCount: Math.max(0, unit.acrossCount - (plan.unitReductions[index] || 0)),
   }));
 }
 
@@ -295,82 +324,61 @@ function createTailCandidates(
   return candidates.sort((a, b) => a.x - b.x || a.y - b.y || a.dx - b.dx || a.dy - b.dy);
 }
 
-function getConflictComponents(candidates: CandidateBoxPosition[]): number[][] {
-  const adjacency = candidates.map((): number[] => []);
+function compareCandidateStable(left: CandidateBoxPosition, right: CandidateBoxPosition): number {
+  return (
+    left.x - right.x ||
+    left.y - right.y ||
+    left.dx - right.dx ||
+    left.dy - right.dy ||
+    left.dz - right.dz ||
+    (left.orientationId || "").localeCompare(right.orientationId || "")
+  );
+}
 
-  for (let left = 0; left < candidates.length; left += 1) {
-    const leftRect = floorRectFromPosition(candidates[left]);
-    for (let right = left + 1; right < candidates.length; right += 1) {
-      if (!rectanglesOverlap(leftRect, floorRectFromPosition(candidates[right]))) continue;
-      adjacency[left].push(right);
-      adjacency[right].push(left);
+const TAIL_CANDIDATE_SORTERS = [
+  compareCandidateStable,
+  (left: CandidateBoxPosition, right: CandidateBoxPosition) =>
+    left.y - right.y || left.x - right.x || compareCandidateStable(left, right),
+  (left: CandidateBoxPosition, right: CandidateBoxPosition) =>
+    left.x - right.x || right.y - left.y || compareCandidateStable(left, right),
+  (left: CandidateBoxPosition, right: CandidateBoxPosition) =>
+    left.y - right.y || right.x - left.x || compareCandidateStable(left, right),
+  (left: CandidateBoxPosition, right: CandidateBoxPosition) =>
+    (left.orientationId || "").localeCompare(right.orientationId || "") || compareCandidateStable(left, right),
+  (left: CandidateBoxPosition, right: CandidateBoxPosition) =>
+    (right.orientationId || "").localeCompare(left.orientationId || "") || compareCandidateStable(left, right),
+];
+
+function selectGreedyTailPositions(
+  tailCandidates: CandidateBoxPosition[],
+  compare: (left: CandidateBoxPosition, right: CandidateBoxPosition) => number,
+  maxSearchStates: number,
+): SearchResult {
+  const positions: CandidateBoxPosition[] = [];
+  const positionRects: FloorRect[] = [];
+  let exploredStates = 0;
+
+  for (const candidate of [...tailCandidates].sort(compare)) {
+    exploredStates += 1;
+    if (exploredStates > maxSearchStates) {
+      return {
+        positions,
+        exploredStates,
+        stoppedByLimit: true,
+      };
+    }
+
+    if (!overlapsAnyFloorRect(candidate, positionRects)) {
+      positions.push(candidate);
+      positionRects.push(floorRectFromPosition(candidate));
     }
   }
 
-  const visited = new Set<number>();
-  const components: number[][] = [];
-
-  for (let index = 0; index < candidates.length; index += 1) {
-    if (visited.has(index)) continue;
-    const component: number[] = [];
-    const queue = [index];
-    visited.add(index);
-
-    for (let queueIndex = 0; queueIndex < queue.length; queueIndex += 1) {
-      const current = queue[queueIndex];
-      component.push(current);
-      for (const next of adjacency[current]) {
-        if (visited.has(next)) continue;
-        visited.add(next);
-        queue.push(next);
-      }
-    }
-
-    components.push(component);
-  }
-
-  return components;
-}
-
-function buildConflictMasks(candidates: CandidateBoxPosition[]): number[] {
-  const masks = candidates.map(() => 0);
-  for (let left = 0; left < candidates.length; left += 1) {
-    for (let right = left + 1; right < candidates.length; right += 1) {
-      if (rectanglesOverlap(floorRectFromPosition(candidates[left]), floorRectFromPosition(candidates[right]))) {
-        masks[left] |= 1 << right;
-        masks[right] |= 1 << left;
-      }
-    }
-  }
-  return masks;
-}
-
-function countMaskBits(mask: number): number {
-  let count = 0;
-  let remaining = mask;
-  while (remaining !== 0) {
-    remaining &= remaining - 1;
-    count += 1;
-  }
-  return count;
-}
-
-function choosePivot(mask: number, conflictMasks: number[]): number {
-  let bestIndex = 0;
-  let bestDegree = -1;
-  for (let index = 0; index < conflictMasks.length; index += 1) {
-    if ((mask & (1 << index)) === 0) continue;
-    const degree = countMaskBits(conflictMasks[index] & mask);
-    if (degree > bestDegree) {
-      bestDegree = degree;
-      bestIndex = index;
-    }
-  }
-  return bestIndex;
-}
-
-function maskToPositions(mask: number, candidates: CandidateBoxPosition[]): CandidateBoxPosition[] {
-  return candidates.filter((_, index) => (mask & (1 << index)) !== 0);
+  return {
+    positions,
+    exploredStates,
+    stoppedByLimit: false,
+  };
 }
 
 function selectBestTailPositions(
@@ -381,87 +389,30 @@ function selectBestTailPositions(
     return { positions: [], exploredStates: 0, stoppedByLimit: false };
   }
 
-  const selectedPositions: CandidateBoxPosition[] = [];
-  const components = getConflictComponents(tailCandidates);
-  let exploredStates = 0;
-
-  for (const component of components) {
-    if (component.length > MAX_BITMASK_CANDIDATES) {
-      return { positions: [], exploredStates, stoppedByLimit: true };
-    }
-
-    const remainingSearchStates = maxSearchStates - exploredStates;
-    if (remainingSearchStates <= 0) {
-      return { positions: [], exploredStates, stoppedByLimit: true };
-    }
-
-    const componentCandidates = component.map((index) => tailCandidates[index]);
-    const result = selectBestTailComponentPositions(componentCandidates, remainingSearchStates);
-    exploredStates += result.exploredStates;
-
-    if (result.stoppedByLimit) {
-      return { positions: [], exploredStates, stoppedByLimit: true };
-    }
-
-    selectedPositions.push(...result.positions);
-  }
-
-  return {
-    positions: selectedPositions.sort((a, b) => a.x - b.x || a.y - b.y || a.dx - b.dx || a.dy - b.dy),
-    exploredStates,
-    stoppedByLimit: false,
-  };
-}
-
-function selectBestTailComponentPositions(
-  candidates: CandidateBoxPosition[],
-  maxSearchStates: number,
-): SearchResult {
-  if (candidates.length === 0) {
-    return { positions: [], exploredStates: 0, stoppedByLimit: false };
-  }
-
-  const conflictMasks = buildConflictMasks(candidates);
-  const memo = new Map<number, number>();
   let exploredStates = 0;
   let stoppedByLimit = false;
+  let selectedPositions: CandidateBoxPosition[] = [];
 
-  function solve(mask: number): number | null {
-    if (mask === 0) return 0;
-    if (stoppedByLimit) return null;
-    const cached = memo.get(mask);
-    if (cached !== undefined) return cached;
-    exploredStates += 1;
-    if (exploredStates > maxSearchStates) {
+  for (const compare of TAIL_CANDIDATE_SORTERS) {
+    const remainingSearchStates = maxSearchStates - exploredStates;
+    if (remainingSearchStates <= 0) {
       stoppedByLimit = true;
-      return null;
+      break;
     }
 
-    const pivot = choosePivot(mask, conflictMasks);
-    const withoutPivot = solve(mask & ~(1 << pivot));
-    if (withoutPivot === null) return null;
-    const withPivotRemainder = solve(mask & ~(1 << pivot) & ~conflictMasks[pivot]);
-    if (withPivotRemainder === null) return null;
-    const withPivot = (1 << pivot) | withPivotRemainder;
-    const best = countMaskBits(withPivot) > countMaskBits(withoutPivot) ? withPivot : withoutPivot;
-    memo.set(mask, best);
-    return best;
-  }
+    const result = selectGreedyTailPositions(tailCandidates, compare, remainingSearchStates);
+    exploredStates += result.exploredStates;
+    stoppedByLimit = stoppedByLimit || result.stoppedByLimit;
 
-  const selectedMask = solve((1 << candidates.length) - 1);
-
-  if (selectedMask === null || stoppedByLimit) {
-    return {
-      positions: [],
-      exploredStates,
-      stoppedByLimit: true,
-    };
+    if (result.positions.length > selectedPositions.length) {
+      selectedPositions = result.positions;
+    }
   }
 
   return {
-    positions: maskToPositions(selectedMask, candidates),
+    positions: selectedPositions.sort(compareCandidateStable),
     exploredStates,
-    stoppedByLimit: false,
+    stoppedByLimit,
   };
 }
 
@@ -504,8 +455,7 @@ export function createTailOptimizedPatterns(
   const maxReductionDepth = options.maxReductionDepth ?? DEFAULT_MAX_REDUCTION_DEPTH;
   const maxSearchStates = options.maxSearchStates ?? DEFAULT_MAX_SEARCH_STATES;
   const originalBaseCount = createLayerPositionsFromUnits(pattern.units).length;
-  const orientationIds = getDistinctOrientationIds(pattern.units);
-  const plans = createReductionPlans(orientationIds, maxReductionDepth);
+  const plans = createReductionPlans(pattern.units, maxReductionDepth);
   const optimizedPatterns: CandidatePattern[] = [];
 
   for (const plan of plans) {
@@ -518,7 +468,6 @@ export function createTailOptimizedPatterns(
 
     const tailCandidates = createTailCandidates(container, orientations, basePositions, freeRects);
     const searchResult = selectBestTailPositions(tailCandidates, maxSearchStates);
-    if (searchResult.stoppedByLimit) continue;
     if (searchResult.positions.length === 0) continue;
 
     const optimizedCount = basePositions.length + searchResult.positions.length;
