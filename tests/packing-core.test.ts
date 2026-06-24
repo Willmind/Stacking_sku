@@ -302,9 +302,8 @@ describe("packing core", () => {
   assert.equal(result.container.id, "40HQ");
   assert.equal(result.usedHeight, 2619);
   assertLoadsInnerFaceBeforeNextDepth(result);
-  const positions = Packing.generateBoxPositions(result, result.totalBoxes);
-  assert.equal(positions.length, result.totalBoxes);
-  assertNoCornerCollisions(result, positions);
+  assertTailOptimizedSource(result);
+  assertValidGeneratedPacking(result);
 }
 
 {

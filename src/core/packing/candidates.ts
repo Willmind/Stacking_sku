@@ -62,6 +62,8 @@ export interface CandidatePattern {
 }
 
 const TAIL_OPTIMIZATION_SOURCE_WINDOW = 4;
+// Tail search is reserved for large-carton, near-best mixed lane layouts; dense small cartons
+// are already well-covered by regular grids and make local search disproportionately expensive.
 const CANDIDATE_CACHE_LIMIT = 128;
 const candidateCache = new Map<string, CandidatePattern[]>();
 const layerCandidateKeyCache = new WeakMap<CandidatePattern[], Set<string>>();
