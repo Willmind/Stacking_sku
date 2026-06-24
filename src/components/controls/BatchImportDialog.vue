@@ -17,7 +17,17 @@ import BaseSelect, { type SelectOption } from "../ui/BaseSelect.vue";
 
 type DifferenceFilter = "全部" | "负差值" | "零差值" | "正差值" | "非零差值";
 type SortDirection = "asc" | "desc";
-type SortKey = "manualCount" | "sizeText" | "containerType" | "totalBoxes" | "difference" | "status" | "error";
+type SortKey =
+  | "manualCount"
+  | "sizeText"
+  | "containerType"
+  | "totalBoxes"
+  | "difference"
+  | "remainingLength"
+  | "remainingWidth"
+  | "remainingHeight"
+  | "status"
+  | "error";
 
 interface SortColumn {
   key: SortKey;
@@ -70,6 +80,9 @@ const sortColumns: SortColumn[] = [
   { key: "containerType", label: "柜型", kind: "text" },
   { key: "totalBoxes", label: "最大装载量", kind: "number" },
   { key: "difference", label: "差值", kind: "number" },
+  { key: "remainingLength", label: "余量（长）", kind: "number" },
+  { key: "remainingWidth", label: "余量（宽）", kind: "number" },
+  { key: "remainingHeight", label: "余量（高）", kind: "number" },
   { key: "status", label: "状态", kind: "text" },
   { key: "error", label: "失败原因", kind: "text" },
 ];
@@ -525,6 +538,9 @@ onBeforeUnmount(() => {
                   </span>
                   <template v-else>{{ formatNumber(item.difference) }}</template>
                 </td>
+                <td>{{ formatNumber(item.remainingLength) }}</td>
+                <td>{{ formatNumber(item.remainingWidth) }}</td>
+                <td>{{ formatNumber(item.remainingHeight) }}</td>
                 <td>{{ item.status }}</td>
                 <td>{{ item.error || "-" }}</td>
               </tr>
@@ -907,7 +923,7 @@ onBeforeUnmount(() => {
 
 table {
   width: 100%;
-  min-width: 860px;
+  min-width: 1080px;
   border-collapse: collapse;
 }
 

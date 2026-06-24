@@ -124,6 +124,18 @@ export interface PackingResult {
   skuSummary?: SkuSummary[];
 }
 
+export interface PackingSummary {
+  container: Required<ContainerSpec>;
+  effectiveContainer: Required<ContainerSpec>;
+  clearance: NormalizedContainerClearance;
+  totalBoxes: number;
+  blockedByCornerTotal: number;
+  perLayerBoxCount: number;
+  occupiedLength: number;
+  occupiedWidth: number;
+  usedHeight: number;
+}
+
 export interface PackingStrategyNote {
   id: string;
   label: string;

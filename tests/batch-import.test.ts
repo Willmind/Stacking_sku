@@ -37,6 +37,9 @@ describe("batch import", () => {
       results.map((result) => result.difference),
       [-247, 9, 2, 9],
     );
+    assert.ok(results.every((result) => result.remainingLength !== null && result.remainingLength >= 0));
+    assert.ok(results.every((result) => result.remainingWidth !== null && result.remainingWidth >= 0));
+    assert.ok(results.every((result) => result.remainingHeight !== null && result.remainingHeight >= 0));
   });
 
   it("uses tail-optimized maximum loads in batch calculations", () => {
@@ -86,6 +89,9 @@ describe("batch import", () => {
     assert.equal(results[0].rowNumber, 3);
     assert.equal(results[0].status, "解析失败");
     assert.match(results[0].error || "", /尺寸/);
+    assert.equal(results[0].remainingLength, null);
+    assert.equal(results[0].remainingWidth, null);
+    assert.equal(results[0].remainingHeight, null);
     assert.equal(results[1].rowNumber, 4);
     assert.equal(results[1].status, "解析失败");
     assert.match(results[1].error || "", /柜型/);
@@ -210,6 +216,9 @@ describe("batch import", () => {
     assert.match(sheetXml, /批量导入结果/);
     assert.match(sheetXml, /最大装载量/);
     assert.match(sheetXml, /差值/);
+    assert.match(sheetXml, /余量（长）/);
+    assert.match(sheetXml, /余量（宽）/);
+    assert.match(sheetXml, /余量（高）/);
     assert.doesNotMatch(sheetXml, /每层数量/);
     assert.doesNotMatch(sheetXml, /占用高度/);
     assert.match(sheetXml, /465\*360\*291/);
@@ -231,6 +240,9 @@ describe("batch import", () => {
     const sheetXml = strFromU8(entries["xl/worksheets/sheet1.xml"]);
 
     assert.match(sheetXml, /批量导入失败行/);
+    assert.match(sheetXml, /余量（长）/);
+    assert.match(sheetXml, /余量（宽）/);
+    assert.match(sheetXml, /余量（高）/);
     assert.match(sheetXml, /状态/);
     assert.match(sheetXml, /失败原因/);
     assert.match(sheetXml, /解析失败/);
@@ -255,6 +267,9 @@ describe("batch import", () => {
     const sheetXml = strFromU8(entries["xl/worksheets/sheet1.xml"]);
 
     assert.match(sheetXml, /批量导入需复核行/);
+    assert.match(sheetXml, /余量（长）/);
+    assert.match(sheetXml, /余量（宽）/);
+    assert.match(sheetXml, /余量（高）/);
     assert.match(sheetXml, /状态/);
     assert.match(sheetXml, /失败原因/);
     assert.match(sheetXml, /465\*360\*291/);

@@ -1,7 +1,16 @@
 import { strToU8, zipSync } from "fflate";
 import { BATCH_CONTAINER_COLUMN, BATCH_MANUAL_COLUMN, BATCH_SIZE_COLUMN, type BatchPackingItem } from "./batchImport";
 
-const RESULT_HEADERS = [BATCH_MANUAL_COLUMN, BATCH_SIZE_COLUMN, BATCH_CONTAINER_COLUMN, "最大装载量", "差值"];
+const RESULT_HEADERS = [
+  BATCH_MANUAL_COLUMN,
+  BATCH_SIZE_COLUMN,
+  BATCH_CONTAINER_COLUMN,
+  "最大装载量",
+  "差值",
+  "余量（长）",
+  "余量（宽）",
+  "余量（高）",
+];
 
 type CellValue = string | number | null;
 
@@ -56,6 +65,9 @@ function resultRows(results: BatchPackingItem[], options: Required<BatchResultWo
         item.containerType || "",
         numberOrBlank(item.totalBoxes),
         numberOrBlank(item.difference),
+        numberOrBlank(item.remainingLength),
+        numberOrBlank(item.remainingWidth),
+        numberOrBlank(item.remainingHeight),
       ];
 
       if (options.includeStatus || options.includeErrorDetails) row.push(item.status);
@@ -90,8 +102,8 @@ function sheetXml(rows: CellValue[][], headers: string[]) {
   const lastRow = Math.max(1, rows.length);
   const lastColumn = columnName(headers.length - 1);
   const detailColumnXml = [
-    headers.includes("状态") ? `\n    <col min="6" max="6" width="12" customWidth="1"/>` : "",
-    headers.includes("失败原因") ? `\n    <col min="7" max="7" width="34" customWidth="1"/>` : "",
+    headers.includes("状态") ? `\n    <col min="9" max="9" width="12" customWidth="1"/>` : "",
+    headers.includes("失败原因") ? `\n    <col min="10" max="10" width="34" customWidth="1"/>` : "",
   ].join("");
 
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -106,7 +118,7 @@ function sheetXml(rows: CellValue[][], headers: string[]) {
     <col min="1" max="1" width="22" customWidth="1"/>
     <col min="2" max="2" width="18" customWidth="1"/>
     <col min="3" max="3" width="10" customWidth="1"/>
-    <col min="4" max="5" width="14" customWidth="1"/>${detailColumnXml}
+    <col min="4" max="8" width="14" customWidth="1"/>${detailColumnXml}
   </cols>
   <sheetData>${rowXml}</sheetData>
   <mergeCells count="1"><mergeCell ref="A1:${lastColumn}1"/></mergeCells>
