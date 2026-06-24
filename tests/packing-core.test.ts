@@ -336,6 +336,30 @@ describe("packing core", () => {
 
 {
   const result = Packing.calculatePacking(
+    Packing.CONTAINERS["40HQ"],
+    carton(488, 380, 291),
+    { cornerBlock: { length: 0, width: 0, height: 0 } },
+  );
+
+  assert.equal(result.totalBoxes, 1350);
+  assertTailOptimizedSource(result);
+  assertValidGeneratedPacking(result);
+}
+
+{
+  const result = Packing.calculatePacking(
+    Packing.CONTAINERS["40HQ"],
+    carton(536, 436, 330),
+    { cornerBlock: { length: 0, width: 0, height: 0 } },
+  );
+
+  assert.equal(result.totalBoxes, 928);
+  assertTailOptimizedSource(result);
+  assertValidGeneratedPacking(result);
+}
+
+{
+  const result = Packing.calculatePacking(
     Packing.CONTAINERS["20GP"],
     carton(495, 395, 310),
   );

@@ -132,6 +132,22 @@ describe("batch import", () => {
     assert.ok(elapsed < 800, `repeated carton batch calculation took ${elapsed.toFixed(1)}ms`);
   });
 
+  it("keeps tail-optimized repeated rows cached", () => {
+    const repeatedRows = Array.from({ length: 30 }, (_, index) => ({
+      "人工码垛数量（原始）": 900 + index,
+      "尺寸（长宽高 mm）": "536*436*330",
+      柜型: "40HQ",
+    }));
+
+    const startedAt = performance.now();
+    const results = calculateBatchPacking(repeatedRows);
+    const elapsed = performance.now() - startedAt;
+
+    assert.equal(results.length, 30);
+    assert.ok(results.every((result) => result.totalBoxes === 927));
+    assert.ok(elapsed < 1000, `tail-optimized repeated batch calculation took ${elapsed.toFixed(1)}ms`);
+  });
+
   it("reports progress while calculating batch rows asynchronously", async () => {
     const progressEvents: Array<{ processed: number; total: number; progress: number }> = [];
     const results = await calculateBatchPackingAsync(
