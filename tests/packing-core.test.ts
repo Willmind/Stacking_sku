@@ -110,6 +110,22 @@ function assertLoadsInnerFaceBeforeNextDepth(result) {
   );
 }
 
+function assertValidGeneratedPacking(result) {
+  const positions = Packing.generateBoxPositions(result, result.totalBoxes);
+  assert.equal(positions.length, result.totalBoxes);
+  assertPositionsFitContainer(result, positions);
+  assertNoPositionOverlaps(positions);
+  assertNoCornerCollisions(result, positions);
+  return positions;
+}
+
+function assertTailOptimizedSource(result) {
+  assert.ok(
+    result.layerPositions.some((position) => position.source === "tail-optimized"),
+    "expected at least one tail-optimized floor position",
+  );
+}
+
 describe("packing core", () => {
   it("matches the static implementation regressions", () => {
     assert.deepEqual(Packing.CONTAINERS["20GP"], {
@@ -268,13 +284,12 @@ describe("packing core", () => {
     carton(488, 380, 291),
   );
 
-  assert.equal(result.totalBoxes, 1340);
+  assert.equal(result.totalBoxes, 1349);
   assert.equal(result.container.id, "40HQ");
   assert.equal(result.usedHeight, 2619);
   assertLoadsInnerFaceBeforeNextDepth(result);
-  const positions = Packing.generateBoxPositions(result, result.totalBoxes);
-  assert.equal(positions.length, result.totalBoxes);
-  assertNoCornerCollisions(result, positions);
+  assertTailOptimizedSource(result);
+  assertValidGeneratedPacking(result);
 }
 
 {
@@ -290,6 +305,34 @@ describe("packing core", () => {
   const positions = Packing.generateBoxPositions(result, result.totalBoxes);
   assert.equal(positions.length, result.totalBoxes);
   assertNoCornerCollisions(result, positions);
+}
+
+{
+  const result = Packing.calculatePacking(
+    Packing.CONTAINERS["40HQ"],
+    carton(509, 418, 338),
+  );
+
+  assert.equal(result.totalBoxes, 889);
+  assert.equal(result.container.id, "40HQ");
+  assert.equal(result.usedHeight, 2366);
+  assertLoadsInnerFaceBeforeNextDepth(result);
+  assertTailOptimizedSource(result);
+  assertValidGeneratedPacking(result);
+}
+
+{
+  const result = Packing.calculatePacking(
+    Packing.CONTAINERS["40HQ"],
+    carton(536, 436, 330),
+  );
+
+  assert.equal(result.totalBoxes, 927);
+  assert.equal(result.container.id, "40HQ");
+  assert.equal(result.usedHeight, 2640);
+  assertLoadsInnerFaceBeforeNextDepth(result);
+  assertTailOptimizedSource(result);
+  assertValidGeneratedPacking(result);
 }
 
 {
