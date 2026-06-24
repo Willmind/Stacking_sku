@@ -77,7 +77,10 @@ function getBackfillNote(result: PackingResult): PackingStrategyNote {
     return false;
   })();
   const hasBackfill = result.orderedPositions.some(
-    (position) => position.source === "heterogeneous-backfill" || position.source === "door-remainder",
+    (position) =>
+      position.source === "heterogeneous-backfill" ||
+      position.source === "door-remainder" ||
+      position.source === "tail-optimized",
   ) || hasHeterogeneousFloorReuse;
 
   if (hasBackfill) {
