@@ -8,10 +8,10 @@ import {
 import { getOrientations, type CartonOrientation, type CartonOrientationId } from "./orientations";
 import type { BoxPosition, CartonSpec, ContainerSpec } from "./types";
 
-type PatternFamily = "length-segments" | "width-lanes";
-type CandidateOrder = "length-first" | "width-first";
+export type PatternFamily = "length-segments" | "width-lanes";
+export type CandidateOrder = "length-first" | "width-first";
 
-interface CandidateUnit {
+export interface CandidateUnit {
   family: PatternFamily;
   orientationId: CartonOrientationId;
   label: string;
@@ -23,7 +23,7 @@ interface CandidateUnit {
   acrossCount: number;
 }
 
-interface CandidateGroup {
+export interface CandidateGroup {
   orientationId: CartonOrientationId;
   label: string;
   axisLabel: string;
@@ -52,6 +52,12 @@ export interface CandidatePattern {
   perLayerBoxCount: number;
   extraLayerPositions?: CandidateBoxPosition[];
   remainderCount?: number;
+  source?: "base" | "door-remainder" | "tail-optimized";
+  tailOptimization?: {
+    reducedUnits: number;
+    extraPositions: number;
+    exploredStates: number;
+  };
 }
 
 function makeSequence(
@@ -246,6 +252,35 @@ function createWidthCandidate(
 
 function getFloorOccupiedLength(positions: CandidateBoxPosition[]): number {
   return positions.reduce((maxLength, position) => Math.max(maxLength, position.x + position.dx), 0);
+}
+
+function patternLayerPositions(pattern: CandidatePattern): CandidateBoxPosition[] {
+  return [
+    ...createLayerPositions(pattern),
+    ...(pattern.extraLayerPositions || []),
+  ].sort((a, b) => a.x - b.x || a.y - b.y || a.dx - b.dx || a.dy - b.dy);
+}
+
+function candidateLayerKey(candidate: CandidatePattern): string {
+  return patternLayerPositions(candidate)
+    .map((position) =>
+      [
+        position.x,
+        position.y,
+        position.dx,
+        position.dy,
+        position.dz,
+        position.orientationId || "",
+        position.source || "",
+      ].join(":"),
+    )
+    .join("|");
+}
+
+export function pushLayerCandidate(candidates: CandidatePattern[], candidate: CandidatePattern) {
+  const key = candidateLayerKey(candidate);
+  if (candidates.some((item) => candidateLayerKey(item) === key)) return;
+  candidates.push(candidate);
 }
 
 function addWidthLaneCandidateVariants(
