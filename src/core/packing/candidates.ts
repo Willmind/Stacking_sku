@@ -258,7 +258,15 @@ function patternLayerPositions(pattern: CandidatePattern): CandidateBoxPosition[
   return [
     ...createLayerPositions(pattern),
     ...(pattern.extraLayerPositions || []),
-  ].sort((a, b) => a.x - b.x || a.y - b.y || a.dx - b.dx || a.dy - b.dy);
+  ].sort(
+    (a, b) =>
+      a.x - b.x ||
+      a.y - b.y ||
+      a.dx - b.dx ||
+      a.dy - b.dy ||
+      a.dz - b.dz ||
+      (a.orientationId || "").localeCompare(b.orientationId || ""),
+  );
 }
 
 function candidateLayerKey(candidate: CandidatePattern): string {
@@ -271,7 +279,6 @@ function candidateLayerKey(candidate: CandidatePattern): string {
         position.dy,
         position.dz,
         position.orientationId || "",
-        position.source || "",
       ].join(":"),
     )
     .join("|");
