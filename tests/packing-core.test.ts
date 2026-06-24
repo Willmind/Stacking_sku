@@ -127,6 +127,34 @@ function assertTailOptimizedSource(result) {
 }
 
 describe("packing core", () => {
+  it("keeps the lightweight packing summary aligned with full packing results", () => {
+    const cases = [
+      {
+        container: Packing.CONTAINERS["40HQ"],
+        carton: carton(488, 380, 291),
+      },
+      {
+        container: Packing.CONTAINERS["40HQ"],
+        carton: carton(536, 436, 330),
+      },
+      {
+        container: Packing.CONTAINERS["20GP"],
+        carton: carton(2900, 1150, 1150),
+        options: { clearance: { front: 100 } },
+      },
+    ];
+
+    for (const item of cases) {
+      const fullResult = Packing.calculatePacking(item.container, item.carton, item.options);
+      const summary = Packing.calculatePackingSummary(item.container, item.carton, item.options);
+
+      assert.equal(summary.totalBoxes, fullResult.totalBoxes);
+      assert.equal(summary.occupiedLength, fullResult.pattern?.occupiedLength ?? 0);
+      assert.equal(summary.occupiedWidth, fullResult.pattern?.occupiedWidth ?? 0);
+      assert.equal(summary.usedHeight, fullResult.usedHeight);
+    }
+  });
+
   it("matches the static implementation regressions", () => {
     assert.deepEqual(Packing.CONTAINERS["20GP"], {
       id: "20GP",

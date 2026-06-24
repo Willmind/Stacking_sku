@@ -47,6 +47,7 @@ export type {
   PackingOptions,
   PackingPattern,
   PackingResult,
+  PackingSummary,
   PackingStrategyNote,
   SkuInput,
   SkuSummary,
@@ -470,28 +471,31 @@ export type {
       ...(pattern.extraLayerPositions || []),
     ].sort((a, b) => a.x - b.x || a.y - b.y);
     const uniqueHeights = new Set(basePositions.map((position) => position.dz));
+    const occupiedLength = getOccupiedLength(basePositions);
+    const occupiedWidth = getOccupiedWidth(basePositions);
 
     if (uniqueHeights.size === 1) {
       const [cartonHeight] = Array.from(uniqueHeights);
       const layerCount = Math.floor(container.height / cartonHeight);
       const perLayerBoxCount = basePositions.length;
-      const affectedStackIndexes = [];
+      let totalBoxes = 0;
+      let highestAcceptedStackIndex = -1;
 
-      for (let index = 0; index < layerCount; index += 1) {
-        if (layerCollidesWithTopBand(index, cartonHeight, container, cornerBlock)) {
-          affectedStackIndexes.push(index);
-        }
-      }
-
-      let totalBoxes = perLayerBoxCount * (layerCount - affectedStackIndexes.length);
-      for (const stackIndex of affectedStackIndexes) {
-        totalBoxes += countAcceptedPositionsForStack(basePositions, stackIndex, container, cornerBlock);
+      for (let stackIndex = 0; stackIndex < layerCount; stackIndex += 1) {
+        const acceptedCount = layerCollidesWithTopBand(stackIndex, cartonHeight, container, cornerBlock)
+          ? countAcceptedPositionsForStack(basePositions, stackIndex, container, cornerBlock)
+          : perLayerBoxCount;
+        totalBoxes += acceptedCount;
+        if (acceptedCount > 0) highestAcceptedStackIndex = stackIndex;
       }
 
       return {
         totalBoxes,
         blockedByCornerTotal: perLayerBoxCount * layerCount - totalBoxes,
         perLayerBoxCount,
+        occupiedLength,
+        occupiedWidth,
+        usedHeight: highestAcceptedStackIndex >= 0 ? (highestAcceptedStackIndex + 1) * cartonHeight : 0,
       };
     }
 
@@ -505,6 +509,9 @@ export type {
       totalBoxes,
       blockedByCornerTotal: potentialBoxCount - totalBoxes,
       perLayerBoxCount: basePositions.length,
+      occupiedLength,
+      occupiedWidth,
+      usedHeight: calculateUsedHeight(orderedPositions),
     };
   }
 
@@ -1176,6 +1183,36 @@ export type {
     return best ? best.totalBoxes : 0;
   }
 
+  function calculatePackingSummary(containerInput, cartonInput, options = {}) {
+    const packingSpace = createPackingSpace(containerInput, options);
+    const container = packingSpace.effectiveContainer;
+    const carton = normalizeCarton(cartonInput);
+    const cornerBlock = packingSpace.effectiveCornerBlock;
+    const allowedOrientations = normalizeAllowedOrientations(options.allowedOrientations);
+
+    const candidates = enumerateCandidates(container, carton, allowedOrientations);
+    let best = null;
+
+    for (const candidate of candidates) {
+      const result = evaluateCandidateTotal(container, carton, candidate, cornerBlock);
+      if (compareCandidateTotals(result, best)) {
+        best = result;
+      }
+    }
+
+    return {
+      container: packingSpace.container,
+      effectiveContainer: packingSpace.effectiveContainer,
+      clearance: packingSpace.clearance,
+      totalBoxes: best ? best.totalBoxes : 0,
+      blockedByCornerTotal: best ? best.blockedByCornerTotal : 0,
+      perLayerBoxCount: best ? best.perLayerBoxCount : 0,
+      occupiedLength: best ? best.occupiedLength : 0,
+      occupiedWidth: best ? best.occupiedWidth : 0,
+      usedHeight: best ? best.usedHeight : 0,
+    };
+  }
+
   function calculateMultiSkuPacking(containerInput, skuInputs, options = {}) {
     const skus = normalizeSkus(skuInputs);
     const strategy = options.strategy || LOADING_STRATEGIES.MULTI_DESTINATION;
@@ -1202,6 +1239,7 @@ export {
   DEFAULT_CORNER_BLOCK,
   LOADING_STRATEGIES,
   calculatePacking,
+  calculatePackingSummary,
   calculatePackingTotalBoxes,
   calculateMultiSkuPacking,
   generateBoxPositions,

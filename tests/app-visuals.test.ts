@@ -393,6 +393,12 @@ describe("batch import UI source guards", () => {
     assert.match(batchImportDialogSource, /reviewOnly/);
     assert.match(batchImportDialogSource, /filteredResults/);
     assert.match(batchImportDialogSource, /sortedResults/);
+    assert.match(batchImportDialogSource, /remainingLength/);
+    assert.match(batchImportDialogSource, /remainingWidth/);
+    assert.match(batchImportDialogSource, /remainingHeight/);
+    assert.match(batchImportDialogSource, /余量（长）/);
+    assert.match(batchImportDialogSource, /余量（宽）/);
+    assert.match(batchImportDialogSource, /余量（高）/);
     assert.match(batchImportDialogSource, /sortKey/);
     assert.match(batchImportDialogSource, /sortDirection/);
     assert.match(batchImportDialogSource, /按导入状态筛选/);

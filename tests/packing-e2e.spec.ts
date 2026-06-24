@@ -48,6 +48,17 @@ async function calculateSingleSku(page: Page, length: string, width: string, hei
 type WorkbookCell = string | number | null;
 
 const batchImportHeaders = ["人工码垛数量（原始）", "尺寸（长宽高 mm）", "柜型"];
+const batchResultHeaders = [
+  "人工码垛数量（原始）",
+  "尺寸（长宽高 mm）",
+  "柜型",
+  "最大装载量",
+  "差值",
+  "余量（长）",
+  "余量（宽）",
+  "余量（高）",
+];
+const batchResultDetailHeaders = [...batchResultHeaders, "状态", "失败原因"];
 
 function escapeXml(value: string) {
   return value
@@ -604,6 +615,9 @@ test("imports an Excel batch and shows calculated packing results in a dialog", 
   await expect(dialog).toContainText("2");
   await expect(dialog).not.toContainText("每层数量");
   await expect(dialog).not.toContainText("占用高度");
+  await expect(dialog).toContainText("余量（长）");
+  await expect(dialog).toContainText("余量（宽）");
+  await expect(dialog).toContainText("余量（高）");
   await expect(dialog.getByLabel("按导入状态筛选")).toBeVisible();
   await expect(dialog.getByLabel("按失败原因筛选")).toBeDisabled();
   await expect(dialog.getByLabel("按差值筛选")).toBeVisible();
@@ -652,10 +666,13 @@ test("imports an Excel batch and shows calculated packing results in a dialog", 
   if (!filteredDownloadedPath) throw new Error("Downloaded filtered batch file is missing");
   const filteredRows = await readSheet(filteredDownloadedPath);
   expect(filteredRows[0]?.[0]).toBe("批量导入当前筛选结果");
-  expect(filteredRows[1]).toEqual(["人工码垛数量（原始）", "尺寸（长宽高 mm）", "柜型", "最大装载量", "差值", "状态", "失败原因"]);
+  expect(filteredRows[1]).toEqual(batchResultDetailHeaders);
   expect(filteredRows).toHaveLength(3);
   expect(filteredRows[2]?.[1]).toBe("465*360*291");
   expect(filteredRows[2]?.[4]).toBe(-247);
+  expect(typeof filteredRows[2]?.[5]).toBe("number");
+  expect(typeof filteredRows[2]?.[6]).toBe("number");
+  expect(typeof filteredRows[2]?.[7]).toBe("number");
 
   await dialog.getByRole("button", { name: "清除筛选" }).click();
   await expect(dialog.locator("tbody tr")).toHaveCount(4);
@@ -682,10 +699,10 @@ test("imports an Excel batch and shows calculated packing results in a dialog", 
   if (!negativeDownloadedPath) throw new Error("Downloaded negative-difference file is missing");
   const negativeRows = await readSheet(negativeDownloadedPath);
   expect(negativeRows[0]?.[0]).toBe("批量导入需复核行");
-  expect(negativeRows[1]).toEqual(["人工码垛数量（原始）", "尺寸（长宽高 mm）", "柜型", "最大装载量", "差值", "状态", "失败原因"]);
+  expect(negativeRows[1]).toEqual(batchResultDetailHeaders);
   expect(negativeRows[2]?.[1]).toBe("465*360*291");
   expect(negativeRows[2]?.[4]).toBe(-247);
-  expect(negativeRows[2]?.[5]).toBe("成功");
+  expect(negativeRows[2]?.[8]).toBe("成功");
   expect(negativeRows).toHaveLength(3);
 
   const downloadPromise = page.waitForEvent("download");
@@ -696,11 +713,14 @@ test("imports an Excel batch and shows calculated packing results in a dialog", 
   if (!downloadedPath) throw new Error("Downloaded batch result file is missing");
   const downloadedRows = await readSheet(downloadedPath);
   expect(downloadedRows[0]?.[0]).toBe("批量导入结果");
-  expect(downloadedRows[1]).toEqual(["人工码垛数量（原始）", "尺寸（长宽高 mm）", "柜型", "最大装载量", "差值"]);
+  expect(downloadedRows[1]).toEqual(batchResultHeaders);
   expect(downloadedRows[2]?.[0]).toBe(1740);
   expect(downloadedRows[2]?.[1]).toBe("465*360*291");
   expect(downloadedRows[2]?.[3]).toBe(1493);
   expect(downloadedRows[2]?.[4]).toBe(-247);
+  expect(typeof downloadedRows[2]?.[5]).toBe("number");
+  expect(typeof downloadedRows[2]?.[6]).toBe("number");
+  expect(typeof downloadedRows[2]?.[7]).toBe("number");
   expect(downloadedRows[4]?.[4]).toBe(2);
 
   await dialog.getByRole("button", { name: "关闭", exact: true }).click();

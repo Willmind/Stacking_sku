@@ -1,6 +1,6 @@
 import {
   CONTAINERS,
-  calculatePackingTotalBoxes,
+  calculatePackingSummary,
   type CartonSpec,
   type ContainerClearanceSpec,
   type ContainerSpec,
@@ -47,8 +47,18 @@ export interface BatchPackingItem {
   width: number | null;
   height: number | null;
   totalBoxes: number | null;
+  remainingLength: number | null;
+  remainingWidth: number | null;
+  remainingHeight: number | null;
   status: BatchImportStatus;
   error?: string;
+}
+
+interface BatchPackingMetrics {
+  totalBoxes: number;
+  remainingLength: number | null;
+  remainingWidth: number | null;
+  remainingHeight: number | null;
 }
 
 function readCell(row: BatchPackingRow, columnName: string) {
@@ -139,6 +149,9 @@ function createFailedItem(rowNumber: number, row: BatchPackingRow, error: string
     width: null,
     height: null,
     totalBoxes: null,
+    remainingLength: null,
+    remainingWidth: null,
+    remainingHeight: null,
     status: "解析失败",
     error,
   };
@@ -149,19 +162,22 @@ function createSuccessItem(
   carton: CartonSpec,
   containerType: BatchContainerType,
   manualCount: number,
-  totalBoxes: number,
+  metrics: BatchPackingMetrics,
 ): BatchPackingItem {
   return {
     rowNumber,
     sizeText: formatSize(carton),
     containerType,
     manualCount,
-    difference: totalBoxes - manualCount,
+    difference: metrics.totalBoxes - manualCount,
     length: carton.length,
     width: carton.width,
     height: carton.height,
-    totalBoxes,
-    status: totalBoxes > 0 ? "成功" : "无法装载",
+    totalBoxes: metrics.totalBoxes,
+    remainingLength: metrics.remainingLength,
+    remainingWidth: metrics.remainingWidth,
+    remainingHeight: metrics.remainingHeight,
+    status: metrics.totalBoxes > 0 ? "成功" : "无法装载",
   };
 }
 
@@ -187,7 +203,7 @@ function waitForMainThread() {
 function calculateBatchRow(
   row: BatchPackingRow,
   index: number,
-  maxLoadCache: Map<string, number>,
+  metricsCache: Map<string, BatchPackingMetrics>,
   options: CalculateBatchPackingOptions,
 ): BatchPackingItem | null {
   const rowNumber = index + 2;
@@ -205,12 +221,18 @@ function calculateBatchRow(
     const manualCount = parseManualCount(manualValue);
     const container = CONTAINERS[containerType] as Required<ContainerSpec>;
     const cacheKey = createMaxLoadCacheKey(containerType, carton, options);
-    let totalBoxes = maxLoadCache.get(cacheKey);
-    if (totalBoxes === undefined) {
-      totalBoxes = Number(calculatePackingTotalBoxes(container, carton, { clearance: options.clearance }));
-      maxLoadCache.set(cacheKey, totalBoxes);
+    let metrics = metricsCache.get(cacheKey);
+    if (!metrics) {
+      const result = calculatePackingSummary(container, carton, { clearance: options.clearance });
+      metrics = {
+        totalBoxes: result.totalBoxes,
+        remainingLength: result.totalBoxes > 0 ? result.effectiveContainer.length - result.occupiedLength : null,
+        remainingWidth: result.totalBoxes > 0 ? result.effectiveContainer.width - result.occupiedWidth : null,
+        remainingHeight: result.totalBoxes > 0 ? result.effectiveContainer.height - result.usedHeight : null,
+      };
+      metricsCache.set(cacheKey, metrics);
     }
-    return createSuccessItem(rowNumber, carton, containerType, manualCount, totalBoxes);
+    return createSuccessItem(rowNumber, carton, containerType, manualCount, metrics);
   } catch (caught) {
     return createFailedItem(rowNumber, row, caught instanceof Error ? caught.message : "解析失败");
   }
@@ -220,9 +242,9 @@ export function calculateBatchPacking(
   rows: BatchPackingRow[],
   options: CalculateBatchPackingOptions = {},
 ): BatchPackingItem[] {
-  const maxLoadCache = new Map<string, number>();
+  const metricsCache = new Map<string, BatchPackingMetrics>();
   return rows.flatMap((row, index) => {
-    const item = calculateBatchRow(row, index, maxLoadCache, options);
+    const item = calculateBatchRow(row, index, metricsCache, options);
     return item ? [item] : [];
   });
 }
@@ -233,7 +255,7 @@ export async function calculateBatchPackingAsync(
 ): Promise<BatchPackingItem[]> {
   const batchSize = Math.max(1, Math.floor(options.batchSize ?? 20));
   const yieldToMain = options.yieldToMain ?? waitForMainThread;
-  const maxLoadCache = new Map<string, number>();
+  const metricsCache = new Map<string, BatchPackingMetrics>();
   const results: BatchPackingItem[] = [];
   const total = rows.length;
   let processed = 0;
@@ -244,7 +266,7 @@ export async function calculateBatchPackingAsync(
 
     for (let offset = 0; offset < chunk.length; offset += 1) {
       throwIfCancelled(options.signal);
-      const item = calculateBatchRow(chunk[offset], start + offset, maxLoadCache, options);
+      const item = calculateBatchRow(chunk[offset], start + offset, metricsCache, options);
       if (item) results.push(item);
       processed += 1;
       options.onProgress?.({
