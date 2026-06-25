@@ -6,6 +6,8 @@ import { describe, it } from "vitest";
 const rendererSource = fs.readFileSync(path.join(__dirname, "..", "src/renderers/cargo3d.ts"), "utf8");
 const plan2dSource = fs.readFileSync(path.join(__dirname, "..", "src/renderers/plan2d.ts"), "utf8");
 const appSource = fs.readFileSync(path.join(__dirname, "..", "src/App.vue"), "utf8");
+const packageSource = fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8");
+const viteConfigSource = fs.readFileSync(path.join(__dirname, "..", "vite.config.ts"), "utf8");
 const tokensSource = fs.readFileSync(path.join(__dirname, "..", "src/styles/tokens.css"), "utf8");
 const plan2dViewSource = fs.readFileSync(
   path.join(__dirname, "..", "src/components/visualizations/Plan2DView.vue"),
@@ -15,6 +17,8 @@ const cargo3dViewSource = fs.readFileSync(
   path.join(__dirname, "..", "src/components/visualizations/Cargo3DView.vue"),
   "utf8",
 );
+const cargo3dSceneV2Path = path.join(__dirname, "..", "src/components/visualizations/Cargo3DSceneV2.vue");
+const cargo3dSceneV2Source = fs.existsSync(cargo3dSceneV2Path) ? fs.readFileSync(cargo3dSceneV2Path, "utf8") : "";
 const visualizationDialogSource = fs.existsSync(
   path.join(__dirname, "..", "src/components/visualizations/VisualizationDialog.vue"),
 )
@@ -72,6 +76,23 @@ const allVueAndCssSource = fs
   .join("\n");
 
 describe("3D visual rendering source guards", () => {
+  it("configures TresJS for Vue-rendered 3D scenes", () => {
+    assert.match(viteConfigSource, /templateCompilerOptions/);
+    assert.match(viteConfigSource, /@tresjs\/core/);
+    assert.match(packageSource, /"@tresjs\/core"/);
+    assert.match(packageSource, /"@tresjs\/cientos"/);
+  });
+
+  it("renders the cargo scene through a TresJS V2 component", () => {
+    assert.match(cargo3dViewSource, /Cargo3DSceneV2/);
+    assert.match(cargo3dSceneV2Source, /TresCanvas/);
+    assert.match(cargo3dSceneV2Source, /OrbitControls/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /Html/);
+    assert.match(cargo3dViewSource, /scene-label--door/);
+    assert.match(cargo3dViewSource, /door-marker/);
+    assert.match(cargo3dSceneV2Source, /toSceneBox/);
+  });
+
   it("keeps cargo colors visible in 3D", () => {
     const edgeMaterialMatch = rendererSource.match(
       /const edgeMaterial = new THREE\.MeshBasicMaterial\(\{([\s\S]*?)\n  \}\);/,

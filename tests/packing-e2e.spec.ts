@@ -929,6 +929,7 @@ test("keeps small viewport page height bounded", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await page.getByRole("button", { name: "计算装载" }).click();
+  await expect(page.locator("#status-chip")).toHaveText("已完成计算");
 
   const initial = await page.evaluate(() => ({
     viewportHeight: window.innerHeight,

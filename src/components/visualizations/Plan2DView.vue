@@ -546,7 +546,8 @@ canvas {
 @media (max-width: 720px) {
   .plan-view-grid {
     grid-template-columns: 1fr;
-    grid-template-rows: repeat(2, minmax(220px, 1fr));
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    gap: 8px;
   }
 
   .plan-view-card--switchable,

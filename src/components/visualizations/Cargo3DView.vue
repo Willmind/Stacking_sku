@@ -1,17 +1,15 @@
 <script setup lang="ts">
 import { Maximize2 } from "@lucide/vue";
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { createCargoScene, type CargoScene } from "../../renderers/cargo3d";
 import { usePackingStore } from "../../stores/packingStore";
 import CoordinateDialog from "../results/CoordinateDialog.vue";
+import Cargo3DSceneV2 from "./Cargo3DSceneV2.vue";
 import VisualizationDialog from "./VisualizationDialog.vue";
 
 const store = usePackingStore();
-const canvasRef = ref<HTMLCanvasElement | null>(null);
 const expandedCanvasRef = ref<HTMLCanvasElement | null>(null);
 const isExpanded = ref(false);
-let cargoScene: CargoScene | null = null;
-let resizeObserver: ResizeObserver | null = null;
 let expandedCargoScene: CargoScene | null = null;
 let expandedResizeObserver: ResizeObserver | null = null;
 
@@ -26,7 +24,6 @@ const expandedSceneSubtitle = computed(() => {
 });
 
 function render() {
-  cargoScene?.render(store.result, store.visibleCount);
   expandedCargoScene?.render(store.result, store.visibleCount);
 }
 
@@ -55,20 +52,8 @@ function closeExpandedScene() {
   disposeExpandedScene();
 }
 
-onMounted(() => {
-  if (!canvasRef.value) return;
-  cargoScene = createCargoScene(canvasRef.value);
-  cargoScene.render(store.result, store.visibleCount);
-  resizeObserver = new ResizeObserver(() => cargoScene?.resize());
-  resizeObserver.observe(canvasRef.value);
-});
-
 onBeforeUnmount(() => {
   disposeExpandedScene();
-  resizeObserver?.disconnect();
-  resizeObserver = null;
-  cargoScene?.dispose();
-  cargoScene = null;
 });
 
 watch(
@@ -98,8 +83,13 @@ watch(
         </button>
       </div>
     </header>
-    <canvas id="scene-canvas" ref="canvasRef" width="980" height="620"></canvas>
-    <span class="door-marker" aria-hidden="true">柜门</span>
+    <div class="cargo-scene-shell">
+      <Cargo3DSceneV2 :result="store.result" :visible-count="store.visibleCount" />
+      <template v-if="store.result?.pattern">
+        <span class="scene-label scene-label--inner" aria-hidden="true">角件端</span>
+        <span class="scene-label scene-label--door door-marker" aria-hidden="true">柜门</span>
+      </template>
+    </div>
 
     <VisualizationDialog
       :open="isExpanded"
@@ -109,7 +99,7 @@ watch(
     >
       <div class="expanded-scene-shell">
         <canvas id="expanded-scene-canvas" ref="expandedCanvasRef" width="1400" height="860"></canvas>
-        <span class="door-marker door-marker--expanded" aria-hidden="true">柜门</span>
+        <span class="scene-label door-marker door-marker--expanded" aria-hidden="true">柜门</span>
       </div>
     </VisualizationDialog>
   </article>
@@ -189,6 +179,16 @@ span {
   box-shadow: var(--focus-ring);
 }
 
+.cargo-scene-shell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: rgba(3, 8, 14, 0.72);
+}
+
 canvas {
   width: 100%;
   height: 100%;
@@ -199,10 +199,8 @@ canvas {
   user-select: none;
 }
 
-.door-marker {
+.scene-label {
   position: absolute;
-  right: 18px;
-  bottom: 18px;
   z-index: 2;
   display: inline-flex;
   align-items: center;
@@ -218,12 +216,28 @@ canvas {
   pointer-events: none;
 }
 
-.door-marker::before {
+.scene-label::before {
   content: "";
   width: 10px;
   height: 10px;
   border: 2px solid var(--accent);
   border-radius: 2px;
+}
+
+.scene-label--inner {
+  top: 16%;
+  left: 43%;
+  border-color: rgba(255, 190, 85, 0.72);
+  color: #ffcf7d;
+}
+
+.scene-label--inner::before {
+  border-color: #ffcf7d;
+}
+
+.scene-label--door {
+  top: 28%;
+  right: 23%;
 }
 
 .expanded-scene-shell {
