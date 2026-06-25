@@ -1,19 +1,18 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { Crosshair, Download, MapPinned } from "@lucide/vue";
 import {
   createBoxCoordinateCsv,
   createBoxCoordinateRows,
   type BoxCoordinateRow,
 } from "../../core/boxCoordinates";
-import { createCargoScene, type CargoScene } from "../../renderers/cargo3d";
 import { usePackingStore } from "../../stores/packingStore";
 import BaseDialog from "../ui/BaseDialog.vue";
+import Cargo3DSceneV2 from "../visualizations/Cargo3DSceneV2.vue";
 
 const store = usePackingStore();
 const isOpen = ref(false);
 const selectedRow = ref<BoxCoordinateRow | null>(null);
-const previewCanvasRef = ref<HTMLCanvasElement | null>(null);
 const rows = computed(() => createBoxCoordinateRows(store.result));
 const hasRows = computed(() => rows.value.length > 0);
 const coordinateSummary = computed(() =>
@@ -23,8 +22,7 @@ const selectedText = computed(() => {
   if (!selectedRow.value) return "当前选中：-";
   return `当前选中：#${selectedRow.value.sequence} · 装载顺序 ${selectedRow.value.loadingSequence}`;
 });
-let previewScene: CargoScene | null = null;
-let previewResizeObserver: ResizeObserver | null = null;
+const selectedLabel = computed(() => (selectedRow.value ? `#${selectedRow.value.sequence}` : ""));
 
 function formatNumber(value: number) {
   return value.toLocaleString("zh-CN");
@@ -35,7 +33,6 @@ function openDialog() {
   const matchingRow = rows.value.find((row) => row.sequence === selectedRow.value?.sequence);
   selectedRow.value = matchingRow ?? rows.value[0];
   isOpen.value = true;
-  void nextTick(setupPreviewScene);
 }
 
 function downloadCsv() {
@@ -52,34 +49,8 @@ function downloadCsv() {
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-function renderPreview() {
-  previewScene?.render(store.result, store.result?.totalBoxes ?? 0, {
-    selectedLoadingSequence: selectedRow.value?.loadingSequence,
-    selectedLabel: selectedRow.value ? `#${selectedRow.value.sequence}` : "",
-    showCoordinateAxes: true,
-  });
-}
-
-function setupPreviewScene() {
-  if (!previewCanvasRef.value || !isOpen.value) return;
-  if (!previewScene) {
-    previewScene = createCargoScene(previewCanvasRef.value);
-    previewResizeObserver = new ResizeObserver(() => previewScene?.resize());
-    previewResizeObserver.observe(previewCanvasRef.value);
-  }
-  renderPreview();
-}
-
-function disposePreviewScene() {
-  previewResizeObserver?.disconnect();
-  previewResizeObserver = null;
-  previewScene?.dispose();
-  previewScene = null;
-}
-
 function selectRow(row: BoxCoordinateRow) {
   selectedRow.value = row;
-  renderPreview();
 }
 
 function coordinateCells(row: BoxCoordinateRow) {
@@ -111,27 +82,12 @@ watch(
   (nextRows) => {
     if (!nextRows.length) {
       selectedRow.value = null;
-      renderPreview();
       return;
     }
     const matchingRow = nextRows.find((row) => row.sequence === selectedRow.value?.sequence);
     selectedRow.value = matchingRow ?? nextRows[0];
-    renderPreview();
   },
 );
-
-watch(
-  isOpen,
-  (open) => {
-    if (open) {
-      void nextTick(setupPreviewScene);
-    } else {
-      disposePreviewScene();
-    }
-  },
-);
-
-onBeforeUnmount(disposePreviewScene);
 </script>
 
 <template>
@@ -210,13 +166,15 @@ onBeforeUnmount(disposePreviewScene);
             <strong>{{ selectedText }}</strong>
             <span>点击左侧任一行，高亮对应纸箱；XYZ 轴从原点伸出</span>
           </div>
-          <canvas
-            id="coordinate-preview-canvas"
-            ref="previewCanvasRef"
+          <Cargo3DSceneV2
+            canvas-id="coordinate-preview-canvas"
             class="coordinate-preview-canvas"
-            width="640"
-            height="460"
-          ></canvas>
+            :result="store.result"
+            :visible-count="store.result?.totalBoxes ?? 0"
+            :selected-loading-sequence="selectedRow?.loadingSequence"
+            :selected-label="selectedLabel"
+            show-coordinate-axes
+          />
         </aside>
       </div>
     </div>

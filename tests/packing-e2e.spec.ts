@@ -238,7 +238,11 @@ test("calculates the 488 x 380 x 291 benchmark and renders both views", async ({
   await expect(page.locator("#plan-canvas-side")).toHaveCount(1);
   await expect(page.locator("#plan-canvas-front")).toHaveCount(1);
   await expect(page.locator("#scene-canvas")).toHaveCount(1);
-  await expect(page.locator(".door-marker")).toHaveText("柜门");
+  await expect(page.locator(".door-marker")).toHaveCount(0);
+  const sceneFrame = await readSceneCanvasScreenshotFrame(page);
+  expect(sceneFrame.screenshotBytes).toBeGreaterThan(1000);
+  expect(sceneFrame.litPixels).toBeGreaterThan(1000);
+  expect(sceneFrame.cargoPixels).toBeGreaterThan(1000);
 });
 
 test("calculates the 488 x 360 x 291 benchmark", async ({ page }) => {

@@ -87,10 +87,40 @@ describe("3D visual rendering source guards", () => {
     assert.match(cargo3dViewSource, /Cargo3DSceneV2/);
     assert.match(cargo3dSceneV2Source, /TresCanvas/);
     assert.match(cargo3dSceneV2Source, /OrbitControls/);
+    assert.match(cargo3dSceneV2Source, /:enable-zoom="true"/);
     assert.doesNotMatch(cargo3dSceneV2Source, /Html/);
-    assert.match(cargo3dViewSource, /scene-label--door/);
-    assert.match(cargo3dViewSource, /door-marker/);
     assert.match(cargo3dSceneV2Source, /toSceneBox/);
+    assert.match(cargo3dSceneV2Source, /endpointLabels/);
+    assert.match(cargo3dSceneV2Source, /makeSpriteLabel/);
+    assert.doesNotMatch(cargo3dViewSource, /scene-label--inner/);
+    assert.doesNotMatch(cargo3dViewSource, /door-marker/);
+  });
+
+  it("uses the TresJS cargo scene for both compact and expanded 3D views", () => {
+    assert.doesNotMatch(cargo3dViewSource, /createCargoScene/);
+    assert.doesNotMatch(cargo3dViewSource, /expandedCanvasRef/);
+    assert.doesNotMatch(cargo3dViewSource, /<canvas id="expanded-scene-canvas"/);
+    assert.match(cargo3dSceneV2Source, /canvasId/);
+    assert.match(cargo3dViewSource, /canvas-id="scene-canvas"/);
+    assert.match(cargo3dViewSource, /canvas-id="expanded-scene-canvas"/);
+  });
+
+  it("uses the TresJS cargo scene for coordinate previews", () => {
+    assert.match(coordinateDialogSource, /Cargo3DSceneV2/);
+    assert.doesNotMatch(coordinateDialogSource, /createCargoScene/);
+    assert.doesNotMatch(coordinateDialogSource, /previewCanvasRef/);
+    assert.doesNotMatch(coordinateDialogSource, /<canvas\s+[\s\S]*coordinate-preview-canvas/);
+    assert.match(coordinateDialogSource, /canvas-id="coordinate-preview-canvas"/);
+    assert.match(coordinateDialogSource, /show-coordinate-axes/);
+    assert.match(coordinateDialogSource, /selected-loading-sequence/);
+  });
+
+  it("keeps TresJS cargo boxes visually separable with scene context", () => {
+    assert.match(cargo3dSceneV2Source, /wireframe/);
+    assert.match(cargo3dSceneV2Source, /box-edge/);
+    assert.match(cargo3dSceneV2Source, /container-shell/);
+    assert.match(cargo3dSceneV2Source, /container-floor/);
+    assert.match(cargo3dSceneV2Source, /corner-block/);
   });
 
   it("keeps cargo colors visible in 3D", () => {
@@ -204,8 +234,8 @@ describe("control panel layout source guards", () => {
     assert.match(coordinateDialogSource, /上表面X/);
     assert.match(coordinateDialogSource, /createBoxCoordinateRows/);
     assert.match(coordinateDialogSource, /createBoxCoordinateCsv/);
-    assert.match(coordinateDialogSource, /createCargoScene/);
-    assert.match(coordinateDialogSource, /showCoordinateAxes:\s*true/);
+    assert.match(coordinateDialogSource, /Cargo3DSceneV2/);
+    assert.match(coordinateDialogSource, /show-coordinate-axes/);
     assert.match(coordinateDialogSource, /selectedRow/);
     assert.match(coordinateDialogSource, /coordinate-preview-canvas/);
     assert.match(coordinateDialogSource, /当前选中/);
