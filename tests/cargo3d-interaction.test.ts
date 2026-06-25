@@ -7,6 +7,20 @@ type PointerModeInput = {
 };
 
 describe("3D cargo interaction controls", () => {
+  it("keeps selected cargo render options separate from loading progress", async () => {
+    const module = (await import("../src/renderers/cargo3d")) as {
+      getSelectedCargoPosition?: (
+        positions: Array<{ sequenceIndex?: number }>,
+        selectedLoadingSequence?: number,
+      ) => { sequenceIndex?: number } | null;
+    };
+
+    assert.equal(typeof module.getSelectedCargoPosition, "function");
+    assert.equal(module.getSelectedCargoPosition([{ sequenceIndex: 0 }, { sequenceIndex: 7 }], 8)?.sequenceIndex, 7);
+    assert.equal(module.getSelectedCargoPosition([{ sequenceIndex: 0 }], 8), null);
+    assert.equal(module.getSelectedCargoPosition([{ sequenceIndex: 0 }], undefined), null);
+  });
+
   it("uses left drag for rotation and right or Shift-left drag for panning", async () => {
     const module = (await import("../src/renderers/cargo3d")) as {
       getCargoPointerDragMode?: (event: PointerModeInput) => "pan" | "rotate";

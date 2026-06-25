@@ -39,6 +39,8 @@ const resultSummarySource = fs.readFileSync(
   path.join(__dirname, "..", "src/components/results/ResultSummary.vue"),
   "utf8",
 );
+const coordinateDialogPath = path.join(__dirname, "..", "src/components/results/CoordinateDialog.vue");
+const coordinateDialogSource = fs.existsSync(coordinateDialogPath) ? fs.readFileSync(coordinateDialogPath, "utf8") : "";
 const strategyDescriptionSource = fs.readFileSync(
   path.join(__dirname, "..", "src/core/packing/strategyDescription.ts"),
   "utf8",
@@ -168,6 +170,25 @@ describe("control panel layout source guards", () => {
     assert.ok(resultIndex < batchIndex, "Primary result summary should appear before batch import actions");
     assert.match(resultSummarySource, /summary-card--primary/);
     assert.match(resultSummarySource, /metric-grid--compact/);
+  });
+
+  it("exposes the first-stage carton coordinate table after calculation", () => {
+    assert.doesNotMatch(appSource, /CoordinateDialog/);
+    assert.match(cargo3dViewSource, /CoordinateDialog/);
+    assert.match(cargo3dViewSource, /<CoordinateDialog \/>/);
+    assert.match(coordinateDialogSource, /查看坐标/);
+    assert.match(coordinateDialogSource, /导出 CSV/);
+    assert.match(coordinateDialogSource, /坐标系/);
+    assert.match(coordinateDialogSource, /柜门面X/);
+    assert.match(coordinateDialogSource, /上表面X/);
+    assert.match(coordinateDialogSource, /createBoxCoordinateRows/);
+    assert.match(coordinateDialogSource, /createBoxCoordinateCsv/);
+    assert.match(coordinateDialogSource, /createCargoScene/);
+    assert.match(coordinateDialogSource, /selectedRow/);
+    assert.match(coordinateDialogSource, /coordinate-preview-canvas/);
+    assert.match(coordinateDialogSource, /当前选中/);
+    assert.match(coordinateDialogSource, /size="fullscreen"/);
+    assert.match(baseDialogSource, /base-dialog-content--fullscreen/);
   });
 
   it("uses distinct status-chip tones for calculation states", () => {

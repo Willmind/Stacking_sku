@@ -300,6 +300,10 @@ onBeforeUnmount(clearCloseTimer);
   justify-content: flex-end;
 }
 
+.base-dialog-content--fullscreen .base-dialog-footer {
+  padding: 0 16px 16px;
+}
+
 @keyframes base-dialog-overlay-in {
   from {
     opacity: 0;

@@ -4,8 +4,13 @@ import { makeSpriteLabel } from "./labels";
 
 export interface CargoScene {
   dispose(): void;
-  render(result: PackingResult | null, visibleCount: number): void;
+  render(result: PackingResult | null, visibleCount: number, options?: CargoRenderOptions): void;
   resize(): void;
+}
+
+export interface CargoRenderOptions {
+  selectedLoadingSequence?: number | null;
+  selectedLabel?: string;
 }
 
 export type CargoPointerDragMode = "pan" | "rotate";
@@ -52,6 +57,27 @@ export function applyCargoCameraDrag(
     panX: state.panX + dx,
     panY: state.panY + dy,
   };
+}
+
+export function getSelectedCargoPosition(
+  positions: BoxPosition[],
+  selectedLoadingSequence?: number | null,
+): BoxPosition | null;
+export function getSelectedCargoPosition<T extends Pick<BoxPosition, "sequenceIndex">>(
+  positions: T[],
+  selectedLoadingSequence?: number | null,
+): T | null;
+export function getSelectedCargoPosition<T extends Pick<BoxPosition, "sequenceIndex">>(
+  positions: T[],
+  selectedLoadingSequence?: number | null,
+): T | null {
+  if (!Number.isFinite(selectedLoadingSequence)) return null;
+  return (
+    positions.find((position) => {
+      if (!Number.isFinite(position.sequenceIndex)) return false;
+      return (position.sequenceIndex ?? -1) + 1 === selectedLoadingSequence;
+    }) || null
+  );
 }
 
 function colorForBox(box: BoxPosition) {
@@ -290,6 +316,63 @@ function addBoxes(group: THREE.Group, result: PackingResult, positions: BoxPosit
   });
 }
 
+function addSelectedBoxHighlight(
+  group: THREE.Group,
+  result: PackingResult,
+  selectedBox: BoxPosition | null,
+  labelText?: string,
+) {
+  if (!selectedBox) return;
+
+  const { container } = result;
+  const position = new THREE.Vector3(
+    (selectedBox.x + selectedBox.dx / 2 - container.length / 2) * 0.001,
+    (selectedBox.z + selectedBox.dz / 2 - container.height / 2) * 0.001,
+    (selectedBox.y + selectedBox.dy / 2 - container.width / 2) * 0.001,
+  );
+  const scale = new THREE.Vector3(
+    Math.max(selectedBox.dx * 0.001 * 1.018, 0.001),
+    Math.max(selectedBox.dz * 0.001 * 1.018, 0.001),
+    Math.max(selectedBox.dy * 0.001 * 1.018, 0.001),
+  );
+  const geometry = new THREE.BoxGeometry(1, 1, 1);
+  const highlight = new THREE.Mesh(
+    geometry,
+    new THREE.MeshBasicMaterial({
+      color: 0x6efcff,
+      transparent: true,
+      opacity: 0.22,
+      depthWrite: false,
+    }),
+  );
+  highlight.position.copy(position);
+  highlight.scale.copy(scale);
+  highlight.renderOrder = 20;
+
+  const edges = new THREE.LineSegments(
+    new THREE.EdgesGeometry(geometry),
+    new THREE.LineBasicMaterial({
+      color: 0x6efcff,
+      transparent: true,
+      opacity: 1,
+      depthTest: false,
+    }),
+  );
+  edges.position.copy(position);
+  edges.scale.copy(scale);
+  edges.renderOrder = 33;
+  group.add(highlight, edges);
+
+  if (labelText) {
+    const labelWidth = Math.min(0.9, Math.max(0.34, selectedBox.dx * 0.001 * 0.55));
+    const labelHeight = Math.min(0.24, Math.max(0.14, labelWidth * 0.28));
+    const label = makeSpriteLabel(labelText, "#6efcff", labelWidth, labelHeight);
+    label.position.set(position.x, position.y + scale.y / 2 + labelHeight * 1.2, position.z);
+    label.renderOrder = 34;
+    group.add(label);
+  }
+}
+
 function samplePositions(positions: BoxPosition[]) {
   if (positions.length <= MAX_3D_BOXES) return positions;
   const step = positions.length / MAX_3D_BOXES;
@@ -362,15 +445,19 @@ export function createCargoScene(canvas: HTMLCanvasElement): CargoScene {
     renderer.render(scene, camera);
   }
 
-  function render(result: PackingResult | null, visibleCount: number) {
+  function render(result: PackingResult | null, visibleCount: number, options: CargoRenderOptions = {}) {
     clearGroup(model);
     if (!result || !result.pattern) {
       draw();
       return;
     }
-    const positions = samplePositions(generateBoxPositions(result, Math.min(visibleCount, MAX_3D_BOXES)));
+    const normalizedVisibleCount = Math.min(visibleCount, result.totalBoxes);
+    const visiblePositions = generateBoxPositions(result, normalizedVisibleCount);
+    const positions = samplePositions(visiblePositions);
+    const selectedBox = getSelectedCargoPosition(visiblePositions, options.selectedLoadingSequence);
     addContainer(model, result);
     addBoxes(model, result, positions);
+    addSelectedBoxHighlight(model, result, selectedBox, options.selectedLabel);
     updateCamera(result.container);
     draw();
   }
