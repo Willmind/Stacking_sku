@@ -547,7 +547,6 @@ onBeforeUnmount(() => {
   font-weight: 700;
   line-height: 1;
   pointer-events: none;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.26);
 }
 
 .endpoint-legend__item {
@@ -562,6 +561,5 @@ onBeforeUnmount(() => {
   height: 10px;
   border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: 2px;
-  box-shadow: 0 0 12px currentColor;
 }
 </style>
