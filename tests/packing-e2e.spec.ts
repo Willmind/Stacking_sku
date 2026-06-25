@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { Locator, Page } from "@playwright/test";
 import { strToU8, zipSync } from "fflate";
+import fs from "node:fs";
 import { readSheet } from "read-excel-file/node";
 
 declare global {
@@ -134,8 +135,8 @@ function createBatchImportWorkbook(rows: WorkbookCell[][]) {
   );
 }
 
-async function readSceneCanvasScreenshotFrame(page: Page) {
-  const screenshot = await page.locator("#scene-canvas").screenshot();
+async function readCanvasScreenshotFrame(page: Page, canvasLocator: Locator) {
+  const screenshot = await canvasLocator.screenshot();
   const dataUrl = `data:image/png;base64,${screenshot.toString("base64")}`;
   const frame = await page.evaluate(async (source) => {
     const image = new Image();
@@ -199,6 +200,10 @@ async function readSceneCanvasScreenshotFrame(page: Page) {
   return { ...frame, screenshotBytes: screenshot.byteLength };
 }
 
+async function readSceneCanvasScreenshotFrame(page: Page) {
+  return readCanvasScreenshotFrame(page, page.locator("#scene-canvas"));
+}
+
 test("calculates the 488 x 380 x 291 benchmark and renders both views", async ({ page }) => {
   await calculateSingleSku(page, "488", "380", "291");
 
@@ -251,6 +256,46 @@ test("sets the progress slider to full after the initial calculation", async ({ 
   await expect(page.locator("#progress-text")).toHaveText("755 / 755");
   await expect(page.locator("#stack-progress")).toHaveValue("755");
   await expect(page.locator("#stack-progress")).toHaveAttribute("style", /--range-progress:\s*100%/);
+});
+
+test("shows and downloads the carton coordinate table", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "计算装载" }).click();
+  await expect(page.locator("#status-chip")).toHaveText("已完成计算");
+
+  const scenePanel = page.locator(".three-d-panel");
+  await expect(scenePanel.locator("header").getByRole("button", { name: "查看坐标" })).toBeVisible();
+  await scenePanel.locator("header").getByRole("button", { name: "查看坐标" }).click();
+  const dialog = page.getByRole("dialog", { name: "查看坐标" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("坐标系");
+  await expect(dialog).toContainText("柜门面X");
+  await expect(dialog).toContainText("上表面X");
+  await expect(dialog.locator("tbody tr")).toHaveCount(755);
+  const tableBox = await dialog.locator(".coordinate-table-shell").boundingBox();
+  const previewBox = await dialog.locator(".coordinate-preview").boundingBox();
+  if (!tableBox || !previewBox) throw new Error("Coordinate dialog layout boxes are missing");
+  expect(previewBox.width).toBeGreaterThan(tableBox.width * 1.25);
+  const previewCanvas = dialog.locator("#coordinate-preview-canvas");
+  await expect(previewCanvas).toBeVisible();
+  await expect(dialog).toContainText("当前选中：#1");
+  const previewFrame = await readCanvasScreenshotFrame(page, previewCanvas);
+  expect(previewFrame.screenshotBytes).toBeGreaterThan(1000);
+  expect(previewFrame.litPixels).toBeGreaterThan(1000);
+  expect(previewFrame.cargoPixels).toBeGreaterThan(1000);
+
+  await dialog.locator("tbody tr").nth(9).click();
+  await expect(dialog).toContainText("当前选中：#10");
+
+  const downloadPromise = page.waitForEvent("download");
+  await dialog.getByRole("button", { name: "导出 CSV" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("纸箱坐标.csv");
+  const downloadedPath = await download.path();
+  if (!downloadedPath) throw new Error("Downloaded coordinate CSV is missing");
+  const csv = fs.readFileSync(downloadedPath, "utf8");
+  expect(csv).toContain("序号,装载顺序,SKU,柜门面X,柜门面Y,柜门面Z,上表面X,上表面Y,上表面Z");
+  expect(csv.split("\n").length).toBeGreaterThan(700);
 });
 
 test("opens expanded dialogs for 2D and 3D visualizations", async ({ page }) => {

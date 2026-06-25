@@ -3,6 +3,7 @@ import { Maximize2 } from "@lucide/vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { createCargoScene, type CargoScene } from "../../renderers/cargo3d";
 import { usePackingStore } from "../../stores/packingStore";
+import CoordinateDialog from "../results/CoordinateDialog.vue";
 import VisualizationDialog from "./VisualizationDialog.vue";
 
 const store = usePackingStore();
@@ -84,15 +85,18 @@ watch(
         <h2>3D 货柜渲染</h2>
         <span>透视图</span>
       </div>
-      <button
-        class="view-expand-button"
-        type="button"
-        aria-label="放大 3D 货柜渲染"
-        title="放大 3D 货柜渲染"
-        @click="openExpandedScene"
-      >
-        <Maximize2 :size="15" :stroke-width="2.3" aria-hidden="true" />
-      </button>
+      <div class="view-actions">
+        <CoordinateDialog />
+        <button
+          class="view-expand-button"
+          type="button"
+          aria-label="放大 3D 货柜渲染"
+          title="放大 3D 货柜渲染"
+          @click="openExpandedScene"
+        >
+          <Maximize2 :size="15" :stroke-width="2.3" aria-hidden="true" />
+        </button>
+      </div>
     </header>
     <canvas id="scene-canvas" ref="canvasRef" width="980" height="620"></canvas>
     <span class="door-marker" aria-hidden="true">柜门</span>
@@ -136,6 +140,13 @@ header div {
   display: grid;
   gap: 4px;
   min-width: 0;
+}
+
+.view-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
 }
 
 h2 {

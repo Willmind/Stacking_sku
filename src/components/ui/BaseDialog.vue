@@ -181,9 +181,9 @@ onBeforeUnmount(clearCloseTimer);
 }
 
 .base-dialog-content--fullscreen {
-  width: min(94vw, 1480px);
-  height: min(86dvh, 980px);
-  max-height: min(86dvh, 980px);
+  width: min(97vw, 1680px);
+  height: min(92dvh, 1080px);
+  max-height: min(92dvh, 1080px);
   padding: 0;
   background: #071016;
 }
@@ -298,6 +298,10 @@ onBeforeUnmount(clearCloseTimer);
   display: flex;
   gap: 10px;
   justify-content: flex-end;
+}
+
+.base-dialog-content--fullscreen .base-dialog-footer {
+  padding: 0 16px 16px;
 }
 
 @keyframes base-dialog-overlay-in {
