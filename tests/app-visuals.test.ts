@@ -108,6 +108,12 @@ describe("3D visual rendering source guards", () => {
     assert.match(cargo3dViewSource, /canvas-id="expanded-scene-canvas"/);
   });
 
+  it("uses a closer initial camera framing for the compact home 3D card", () => {
+    assert.match(cargo3dSceneV2Source, /cameraZoom/);
+    assert.match(cargo3dSceneV2Source, /:zoom="cameraZoom"/);
+    assert.match(cargo3dViewSource, /canvas-id="scene-canvas"[\s\S]*:camera-zoom="1\.16"/);
+  });
+
   it("uses the TresJS cargo scene for coordinate previews", () => {
     assert.match(coordinateDialogSource, /Cargo3DSceneV2/);
     assert.doesNotMatch(coordinateDialogSource, /createCargoScene/);
@@ -252,9 +258,9 @@ describe("control panel layout source guards", () => {
     assert.match(rendererSource, /addCoordinateAxes/);
   });
 
-  it("keeps coordinate table cells centered with reserved scroll gutters", () => {
-    assert.match(coordinateDialogSource, /\.coordinate-table-shell\s*\{[\s\S]*scrollbar-gutter:\s*stable both-edges/);
-    assert.match(coordinateDialogSource, /\.coordinate-table-shell\s*\{[\s\S]*padding:\s*0 10px 10px 0/);
+  it("keeps coordinate table cells centered without extra scroll gutters", () => {
+    assert.doesNotMatch(coordinateDialogSource, /scrollbar-gutter:\s*stable both-edges/);
+    assert.doesNotMatch(coordinateDialogSource, /padding:\s*0 10px 10px 0/);
     assert.match(coordinateDialogSource, /th,\s*\ntd\s*\{[\s\S]*text-align:\s*center/);
   });
 

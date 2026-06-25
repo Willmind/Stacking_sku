@@ -268,15 +268,12 @@ watch(
 }
 
 .coordinate-table-shell {
-  box-sizing: border-box;
   height: 100%;
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
-  padding: 0 10px 10px 0;
   border: 1px solid rgba(174, 184, 201, 0.18);
   border-radius: 8px;
-  scrollbar-gutter: stable both-edges;
 }
 
 table {

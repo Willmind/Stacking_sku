@@ -49,7 +49,12 @@ function closeExpandedScene() {
       </div>
     </header>
     <div class="cargo-scene-shell">
-      <Cargo3DSceneV2 canvas-id="scene-canvas" :result="store.result" :visible-count="store.visibleCount" />
+      <Cargo3DSceneV2
+        canvas-id="scene-canvas"
+        :result="store.result"
+        :visible-count="store.visibleCount"
+        :camera-zoom="1.16"
+      />
     </div>
 
     <VisualizationDialog

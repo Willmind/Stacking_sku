@@ -14,11 +14,13 @@ const props = withDefaults(defineProps<{
   selectedLoadingSequence?: number | null;
   selectedLabel?: string;
   showCoordinateAxes?: boolean;
+  cameraZoom?: number;
 }>(), {
   canvasId: "scene-canvas",
   selectedLoadingSequence: null,
   selectedLabel: "",
   showCoordinateAxes: false,
+  cameraZoom: 1,
 });
 
 const DoubleSide = THREE.DoubleSide;
@@ -283,7 +285,7 @@ onBeforeUnmount(() => {
       :window-size="false"
       @ready="onTresReady"
     >
-      <TresPerspectiveCamera :position="[9.8, 5.7, 9.6]" :look-at="[0, -0.2, 0]" :fov="48" />
+      <TresPerspectiveCamera :position="[9.8, 5.7, 9.6]" :look-at="[0, -0.2, 0]" :fov="48" :zoom="cameraZoom" />
       <OrbitControls :enable-zoom="true" :zoom-speed="0.84" />
       <TresAmbientLight :intensity="0.72" />
       <TresDirectionalLight :position="[5, 8, 6]" :intensity="1.18" />
