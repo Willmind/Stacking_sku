@@ -53,7 +53,7 @@ function closeExpandedScene() {
         canvas-id="scene-canvas"
         :result="store.result"
         :visible-count="store.visibleCount"
-        :camera-zoom="1.16"
+        :camera-zoom="1.85"
       />
     </div>
 
@@ -68,6 +68,7 @@ function closeExpandedScene() {
           canvas-id="expanded-scene-canvas"
           :result="store.result"
           :visible-count="store.visibleCount"
+          :camera-zoom="1.65"
         />
       </div>
     </VisualizationDialog>

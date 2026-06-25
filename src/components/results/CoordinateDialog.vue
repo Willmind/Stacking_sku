@@ -173,6 +173,7 @@ watch(
             :visible-count="store.result?.totalBoxes ?? 0"
             :selected-loading-sequence="selectedRow?.loadingSequence"
             :selected-label="selectedLabel"
+            :camera-zoom="1.6"
             show-coordinate-axes
           />
         </aside>

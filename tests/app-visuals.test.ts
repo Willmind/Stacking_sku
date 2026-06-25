@@ -108,10 +108,12 @@ describe("3D visual rendering source guards", () => {
     assert.match(cargo3dViewSource, /canvas-id="expanded-scene-canvas"/);
   });
 
-  it("uses a closer initial camera framing for the compact home 3D card", () => {
+  it("uses closer initial camera framing for all 3D cargo views", () => {
     assert.match(cargo3dSceneV2Source, /cameraZoom/);
     assert.match(cargo3dSceneV2Source, /:zoom="cameraZoom"/);
-    assert.match(cargo3dViewSource, /canvas-id="scene-canvas"[\s\S]*:camera-zoom="1\.16"/);
+    assert.match(cargo3dViewSource, /canvas-id="scene-canvas"[\s\S]*:camera-zoom="1\.85"/);
+    assert.match(cargo3dViewSource, /canvas-id="expanded-scene-canvas"[\s\S]*:camera-zoom="1\.65"/);
+    assert.match(coordinateDialogSource, /canvas-id="coordinate-preview-canvas"[\s\S]*:camera-zoom="1\.6"/);
   });
 
   it("uses the TresJS cargo scene for coordinate previews", () => {
