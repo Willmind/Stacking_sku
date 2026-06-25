@@ -23,14 +23,35 @@ export interface SceneLabelModel {
   scale: [number, number];
 }
 
+export interface SceneEndpointSurfaceModel {
+  key: string;
+  label: string;
+  color: string;
+  position: [number, number, number];
+  size: [number, number];
+  rotation: [number, number, number];
+  opacity: number;
+}
+
+export interface SceneLegendItemModel {
+  key: string;
+  label: string;
+  color: string;
+}
+
 export interface SceneContainerModel {
   scale: [number, number, number];
   floorSize: [number, number];
   floorPosition: [number, number, number];
   cornerBlocks: ScenePrimitiveModel[];
+  endpointSurfaces: SceneEndpointSurfaceModel[];
+  endpointLegend: SceneLegendItemModel[];
   endpointLabels: SceneLabelModel[];
   effectiveFrame: ScenePrimitiveModel | null;
 }
+
+export const DOOR_ENDPOINT_COLOR = "#42d6a4";
+export const INNER_ENDPOINT_COLOR = "#ffb24a";
 
 function roundSceneUnit(value: number) {
   return Math.round(value * 1000) / 1000;
@@ -82,6 +103,9 @@ export function toSceneContainer(
   const labelHeight = roundSceneUnit(Math.min(0.64, Math.max(0.34, labelWidth * 0.26)));
   const labelOffset = roundSceneUnit(Math.max(0.28, labelWidth * 0.35));
   const labelY = roundSceneUnit(height / 2 + labelHeight * 0.7);
+  const surfaceOffset = 0.004;
+  const endpointSurfaceSize: [number, number] = [width, height];
+  const endpointSurfaceRotation: [number, number, number] = [0, Math.PI / 2, 0];
 
   return {
     scale: [length, height, width],
@@ -99,18 +123,42 @@ export function toSceneContainer(
         scale: blockScale,
       },
     ],
+    endpointSurfaces: [
+      {
+        key: "inner-end-surface",
+        label: "角件端",
+        color: INNER_ENDPOINT_COLOR,
+        position: [roundSceneUnit(-length / 2 - surfaceOffset), 0, 0],
+        size: endpointSurfaceSize,
+        rotation: endpointSurfaceRotation,
+        opacity: 0.18,
+      },
+      {
+        key: "door-end-surface",
+        label: "柜门",
+        color: DOOR_ENDPOINT_COLOR,
+        position: [roundSceneUnit(length / 2 + surfaceOffset), 0, 0],
+        size: endpointSurfaceSize,
+        rotation: endpointSurfaceRotation,
+        opacity: 0.18,
+      },
+    ],
+    endpointLegend: [
+      { key: "door-end", label: "柜门", color: DOOR_ENDPOINT_COLOR },
+      { key: "inner-end", label: "角件端", color: INNER_ENDPOINT_COLOR },
+    ],
     endpointLabels: [
       {
         key: "inner-end-label",
         text: "角件端",
-        color: "#ffcf7d",
+        color: INNER_ENDPOINT_COLOR,
         position: [roundSceneUnit(-length / 2 - labelOffset), labelY, 0],
         scale: [labelWidth, labelHeight],
       },
       {
         key: "door-end-label",
         text: "柜门",
-        color: "#57e3bc",
+        color: DOOR_ENDPOINT_COLOR,
         position: [roundSceneUnit(length / 2 + labelOffset), labelY, 0],
         scale: [labelWidth, labelHeight],
       },

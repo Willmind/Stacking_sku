@@ -91,7 +91,10 @@ describe("3D visual rendering source guards", () => {
     assert.doesNotMatch(cargo3dSceneV2Source, /Html/);
     assert.match(cargo3dSceneV2Source, /toSceneBox/);
     assert.match(cargo3dSceneV2Source, /endpointLabels/);
-    assert.match(cargo3dSceneV2Source, /makeSpriteLabel/);
+    assert.match(cargo3dSceneV2Source, /endpointSurfaces/);
+    assert.match(cargo3dSceneV2Source, /endpoint-legend/);
+    assert.match(cargo3dSceneV2Source, /projection-label-layer/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /endpointLabels\.forEach\(\(label\) => addSpriteLabel/);
     assert.doesNotMatch(cargo3dViewSource, /scene-label--inner/);
     assert.doesNotMatch(cargo3dViewSource, /door-marker/);
   });

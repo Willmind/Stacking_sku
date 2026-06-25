@@ -45,6 +45,24 @@ describe("cargo scene model", () => {
     assert.deepEqual(container.cornerBlocks[0].scale, [0.5, 0.3, 0.25]);
     assert.deepEqual(container.cornerBlocks[1].position, [-5.75, 1.15, 1.075]);
     assert.deepEqual(
+      container.endpointSurfaces.map(
+        (surface: { key: string; label: string; color: string; position: [number, number, number] }) => ({
+          key: surface.key,
+          label: surface.label,
+          color: surface.color,
+          position: surface.position,
+        }),
+      ),
+      [
+        { key: "inner-end-surface", label: "角件端", color: "#ffb24a", position: [-6.004, 0, 0] },
+        { key: "door-end-surface", label: "柜门", color: "#42d6a4", position: [6.004, 0, 0] },
+      ],
+    );
+    assert.deepEqual(container.endpointLegend, [
+      { key: "door-end", label: "柜门", color: "#42d6a4" },
+      { key: "inner-end", label: "角件端", color: "#ffb24a" },
+    ]);
+    assert.deepEqual(
       container.endpointLabels.map((label: { key: string; text: string; position: [number, number, number] }) => ({
         key: label.key,
         text: label.text,
