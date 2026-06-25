@@ -7,6 +7,29 @@ type PointerModeInput = {
 };
 
 describe("3D cargo interaction controls", () => {
+  it("maps robot coordinate axes from the innermost left bottom origin", async () => {
+    const module = (await import("../src/renderers/cargo3d")) as {
+      getCargoCoordinateAxes?: (container: { length: number; width: number; height: number }) => Array<{
+        label: "X" | "Y" | "Z";
+        start: [number, number, number];
+        end: [number, number, number];
+      }>;
+    };
+
+    assert.equal(typeof module.getCargoCoordinateAxes, "function");
+    const axes = module.getCargoCoordinateAxes({ length: 12000, width: 2400, height: 2600 });
+    const xAxis = axes.find((axis) => axis.label === "X");
+    const yAxis = axes.find((axis) => axis.label === "Y");
+    const zAxis = axes.find((axis) => axis.label === "Z");
+
+    assert.deepEqual(xAxis?.start, [-6, -1.3, -1.2]);
+    assert.deepEqual(yAxis?.start, [-6, -1.3, -1.2]);
+    assert.deepEqual(zAxis?.start, [-6, -1.3, -1.2]);
+    assert.ok((xAxis?.end[2] ?? -Infinity) > -1.2, "X should point across container width");
+    assert.ok((yAxis?.end[0] ?? -Infinity) > -6, "Y should point toward the container door");
+    assert.ok((zAxis?.end[1] ?? -Infinity) > -1.3, "Z should point upward");
+  });
+
   it("keeps selected cargo render options separate from loading progress", async () => {
     const module = (await import("../src/renderers/cargo3d")) as {
       getSelectedCargoPosition?: (

@@ -272,6 +272,10 @@ test("shows and downloads the carton coordinate table", async ({ page }) => {
   await expect(dialog).toContainText("柜门面X");
   await expect(dialog).toContainText("上表面X");
   await expect(dialog.locator("tbody tr")).toHaveCount(755);
+  const tableBox = await dialog.locator(".coordinate-table-shell").boundingBox();
+  const previewBox = await dialog.locator(".coordinate-preview").boundingBox();
+  if (!tableBox || !previewBox) throw new Error("Coordinate dialog layout boxes are missing");
+  expect(previewBox.width).toBeGreaterThan(tableBox.width * 1.25);
   const previewCanvas = dialog.locator("#coordinate-preview-canvas");
   await expect(previewCanvas).toBeVisible();
   await expect(dialog).toContainText("当前选中：#1");

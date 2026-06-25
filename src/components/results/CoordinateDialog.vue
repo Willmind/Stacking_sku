@@ -56,6 +56,7 @@ function renderPreview() {
   previewScene?.render(store.result, store.result?.totalBoxes ?? 0, {
     selectedLoadingSequence: selectedRow.value?.loadingSequence,
     selectedLabel: selectedRow.value ? `#${selectedRow.value.sequence}` : "",
+    showCoordinateAxes: true,
   });
 }
 
@@ -207,7 +208,7 @@ onBeforeUnmount(disposePreviewScene);
         <aside class="coordinate-preview" aria-label="坐标 3D 预览">
           <div class="coordinate-preview-head">
             <strong>{{ selectedText }}</strong>
-            <span>点击左侧任一行，高亮对应纸箱</span>
+            <span>点击左侧任一行，高亮对应纸箱；XYZ 轴从原点伸出</span>
           </div>
           <canvas
             id="coordinate-preview-canvas"
@@ -292,7 +293,7 @@ onBeforeUnmount(disposePreviewScene);
   display: grid;
   min-width: 0;
   min-height: 0;
-  grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.7fr);
+  grid-template-columns: minmax(340px, 0.72fr) minmax(560px, 1.55fr);
   gap: 12px;
 }
 
@@ -401,7 +402,7 @@ tr:last-child td {
 .coordinate-preview-canvas {
   width: 100%;
   height: 100%;
-  min-height: 280px;
+  min-height: 420px;
   background: rgba(3, 8, 14, 0.72);
   cursor: grab;
   touch-action: none;
@@ -431,6 +432,10 @@ tr:last-child td {
   .coordinate-content {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(300px, 1fr) minmax(280px, 0.75fr);
+  }
+
+  .coordinate-preview-canvas {
+    min-height: 320px;
   }
 }
 </style>

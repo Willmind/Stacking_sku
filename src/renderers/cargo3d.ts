@@ -11,6 +11,16 @@ export interface CargoScene {
 export interface CargoRenderOptions {
   selectedLoadingSequence?: number | null;
   selectedLabel?: string;
+  showCoordinateAxes?: boolean;
+}
+
+export interface CargoCoordinateAxis {
+  label: "X" | "Y" | "Z";
+  start: [number, number, number];
+  end: [number, number, number];
+  labelPosition: [number, number, number];
+  color: string;
+  colorHex: number;
 }
 
 export type CargoPointerDragMode = "pan" | "rotate";
@@ -33,6 +43,9 @@ const CARGO_DEFAULT_ZOOM = 0.9;
 const CARGO_DEFAULT_PAN_Y = -8;
 const CARGO_CAMERA_DISTANCE_FACTOR = 2;
 const CARGO_CAMERA_PAN_SCALE_DIVISOR = 780;
+const AXIS_MIN_LENGTH = 0.7;
+const AXIS_MAX_LENGTH = 2.4;
+const AXIS_LENGTH_RATIO = 0.36;
 
 export function getCargoPointerDragMode(event: Pick<PointerEvent, "button" | "shiftKey">): CargoPointerDragMode {
   if (event.button === 2 || (event.button === 0 && event.shiftKey)) return "pan";
@@ -78,6 +91,52 @@ export function getSelectedCargoPosition<T extends Pick<BoxPosition, "sequenceIn
       return (position.sequenceIndex ?? -1) + 1 === selectedLoadingSequence;
     }) || null
   );
+}
+
+function roundSceneUnit(value: number) {
+  return Math.round(value * 1000) / 1000;
+}
+
+function visibleAxisLength(sizeMm: number) {
+  return roundSceneUnit(Math.min(AXIS_MAX_LENGTH, Math.max(AXIS_MIN_LENGTH, sizeMm * 0.001 * AXIS_LENGTH_RATIO)));
+}
+
+export function getCargoCoordinateAxes(container: Pick<PackingResult["container"], "length" | "width" | "height">) {
+  const origin: [number, number, number] = [
+    roundSceneUnit(-container.length * 0.0005),
+    roundSceneUnit(-container.height * 0.0005),
+    roundSceneUnit(-container.width * 0.0005),
+  ];
+  const xLength = visibleAxisLength(container.width);
+  const yLength = visibleAxisLength(container.length);
+  const zLength = visibleAxisLength(container.height);
+
+  return [
+    {
+      label: "X",
+      start: origin,
+      end: [origin[0], origin[1], roundSceneUnit(origin[2] + xLength)] as [number, number, number],
+      labelPosition: [origin[0], origin[1], roundSceneUnit(origin[2] + xLength + 0.18)] as [number, number, number],
+      color: "#ff5b5b",
+      colorHex: 0xff5b5b,
+    },
+    {
+      label: "Y",
+      start: origin,
+      end: [roundSceneUnit(origin[0] + yLength), origin[1], origin[2]] as [number, number, number],
+      labelPosition: [roundSceneUnit(origin[0] + yLength + 0.18), origin[1], origin[2]] as [number, number, number],
+      color: "#42d6a4",
+      colorHex: 0x42d6a4,
+    },
+    {
+      label: "Z",
+      start: origin,
+      end: [origin[0], roundSceneUnit(origin[1] + zLength), origin[2]] as [number, number, number],
+      labelPosition: [origin[0], roundSceneUnit(origin[1] + zLength + 0.18), origin[2]] as [number, number, number],
+      color: "#68a6ff",
+      colorHex: 0x68a6ff,
+    },
+  ] satisfies CargoCoordinateAxis[];
 }
 
 function colorForBox(box: BoxPosition) {
@@ -373,6 +432,45 @@ function addSelectedBoxHighlight(
   }
 }
 
+function addCoordinateAxes(group: THREE.Group, result: PackingResult) {
+  const upVector = new THREE.Vector3(0, 1, 0);
+  for (const axis of getCargoCoordinateAxes(result.container)) {
+    const start = new THREE.Vector3(...axis.start);
+    const end = new THREE.Vector3(...axis.end);
+    const direction = end.clone().sub(start).normalize();
+    const axisLength = start.distanceTo(end);
+    const coneHeight = Math.min(0.22, Math.max(0.11, axisLength * 0.16));
+    const coneRadius = coneHeight * 0.34;
+    const material = new THREE.LineBasicMaterial({
+      color: axis.colorHex,
+      transparent: true,
+      opacity: 1,
+      depthTest: false,
+    });
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([start, end]), material);
+    line.renderOrder = 41;
+
+    const cone = new THREE.Mesh(
+      new THREE.ConeGeometry(coneRadius, coneHeight, 20),
+      new THREE.MeshBasicMaterial({
+        color: axis.colorHex,
+        transparent: true,
+        opacity: 0.96,
+        depthTest: false,
+        depthWrite: false,
+      }),
+    );
+    cone.position.copy(end);
+    cone.quaternion.setFromUnitVectors(upVector, direction);
+    cone.renderOrder = 42;
+
+    const label = makeSpriteLabel(axis.label, axis.color, 0.26, 0.2);
+    label.position.set(...axis.labelPosition);
+    label.renderOrder = 43;
+    group.add(line, cone, label);
+  }
+}
+
 function samplePositions(positions: BoxPosition[]) {
   if (positions.length <= MAX_3D_BOXES) return positions;
   const step = positions.length / MAX_3D_BOXES;
@@ -458,6 +556,7 @@ export function createCargoScene(canvas: HTMLCanvasElement): CargoScene {
     addContainer(model, result);
     addBoxes(model, result, positions);
     addSelectedBoxHighlight(model, result, selectedBox, options.selectedLabel);
+    if (options.showCoordinateAxes) addCoordinateAxes(model, result);
     updateCamera(result.container);
     draw();
   }

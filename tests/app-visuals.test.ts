@@ -184,11 +184,18 @@ describe("control panel layout source guards", () => {
     assert.match(coordinateDialogSource, /createBoxCoordinateRows/);
     assert.match(coordinateDialogSource, /createBoxCoordinateCsv/);
     assert.match(coordinateDialogSource, /createCargoScene/);
+    assert.match(coordinateDialogSource, /showCoordinateAxes:\s*true/);
     assert.match(coordinateDialogSource, /selectedRow/);
     assert.match(coordinateDialogSource, /coordinate-preview-canvas/);
     assert.match(coordinateDialogSource, /当前选中/);
     assert.match(coordinateDialogSource, /size="fullscreen"/);
+    assert.match(coordinateDialogSource, /grid-template-columns:\s*minmax\(340px,\s*0\.72fr\)\s*minmax\(560px,\s*1\.55fr\)/);
+    assert.doesNotMatch(coordinateDialogSource, /grid-template-columns:\s*minmax\(0,\s*1\.45fr\)\s*minmax\(300px,\s*0\.7fr\)/);
     assert.match(baseDialogSource, /base-dialog-content--fullscreen/);
+    assert.match(baseDialogSource, /width:\s*min\(97vw,\s*1680px\)/);
+    assert.match(baseDialogSource, /height:\s*min\(92dvh,\s*1080px\)/);
+    assert.match(rendererSource, /getCargoCoordinateAxes/);
+    assert.match(rendererSource, /addCoordinateAxes/);
   });
 
   it("uses distinct status-chip tones for calculation states", () => {
