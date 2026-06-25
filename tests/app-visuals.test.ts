@@ -252,6 +252,12 @@ describe("control panel layout source guards", () => {
     assert.match(rendererSource, /addCoordinateAxes/);
   });
 
+  it("keeps coordinate table cells centered with reserved scroll gutters", () => {
+    assert.match(coordinateDialogSource, /\.coordinate-table-shell\s*\{[\s\S]*scrollbar-gutter:\s*stable both-edges/);
+    assert.match(coordinateDialogSource, /\.coordinate-table-shell\s*\{[\s\S]*padding:\s*0 10px 10px 0/);
+    assert.match(coordinateDialogSource, /th,\s*\ntd\s*\{[\s\S]*text-align:\s*center/);
+  });
+
   it("uses distinct status-chip tones for calculation states", () => {
     assert.match(appSource, /statusToneByLabel/);
     assert.match(appSource, /:class="statusChipClass"/);
