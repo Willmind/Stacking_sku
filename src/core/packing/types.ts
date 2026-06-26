@@ -59,6 +59,7 @@ export interface BoxPosition {
   sequenceIndex?: number;
   faceIndex?: number;
   stackIndex?: number;
+  loadingRowIndex?: number;
   skuLabel?: string;
   skuColor?: string;
   source?: string;

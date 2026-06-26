@@ -15,6 +15,7 @@ const props = withDefaults(defineProps<{
   selectedLabel?: string;
   showCoordinateAxes?: boolean;
   dimCargoWhenSelected?: boolean;
+  lightweightCoordinatePreview?: boolean;
   cameraZoom?: number;
 }>(), {
   canvasId: "scene-canvas",
@@ -22,6 +23,7 @@ const props = withDefaults(defineProps<{
   selectedLabel: "",
   showCoordinateAxes: false,
   dimCargoWhenSelected: false,
+  lightweightCoordinatePreview: false,
   cameraZoom: 1,
 });
 
@@ -263,6 +265,10 @@ function addCoordinateAxes(group: THREE.Group, result: PackingResult) {
 }
 
 const isCoordinateFocusMode = computed(() => Boolean(props.dimCargoWhenSelected && selectedSceneBox.value));
+const shouldUseLightweightCoordinatePreview = computed(() =>
+  Boolean(props.lightweightCoordinatePreview && isCoordinateFocusMode.value),
+);
+const shouldRenderContextCargoFaces = computed(() => !shouldUseLightweightCoordinatePreview.value);
 const contextCargoFaceOpacity = computed(() => (isCoordinateFocusMode.value ? 0.025 : 1));
 const contextCargoEdgeOpacity = computed(() => (isCoordinateFocusMode.value ? 0.18 : 0.08));
 const contextCargoEdgeColor = computed(() => (isCoordinateFocusMode.value ? "#dce8ee" : "#b8fff0"));
@@ -453,22 +459,24 @@ onBeforeUnmount(() => {
         </template>
       </template>
 
-      <TresMesh
-        v-for="box in sceneBoxes"
-        :key="`${box.key}-face`"
-        name="cargo-box"
-        :position="box.position"
-        :scale="box.scale"
-      >
-        <TresBoxGeometry />
-        <TresMeshBasicMaterial
-          :color="box.color"
-          :side="DoubleSide"
-          :transparent="isCoordinateFocusMode"
-          :opacity="contextCargoFaceOpacity"
-          :depth-write="contextCargoDepthWrite"
-        />
-      </TresMesh>
+      <template v-if="shouldRenderContextCargoFaces">
+        <TresMesh
+          v-for="box in sceneBoxes"
+          :key="`${box.key}-face`"
+          name="cargo-box"
+          :position="box.position"
+          :scale="box.scale"
+        >
+          <TresBoxGeometry />
+          <TresMeshBasicMaterial
+            :color="box.color"
+            :side="DoubleSide"
+            :transparent="isCoordinateFocusMode"
+            :opacity="contextCargoFaceOpacity"
+            :depth-write="contextCargoDepthWrite"
+          />
+        </TresMesh>
+      </template>
 
       <TresMesh
         v-if="coordinateOrigin"

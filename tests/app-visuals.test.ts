@@ -151,6 +151,14 @@ describe("3D visual rendering source guards", () => {
     assert.match(cargo3dSceneV2Source, /contextCargoEdgeOpacity[\s\S]*0\.18/);
     assert.match(cargo3dSceneV2Source, /contextCargoEdgeColor[\s\S]*#dce8ee/);
     assert.match(cargo3dSceneV2Source, /:opacity="0\.9"/);
+    assert.match(coordinateDialogSource, /lightweight-coordinate-preview/);
+    assert.match(cargo3dSceneV2Source, /lightweightCoordinatePreview/);
+    assert.match(cargo3dSceneV2Source, /shouldUseLightweightCoordinatePreview/);
+    assert.match(cargo3dSceneV2Source, /shouldRenderContextCargoFaces/);
+    assert.match(
+      cargo3dSceneV2Source,
+      /<template v-if="shouldRenderContextCargoFaces">[\s\S]*v-for="box in sceneBoxes"[\s\S]*name="cargo-box"/,
+    );
     assert.doesNotMatch(coordinateDialogSource, /show-selected-coordinate-points/);
     assert.doesNotMatch(cargo3dSceneV2Source, /showSelectedCoordinatePoints/);
     assert.doesNotMatch(cargo3dSceneV2Source, /toSceneCoordinatePoints/);
@@ -301,6 +309,13 @@ describe("control panel layout source guards", () => {
     assert.match(coordinateDialogSource, /上表面X/);
     assert.match(coordinateDialogSource, /createBoxCoordinateRows/);
     assert.match(coordinateDialogSource, /createBoxCoordinateCsv/);
+    assert.match(packageSource, /"@tanstack\/vue-table"/);
+    assert.match(packageSource, /"@tanstack\/vue-virtual"/);
+    assert.match(coordinateDialogSource, /useVueTable/);
+    assert.match(coordinateDialogSource, /useVirtualizer/);
+    assert.match(coordinateDialogSource, /coordinateVirtualRows/);
+    assert.match(coordinateDialogSource, /coordinate-virtual-spacer/);
+    assert.doesNotMatch(coordinateDialogSource, /v-for="row in rows"/);
     assert.match(coordinateDialogSource, /Cargo3DSceneV2/);
     assert.match(coordinateDialogSource, /show-coordinate-axes/);
     assert.match(coordinateDialogSource, /selectedRow/);

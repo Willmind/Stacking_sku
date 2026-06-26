@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
+import { FlexRender, getCoreRowModel, useVueTable, type ColumnDef } from "@tanstack/vue-table";
+import { useVirtualizer } from "@tanstack/vue-virtual";
 import { Crosshair, Download, MapPinned } from "@lucide/vue";
 import {
+  BOX_COORDINATE_HEADERS,
   createBoxCoordinateCsv,
   createBoxCoordinateRows,
   type BoxCoordinateRow,
@@ -10,9 +13,43 @@ import { usePackingStore } from "../../stores/packingStore";
 import BaseDialog from "../ui/BaseDialog.vue";
 import Cargo3DSceneV2 from "../visualizations/Cargo3DSceneV2.vue";
 
+const COORDINATE_ROW_HEIGHT = 37;
+const COORDINATE_TABLE_OVERSCAN = 10;
+
+type CoordinateColumnKey = Extract<keyof BoxCoordinateRow, string>;
+
+const coordinateColumnSpecs: Array<{ key: CoordinateColumnKey; header: (typeof BOX_COORDINATE_HEADERS)[number] }> = [
+  { key: "sequence", header: "序号" },
+  { key: "loadingSequence", header: "装载顺序" },
+  { key: "sku", header: "SKU" },
+  { key: "doorFaceX", header: "柜门面X" },
+  { key: "doorFaceY", header: "柜门面Y" },
+  { key: "doorFaceZ", header: "柜门面Z" },
+  { key: "topFaceX", header: "上表面X" },
+  { key: "topFaceY", header: "上表面Y" },
+  { key: "topFaceZ", header: "上表面Z" },
+  { key: "centerX", header: "中心点X" },
+  { key: "centerY", header: "中心点Y" },
+  { key: "centerZ", header: "中心点Z" },
+  { key: "length", header: "长" },
+  { key: "width", header: "宽" },
+  { key: "height", header: "高" },
+  { key: "layer", header: "层" },
+  { key: "row", header: "排" },
+  { key: "column", header: "列" },
+  { key: "orientation", header: "朝向" },
+];
+
+const coordinateColumns: ColumnDef<BoxCoordinateRow>[] = coordinateColumnSpecs.map(({ key, header }) => ({
+  accessorKey: key,
+  header,
+  cell: ({ getValue }) => formatCellValue(getValue()),
+}));
+
 const store = usePackingStore();
 const isOpen = ref(false);
 const selectedRow = ref<BoxCoordinateRow | null>(null);
+const coordinateTableShellRef = ref<HTMLDivElement | null>(null);
 const rows = computed(() => createBoxCoordinateRows(store.result));
 const hasRows = computed(() => rows.value.length > 0);
 const coordinateSummary = computed(() =>
@@ -40,11 +77,53 @@ function formatNumber(value: number) {
   return value.toLocaleString("zh-CN");
 }
 
+function formatCellValue(value: unknown) {
+  if (typeof value === "number") return formatNumber(value);
+  return value ? String(value) : "-";
+}
+
+const coordinateTable = useVueTable({
+  data: rows,
+  columns: coordinateColumns,
+  getCoreRowModel: getCoreRowModel(),
+  getRowId: (row) => String(row.sequence),
+});
+const coordinateTableRows = computed(() => {
+  const rowCount = rows.value.length;
+  if (rowCount === 0) return [];
+  return coordinateTable.getRowModel().rows;
+});
+const coordinateLeafColumnCount = computed(() => coordinateTable.getAllLeafColumns().length);
+const coordinateVirtualizer = useVirtualizer<HTMLDivElement, HTMLTableRowElement>(
+  computed(() => ({
+    count: coordinateTableRows.value.length,
+    getScrollElement: () => coordinateTableShellRef.value,
+    estimateSize: () => COORDINATE_ROW_HEIGHT,
+    overscan: COORDINATE_TABLE_OVERSCAN,
+    getItemKey: (index) => coordinateTableRows.value[index]?.id ?? index,
+  })),
+);
+const coordinateVirtualItems = computed(() => coordinateVirtualizer.value.getVirtualItems());
+const coordinateVirtualRows = computed(() =>
+  coordinateVirtualItems.value.flatMap((virtualRow) => {
+    const row = coordinateTableRows.value[virtualRow.index];
+    return row ? [{ row, virtualRow }] : [];
+  }),
+);
+const topSpacerHeight = computed(() => coordinateVirtualItems.value[0]?.start ?? 0);
+const bottomSpacerHeight = computed(() => {
+  const virtualItems = coordinateVirtualItems.value;
+  const lastVirtualRow = virtualItems[virtualItems.length - 1];
+  if (!lastVirtualRow) return 0;
+  return Math.max(0, coordinateVirtualizer.value.getTotalSize() - lastVirtualRow.end);
+});
+
 function openDialog() {
   if (!hasRows.value) return;
   const matchingRow = rows.value.find((row) => row.sequence === selectedRow.value?.sequence);
   selectedRow.value = matchingRow ?? rows.value[0];
   isOpen.value = true;
+  void nextTick(() => coordinateVirtualizer.value.measure());
 }
 
 function downloadCsv() {
@@ -65,30 +144,6 @@ function selectRow(row: BoxCoordinateRow) {
   selectedRow.value = row;
 }
 
-function coordinateCells(row: BoxCoordinateRow) {
-  return [
-    row.sequence,
-    row.loadingSequence,
-    row.sku || "-",
-    row.doorFaceX,
-    row.doorFaceY,
-    row.doorFaceZ,
-    row.topFaceX,
-    row.topFaceY,
-    row.topFaceZ,
-    row.centerX,
-    row.centerY,
-    row.centerZ,
-    row.length,
-    row.width,
-    row.height,
-    row.layer,
-    row.row,
-    row.column,
-    row.orientation || "-",
-  ];
-}
-
 watch(
   () => rows.value,
   (nextRows) => {
@@ -98,6 +153,13 @@ watch(
     }
     const matchingRow = nextRows.find((row) => row.sequence === selectedRow.value?.sequence);
     selectedRow.value = matchingRow ?? nextRows[0];
+  },
+);
+
+watch(
+  () => coordinateTableRows.value.length,
+  () => {
+    void nextTick(() => coordinateVirtualizer.value.measure());
   },
 );
 </script>
@@ -130,44 +192,39 @@ watch(
       </p>
 
       <div class="coordinate-content">
-        <div class="coordinate-table-shell">
+        <div ref="coordinateTableShellRef" class="coordinate-table-shell">
           <table>
             <thead>
-              <tr>
-                <th>序号</th>
-                <th>装载顺序</th>
-                <th>SKU</th>
-                <th>柜门面X</th>
-                <th>柜门面Y</th>
-                <th>柜门面Z</th>
-                <th>上表面X</th>
-                <th>上表面Y</th>
-                <th>上表面Z</th>
-                <th>中心点X</th>
-                <th>中心点Y</th>
-                <th>中心点Z</th>
-                <th>长</th>
-                <th>宽</th>
-                <th>高</th>
-                <th>层</th>
-                <th>排</th>
-                <th>列</th>
-                <th>朝向</th>
+              <tr v-for="headerGroup in coordinateTable.getHeaderGroups()" :key="headerGroup.id">
+                <th v-for="header in headerGroup.headers" :key="header.id">
+                  <FlexRender
+                    v-if="!header.isPlaceholder"
+                    :render="header.column.columnDef.header"
+                    :props="header.getContext()"
+                  />
+                </th>
               </tr>
             </thead>
             <tbody>
+              <tr v-if="topSpacerHeight > 0" class="coordinate-virtual-spacer" aria-hidden="true">
+                <td :colspan="coordinateLeafColumnCount" :style="{ height: `${topSpacerHeight}px` }"></td>
+              </tr>
               <tr
-                v-for="row in rows"
-                :key="row.sequence"
-                :class="{ 'is-selected': selectedRow?.sequence === row.sequence }"
+                v-for="{ row, virtualRow } in coordinateVirtualRows"
+                :key="row.id"
+                :data-index="virtualRow.index"
+                :class="{ 'is-selected': selectedRow?.sequence === row.original.sequence }"
                 tabindex="0"
-                @click="selectRow(row)"
-                @keydown.enter.prevent="selectRow(row)"
-                @keydown.space.prevent="selectRow(row)"
+                @click="selectRow(row.original)"
+                @keydown.enter.prevent="selectRow(row.original)"
+                @keydown.space.prevent="selectRow(row.original)"
               >
-                <td v-for="(cell, cellIndex) in coordinateCells(row)" :key="`${row.sequence}-${cellIndex}`">
-                  {{ typeof cell === "number" ? formatNumber(cell) : cell }}
+                <td v-for="cell in row.getVisibleCells()" :key="cell.id">
+                  <FlexRender :render="cell.column.columnDef.cell" :props="cell.getContext()" />
                 </td>
+              </tr>
+              <tr v-if="bottomSpacerHeight > 0" class="coordinate-virtual-spacer" aria-hidden="true">
+                <td :colspan="coordinateLeafColumnCount" :style="{ height: `${bottomSpacerHeight}px` }"></td>
               </tr>
             </tbody>
           </table>
@@ -198,6 +255,7 @@ watch(
             :camera-zoom="1.6"
             show-coordinate-axes
             dim-cargo-when-selected
+            lightweight-coordinate-preview
           />
         </aside>
       </div>
@@ -333,7 +391,7 @@ tbody tr {
   cursor: pointer;
 }
 
-tbody tr:hover td {
+tbody tr:not(.coordinate-virtual-spacer):hover td {
   background: rgba(66, 214, 164, 0.06);
 }
 
@@ -345,6 +403,17 @@ tbody tr:focus-visible td,
 tbody tr.is-selected td {
   background: rgba(66, 214, 164, 0.12);
   color: var(--accent);
+}
+
+.coordinate-virtual-spacer {
+  cursor: default;
+  pointer-events: none;
+}
+
+.coordinate-virtual-spacer td {
+  padding: 0;
+  border-bottom: 0;
+  background: transparent;
 }
 
 tr:last-child td {

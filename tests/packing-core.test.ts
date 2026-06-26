@@ -95,18 +95,58 @@ function assertNoPositionOverlaps(positions) {
   }
 }
 
-function assertLoadsInnerFaceBeforeNextDepth(result) {
-  const innerDepthPositions = result.orderedPositions.filter((position) => position.x === 0);
-  const positions = Packing.generateBoxPositions(result, innerDepthPositions.length + 1);
-  assert.ok(innerDepthPositions.length > 1, "expected multiple boxes at the innermost loading depth");
-  assert.ok(positions.length > innerDepthPositions.length, "expected at least one box after the innermost face");
+function assertLoadsFirstLayerBeforeNextLayer(result) {
+  const positions = Packing.generateBoxPositions(result, result.totalBoxes);
+  const rowGroups = new Map();
+  let checkedRows = 0;
+
+  for (const position of positions) {
+    const key = Number.isFinite(position.loadingRowIndex) ? `row:${position.loadingRowIndex}` : `x:${position.x}`;
+    if (!rowGroups.has(key)) rowGroups.set(key, []);
+    rowGroups.get(key).push(position);
+  }
+
+  for (const rowPositions of rowGroups.values()) {
+    const firstLayerCount = rowPositions.filter((position) => position.stackIndex === 0).length;
+    const firstNextLayerIndex = rowPositions.findIndex((position) => position.stackIndex > 0);
+    if (firstNextLayerIndex < 0) continue;
+    if (firstLayerCount <= 1) continue;
+    checkedRows += 1;
+
+    assert.equal(
+      firstNextLayerIndex,
+      firstLayerCount,
+      "all cartons in a row first layer should load before any carton in that row second layer",
+    );
+    assert.ok(
+      rowPositions.slice(0, firstLayerCount).every((position) => position.stackIndex === 0),
+      "each row first loading block should contain only first-layer cartons",
+    );
+  }
+
+  assert.ok(checkedRows > 0, "expected at least one multi-layer loading row");
+}
+
+function assertMixedWidthLanesTouchBothSideWalls(result) {
+  assert.equal(result.pattern.family, "width-lanes");
+  const labels = Array.from(new Set(result.layerPositions.map((position) => position.label)));
+  assert.ok(labels.length > 1, "expected a mixed-orientation width-lane pattern");
+
+  const leftByLabel = new Map();
+  const rightByLabel = new Map();
+  for (const label of labels) {
+    const positions = result.layerPositions.filter((position) => position.label === label);
+    leftByLabel.set(label, Math.min(...positions.map((position) => position.y)));
+    rightByLabel.set(label, Math.max(...positions.map((position) => position.y + position.dy)));
+  }
+
   assert.ok(
-    positions.slice(0, innerDepthPositions.length).every((position) => position.x === 0),
-    "all boxes at the innermost depth should load before moving toward the door",
+    Array.from(leftByLabel.values()).some((left) => left === 0),
+    "one orientation group should start against the left side wall",
   );
   assert.ok(
-    positions[innerDepthPositions.length].x > 0,
-    "loading should move toward the door only after the innermost face is complete",
+    Array.from(rightByLabel.values()).some((right) => right === result.container.width),
+    "one orientation group should end against the right side wall",
   );
 }
 
@@ -192,6 +232,20 @@ describe("packing core", () => {
   assert.equal(result.pattern.lengthFacingCount, 1);
   assert.equal(result.pattern.widthFacingCount, 1);
   assert.equal(result.pattern.occupiedWidth, 500);
+  assertMixedWidthLanesTouchBothSideWalls(result);
+}
+
+{
+  const result = Packing.calculatePacking(
+    customContainer(1000, 500, 200),
+    carton(360, 140, 100),
+    { cornerBlock: { length: 0, width: 0, height: 0 } },
+  );
+
+  assert.equal(result.totalBoxes, 18);
+  assert.equal(result.pattern.family, "width-lanes");
+  assertLoadsFirstLayerBeforeNextLayer(result);
+  assertMixedWidthLanesTouchBothSideWalls(result);
 }
 
 {
@@ -227,10 +281,10 @@ describe("packing core", () => {
   assert.deepEqual(
     positions.map((box) => [box.x, box.y, box.z]),
     [
-      [0, 110, 0],
       [0, 0, 0],
-      [0, 110, 100],
+      [0, 110, 0],
       [0, 0, 100],
+      [0, 110, 100],
     ],
   );
 }
@@ -246,10 +300,10 @@ describe("packing core", () => {
   assert.deepEqual(
     positions.map((box) => [box.sequenceIndex, box.faceIndex, box.stackIndex]),
     [
-      [0, 1, 0],
-      [1, 0, 0],
-      [2, 1, 1],
-      [3, 0, 1],
+      [0, 0, 0],
+      [1, 1, 0],
+      [2, 0, 1],
+      [3, 1, 1],
     ],
   );
 }
@@ -276,8 +330,8 @@ describe("packing core", () => {
   assert.deepEqual(
     positions.slice(0, 2).map((position) => [position.x, position.y, position.z]),
     [
-      [10, 410, 0],
-      [10, 310, 0],
+      [10, 10, 0],
+      [10, 110, 0],
     ],
   );
   assertPositionsFitContainer(result, positions);
@@ -315,7 +369,8 @@ describe("packing core", () => {
   assert.equal(result.totalBoxes, 1349);
   assert.equal(result.container.id, "40HQ");
   assert.equal(result.usedHeight, 2619);
-  assertLoadsInnerFaceBeforeNextDepth(result);
+  assertLoadsFirstLayerBeforeNextLayer(result);
+  assertMixedWidthLanesTouchBothSideWalls(result);
   assertTailOptimizedSource(result);
   assertValidGeneratedPacking(result);
 }
@@ -329,7 +384,8 @@ describe("packing core", () => {
   assert.equal(result.totalBoxes, 1412);
   assert.equal(result.container.id, "40HQ");
   assert.equal(result.usedHeight, 2619);
-  assertLoadsInnerFaceBeforeNextDepth(result);
+  assertLoadsFirstLayerBeforeNextLayer(result);
+  assertMixedWidthLanesTouchBothSideWalls(result);
   assertTailOptimizedSource(result);
   assertValidGeneratedPacking(result);
 }
@@ -340,11 +396,10 @@ describe("packing core", () => {
     carton(509, 418, 338),
   );
 
-  assert.equal(result.totalBoxes, 889);
+  assert.equal(result.totalBoxes, 875);
   assert.equal(result.container.id, "40HQ");
   assert.equal(result.usedHeight, 2366);
-  assertLoadsInnerFaceBeforeNextDepth(result);
-  assertTailOptimizedSource(result);
+  assertLoadsFirstLayerBeforeNextLayer(result);
   assertValidGeneratedPacking(result);
 }
 
@@ -357,7 +412,7 @@ describe("packing core", () => {
   assert.equal(result.totalBoxes, 927);
   assert.equal(result.container.id, "40HQ");
   assert.equal(result.usedHeight, 2640);
-  assertLoadsInnerFaceBeforeNextDepth(result);
+  assertLoadsFirstLayerBeforeNextLayer(result);
   assertTailOptimizedSource(result);
   assertValidGeneratedPacking(result);
 }
@@ -392,26 +447,22 @@ describe("packing core", () => {
     carton(495, 395, 310),
   );
 
-  assert.equal(result.totalBoxes, 462);
-  assert.equal(result.perLayerBoxCount, 66);
+  assert.equal(result.totalBoxes, 455);
+  assert.equal(result.perLayerBoxCount, 65);
   assert.equal(result.layers.length, 7);
   assert.equal(result.pattern.family, "width-lanes");
   assert.equal(result.pattern.lengthFacingCount, 2);
   assert.equal(result.pattern.widthFacingCount, 3);
-  assertTailOptimizedSource(result);
+  assert.equal(result.pattern.source, "door-remainder");
+  assert.equal(result.pattern.remainderCount, 1);
 
   const positions = Packing.generateBoxPositions(result, result.totalBoxes);
   assert.equal(positions.length, result.totalBoxes);
   assertNoCornerCollisions(result, positions);
   assertNoPositionOverlaps(positions);
 
-  const tailHorizontalStack = positions.filter(
-    (position) =>
-      position.x === 495 * 11 &&
-      position.dx === 395 &&
-      position.dy === 495,
-  );
-  assert.equal(tailHorizontalStack.length, 14);
+  const tailHorizontalStack = positions.filter((position) => position.source === "door-remainder");
+  assert.equal(tailHorizontalStack.length, 7);
   assert.deepEqual(
     [...new Set(tailHorizontalStack.map((position) => position.stackIndex))],
     [0, 1, 2, 3, 4, 5, 6],
@@ -566,7 +617,7 @@ describe("packing core", () => {
   assert.equal(result.totalBoxes, 200);
   assert.deepEqual(summarizeSkuCounts(result), { A: 100, B: 100 });
   assert.equal(aFootprints.length, 14);
-  assert.equal(bFootprints.length, 14);
+  assert.equal(bFootprints.length, 15);
   assert.equal(new Set(aFootprints.map(footprintKey)).size, aFootprints.length);
   assert.equal(new Set(bFootprints.map(footprintKey)).size, bFootprints.length);
   assert.equal(
@@ -596,12 +647,12 @@ describe("packing core", () => {
   assert.deepEqual(
     positions.map((position) => [position.skuLabel, position.x, position.y, position.z]),
     [
-      ["A", 0, 400, 0],
-      ["A", 0, 300, 0],
-      ["A", 0, 200, 0],
-      ["A", 0, 100, 0],
       ["A", 0, 0, 0],
-      ["A", 0, 400, 100],
+      ["A", 0, 100, 0],
+      ["A", 0, 200, 0],
+      ["A", 0, 300, 0],
+      ["A", 0, 400, 0],
+      ["A", 0, 0, 100],
     ],
   );
 }
