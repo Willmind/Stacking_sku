@@ -506,16 +506,24 @@ function drawGuideLabel(ctx: CanvasRenderingContext2D, text: string, x: number, 
   ctx.restore();
 }
 
-function formatAxisGuideText(metric: Plan2DAxisGuideMetric) {
-  const axisName = axisNameForLabel(metric.axisLabel);
-  const countText = metric.countLabel ? `${formatNumber(metric.count)}${metric.countLabel} · ` : "";
-  return `${countText}占${axisName} ${formatNumber(metric.occupied)}mm · 余量 ${formatNumber(metric.remaining)}mm`;
+function formatAxisGuideCountText(metric: Plan2DAxisGuideMetric, axis: "x" | "y") {
+  if (!metric.countLabel) return "";
+  const directionLabel = axis === "x" ? "横向" : "竖向";
+  return `${directionLabel} ${formatNumber(metric.count)}${metric.countLabel}`;
 }
 
-function formatAxisGuideLines(metric: Plan2DAxisGuideMetric) {
+function formatAxisGuideText(metric: Plan2DAxisGuideMetric, axis: "x" | "y") {
+  const axisName = axisNameForLabel(metric.axisLabel);
+  const countText = formatAxisGuideCountText(metric, axis);
+  const countPrefix = countText ? `${countText} · ` : "";
+  return `${countPrefix}占${axisName} ${formatNumber(metric.occupied)}mm · 余量 ${formatNumber(metric.remaining)}mm`;
+}
+
+function formatAxisGuideLines(metric: Plan2DAxisGuideMetric, axis: "x" | "y") {
   const axisName = axisNameForLabel(metric.axisLabel);
   const lines = [`占${axisName} ${formatNumber(metric.occupied)}mm`, `余量 ${formatNumber(metric.remaining)}mm`];
-  return metric.countLabel ? [`${formatNumber(metric.count)}${metric.countLabel}`, ...lines] : lines;
+  const countText = formatAxisGuideCountText(metric, axis);
+  return countText ? [countText, ...lines] : lines;
 }
 
 function getStackedGuideLabelSize(lines: string[], measureText: (text: string) => number) {
@@ -642,8 +650,8 @@ function drawOuterAxisGuides(
   ctx.stroke();
 
   ctx.setLineDash([]);
-  drawGuideLabel(ctx, formatAxisGuideText(model.x), clamp((x1 + x2) / 2, 80, canvasWidth - 80), xGuideY + 17);
-  const yGuideLines = formatAxisGuideLines(model.y);
+  drawGuideLabel(ctx, formatAxisGuideText(model.x, "x"), clamp((x1 + x2) / 2, 80, canvasWidth - 80), xGuideY + 17);
+  const yGuideLines = formatAxisGuideLines(model.y, "y");
   ctx.font = STACKED_GUIDE_LABEL_FONT;
   drawStackedGuideLabel(
     ctx,

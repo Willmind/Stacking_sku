@@ -66,16 +66,24 @@ function estimateTextWidth(text: string) {
   }, 0);
 }
 
-function formatAxisGuideText(metric: Plan2DAxisGuideMetric) {
-  const axisName = axisNameForLabel(metric.axisLabel);
-  const countText = metric.countLabel ? `${formatNumber(metric.count)}${metric.countLabel} · ` : "";
-  return `${countText}占${axisName} ${formatNumber(metric.occupied)}mm · 余量 ${formatNumber(metric.remaining)}mm`;
+function formatAxisGuideCountText(metric: Plan2DAxisGuideMetric, axis: "x" | "y") {
+  if (!metric.countLabel) return "";
+  const directionLabel = axis === "x" ? "横向" : "竖向";
+  return `${directionLabel} ${formatNumber(metric.count)}${metric.countLabel}`;
 }
 
-function formatAxisGuideLines(metric: Plan2DAxisGuideMetric) {
+function formatAxisGuideText(metric: Plan2DAxisGuideMetric, axis: "x" | "y") {
+  const axisName = axisNameForLabel(metric.axisLabel);
+  const countText = formatAxisGuideCountText(metric, axis);
+  const countPrefix = countText ? `${countText} · ` : "";
+  return `${countPrefix}占${axisName} ${formatNumber(metric.occupied)}mm · 余量 ${formatNumber(metric.remaining)}mm`;
+}
+
+function formatAxisGuideLines(metric: Plan2DAxisGuideMetric, axis: "x" | "y") {
   const axisName = axisNameForLabel(metric.axisLabel);
   const lines = [`占${axisName} ${formatNumber(metric.occupied)}mm`, `余量 ${formatNumber(metric.remaining)}mm`];
-  return metric.countLabel ? [`${formatNumber(metric.count)}${metric.countLabel}`, ...lines] : lines;
+  const countText = formatAxisGuideCountText(metric, axis);
+  return countText ? [countText, ...lines] : lines;
 }
 
 function getStackedGuideLabelSize(lines: string[]) {
@@ -128,12 +136,12 @@ const axisGuideConfig = computed(() => {
   const tick = 5;
   const xGuideY = Math.min(model.height - 48, yEnd + (compact ? 14 : 18));
   const yGuideX = Math.max(34, xStart - (compact ? 12 : 16));
-  const xLabelText = formatAxisGuideText(metrics.x);
+  const xLabelText = formatAxisGuideText(metrics.x, "x");
   const xLabelWidth = Math.min(estimateTextWidth(xLabelText) + GUIDE_LABEL_PADDING_X * 2, stageSize.value.width - 16);
   const xLabelHeight = 25;
   const xLabelCenterX = clamp((xStart + xEnd) / 2, 8 + xLabelWidth / 2, stageSize.value.width - xLabelWidth / 2 - 8);
   const xLabelY = clamp(xGuideY + 13, 8, model.height - xLabelHeight - 8);
-  const yLabelLines = formatAxisGuideLines(metrics.y);
+  const yLabelLines = formatAxisGuideLines(metrics.y, "y");
   const yLabelSize = getStackedGuideLabelSize(yLabelLines);
   const yLabelX = clamp(
     yGuideX - yLabelSize.width - VERTICAL_GUIDE_LABEL_GAP,

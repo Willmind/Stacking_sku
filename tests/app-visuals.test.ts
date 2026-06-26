@@ -146,9 +146,11 @@ describe("3D visual rendering source guards", () => {
     assert.match(cargo3dSceneV2Source, /selected-box-glow/);
     assert.match(cargo3dSceneV2Source, /selected-box-highlight/);
     assert.match(cargo3dSceneV2Source, /selected-box-outline/);
-    assert.match(cargo3dSceneV2Source, /cargoFaceOpacity[\s\S]*0\.16/);
-    assert.match(cargo3dSceneV2Source, /cargoEdgeOpacity[\s\S]*0\.06/);
-    assert.match(cargo3dSceneV2Source, /:opacity="0\.68"/);
+    assert.match(cargo3dSceneV2Source, /isCoordinateFocusMode/);
+    assert.match(cargo3dSceneV2Source, /contextCargoFaceOpacity[\s\S]*0\.025/);
+    assert.match(cargo3dSceneV2Source, /contextCargoEdgeOpacity[\s\S]*0\.18/);
+    assert.match(cargo3dSceneV2Source, /contextCargoEdgeColor[\s\S]*#dce8ee/);
+    assert.match(cargo3dSceneV2Source, /:opacity="0\.9"/);
     assert.doesNotMatch(coordinateDialogSource, /show-selected-coordinate-points/);
     assert.doesNotMatch(cargo3dSceneV2Source, /showSelectedCoordinatePoints/);
     assert.doesNotMatch(cargo3dSceneV2Source, /toSceneCoordinatePoints/);
@@ -502,11 +504,17 @@ describe("2D plan source guards", () => {
 
   it("uses an upright compact label for the vertical axis guide", () => {
     assert.match(plan2dSource, /function drawStackedGuideLabel/);
+    assert.match(plan2dSource, /function formatAxisGuideCountText/);
     assert.match(plan2dSource, /function formatAxisGuideLines/);
     assert.match(plan2dSource, /getPlan2DVerticalGuideLabelLayout/);
+    assert.match(plan2dKonvaStageSource, /function formatAxisGuideCountText/);
     assert.match(plan2dKonvaStageSource, /formatAxisGuideLines/);
     assert.match(plan2dKonvaStageSource, /verticalGuideLabelStyle/);
     assert.match(plan2dKonvaStageSource, /axisGuideConfig\.yLabel\.lines/);
+    assert.match(plan2dSource, /横向/);
+    assert.match(plan2dSource, /竖向/);
+    assert.match(plan2dKonvaStageSource, /横向/);
+    assert.match(plan2dKonvaStageSource, /竖向/);
     assert.match(plan2dSource, /yGuideX,\s*yStart:\s*y1,\s*yEnd:\s*y2/);
     assert.doesNotMatch(plan2dSource, /boxX \+ 6,\s*boxY - 58/);
     assert.doesNotMatch(plan2dSource, /formatAxisGuideText\(model\.y\),\s*yGuideX[^)]*-\s*Math\.PI\s*\/\s*2/);

@@ -155,6 +155,7 @@ async function readCanvasScreenshotFrame(page: Page, canvasLocator: Locator) {
     const { data: pixels } = context.getImageData(0, 0, width, height);
     let litPixels = 0;
     let cargoPixels = 0;
+    let selectedPixels = 0;
     let minX = width;
     let maxX = -1;
     let minY = height;
@@ -177,10 +178,14 @@ async function readCanvasScreenshotFrame(page: Page, canvasLocator: Locator) {
         maxY = Math.max(maxY, y);
 
         const isCargo = red > 120 && green > 70 && green < 190 && blue < 90;
-        if (!isCargo) continue;
-        cargoPixels += 1;
-        cargoMinY = Math.min(cargoMinY, y);
-        cargoMaxY = Math.max(cargoMaxY, y);
+        if (isCargo) {
+          cargoPixels += 1;
+          cargoMinY = Math.min(cargoMinY, y);
+          cargoMaxY = Math.max(cargoMaxY, y);
+        }
+
+        const isSelectedHighlight = red < 150 && green > 190 && blue > 190;
+        if (isSelectedHighlight) selectedPixels += 1;
       }
     }
 
@@ -189,6 +194,7 @@ async function readCanvasScreenshotFrame(page: Page, canvasLocator: Locator) {
       height,
       litPixels,
       cargoPixels,
+      selectedPixels,
       leftMargin: minX,
       rightMargin: width - 1 - maxX,
       topMargin: minY,
@@ -222,6 +228,8 @@ test("calculates the 488 x 380 x 291 benchmark and renders both views", async ({
   await expect(page.locator("#plan-canvas-top")).toHaveCount(1);
   await expect(page.locator("#plan-canvas-side")).toHaveCount(0);
   await expect(page.locator("#plan-canvas-front")).toHaveCount(1);
+  await expect(page.locator(".plan-view-card--switchable .plan-guide-label--x")).toContainText("横向");
+  await expect(page.locator(".plan-view-card--switchable .plan-guide-label--y")).toContainText("竖向");
   await expect(page.locator(".plan-view-card--front")).toContainText("端视图");
   await expect(page.locator(".plan-view-card--front .plan-view-measure")).toContainText("柜宽");
   await expect(page.locator(".plan-group-summary")).toHaveCount(0);
@@ -286,7 +294,7 @@ test("shows and downloads the carton coordinate table", async ({ page }) => {
   const previewFrame = await readCanvasScreenshotFrame(page, previewCanvas);
   expect(previewFrame.screenshotBytes).toBeGreaterThan(1000);
   expect(previewFrame.litPixels).toBeGreaterThan(1000);
-  expect(previewFrame.cargoPixels).toBeGreaterThan(1000);
+  expect(previewFrame.selectedPixels).toBeGreaterThan(150);
 
   await dialog.locator("tbody tr").nth(9).click();
   await expect(dialog).toContainText("当前选中：#10");

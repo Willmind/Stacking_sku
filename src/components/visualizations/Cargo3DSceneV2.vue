@@ -89,7 +89,7 @@ const selectedHighlight = computed(() => {
   if (!box) return null;
   return {
     ...box,
-    scale: box.scale.map((value) => Math.max(value * 1.08, 0.001)) as [number, number, number],
+    scale: box.scale.map((value) => Math.max(value * 1.12, 0.001)) as [number, number, number],
   };
 });
 
@@ -98,7 +98,7 @@ const selectedGlow = computed(() => {
   if (!box) return null;
   return {
     ...box,
-    scale: box.scale.map((value) => Math.max(value * 1.24, 0.001)) as [number, number, number],
+    scale: box.scale.map((value) => Math.max(value * 1.32, 0.001)) as [number, number, number],
   };
 });
 
@@ -107,7 +107,7 @@ const selectedHalo = computed(() => {
   if (!box) return null;
   return {
     ...box,
-    scale: box.scale.map((value) => Math.max(value * 1.42, 0.001)) as [number, number, number],
+    scale: box.scale.map((value) => Math.max(value * 1.58, 0.001)) as [number, number, number],
   };
 });
 
@@ -116,7 +116,7 @@ const selectedOutline = computed(() => {
   if (!box) return null;
   return {
     ...box,
-    scale: box.scale.map((value) => Math.max(value * 1.14, 0.001)) as [number, number, number],
+    scale: box.scale.map((value) => Math.max(value * 1.2, 0.001)) as [number, number, number],
   };
 });
 
@@ -262,9 +262,11 @@ function addCoordinateAxes(group: THREE.Group, result: PackingResult) {
   }
 }
 
-const isCargoDimmed = computed(() => Boolean(props.dimCargoWhenSelected && selectedSceneBox.value));
-const cargoFaceOpacity = computed(() => (isCargoDimmed.value ? 0.16 : 1));
-const cargoEdgeOpacity = computed(() => (isCargoDimmed.value ? 0.06 : 0.08));
+const isCoordinateFocusMode = computed(() => Boolean(props.dimCargoWhenSelected && selectedSceneBox.value));
+const contextCargoFaceOpacity = computed(() => (isCoordinateFocusMode.value ? 0.025 : 1));
+const contextCargoEdgeOpacity = computed(() => (isCoordinateFocusMode.value ? 0.18 : 0.08));
+const contextCargoEdgeColor = computed(() => (isCoordinateFocusMode.value ? "#dce8ee" : "#b8fff0"));
+const contextCargoDepthWrite = computed(() => !isCoordinateFocusMode.value);
 
 function rebuildOverlayGroup() {
   clearOverlayGroup();
@@ -462,8 +464,9 @@ onBeforeUnmount(() => {
         <TresMeshBasicMaterial
           :color="box.color"
           :side="DoubleSide"
-          :transparent="isCargoDimmed"
-          :opacity="cargoFaceOpacity"
+          :transparent="isCoordinateFocusMode"
+          :opacity="contextCargoFaceOpacity"
+          :depth-write="contextCargoDepthWrite"
         />
       </TresMesh>
 
@@ -518,7 +521,7 @@ onBeforeUnmount(() => {
         <TresMeshBasicMaterial
           color="#78ffff"
           :transparent="true"
-          :opacity="0.68"
+          :opacity="0.9"
           :depth-test="false"
           :depth-write="false"
         />
@@ -567,10 +570,10 @@ onBeforeUnmount(() => {
       >
         <TresBoxGeometry />
         <TresMeshBasicMaterial
-          color="#b8fff0"
+          :color="contextCargoEdgeColor"
           :wireframe="true"
           :transparent="true"
-          :opacity="cargoEdgeOpacity"
+          :opacity="contextCargoEdgeOpacity"
           :depth-write="false"
         />
       </TresMesh>
