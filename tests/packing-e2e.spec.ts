@@ -283,7 +283,10 @@ test("shows and downloads the carton coordinate table", async ({ page }) => {
   await expect(dialog).toContainText("坐标系");
   await expect(dialog).toContainText("柜门面X");
   await expect(dialog).toContainText("上表面X");
-  await expect(dialog.locator("tbody tr")).toHaveCount(755);
+  await expect(dialog.locator(".coordinate-virtual-spacer")).toHaveCount(1);
+  const renderedCoordinateRows = dialog.locator("tbody tr:not(.coordinate-virtual-spacer)");
+  await expect(renderedCoordinateRows.first()).toBeVisible();
+  await expect.poll(async () => renderedCoordinateRows.count()).toBeLessThan(80);
   const tableBox = await dialog.locator(".coordinate-table-shell").boundingBox();
   const previewBox = await dialog.locator(".coordinate-preview").boundingBox();
   if (!tableBox || !previewBox) throw new Error("Coordinate dialog layout boxes are missing");
@@ -296,7 +299,7 @@ test("shows and downloads the carton coordinate table", async ({ page }) => {
   expect(previewFrame.litPixels).toBeGreaterThan(1000);
   expect(previewFrame.selectedPixels).toBeGreaterThan(50);
 
-  await dialog.locator("tbody tr").nth(9).click();
+  await renderedCoordinateRows.nth(9).click();
   await expect(dialog).toContainText("当前选中：#10");
 
   const downloadPromise = page.waitForEvent("download");

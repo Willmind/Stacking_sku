@@ -301,6 +301,13 @@ describe("control panel layout source guards", () => {
     assert.match(coordinateDialogSource, /上表面X/);
     assert.match(coordinateDialogSource, /createBoxCoordinateRows/);
     assert.match(coordinateDialogSource, /createBoxCoordinateCsv/);
+    assert.match(packageSource, /"@tanstack\/vue-table"/);
+    assert.match(packageSource, /"@tanstack\/vue-virtual"/);
+    assert.match(coordinateDialogSource, /useVueTable/);
+    assert.match(coordinateDialogSource, /useVirtualizer/);
+    assert.match(coordinateDialogSource, /coordinateVirtualRows/);
+    assert.match(coordinateDialogSource, /coordinate-virtual-spacer/);
+    assert.doesNotMatch(coordinateDialogSource, /v-for="row in rows"/);
     assert.match(coordinateDialogSource, /Cargo3DSceneV2/);
     assert.match(coordinateDialogSource, /show-coordinate-axes/);
     assert.match(coordinateDialogSource, /selectedRow/);
