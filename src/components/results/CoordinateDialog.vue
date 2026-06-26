@@ -255,6 +255,7 @@ watch(
             :camera-zoom="1.6"
             show-coordinate-axes
             dim-cargo-when-selected
+            lightweight-coordinate-preview
           />
         </aside>
       </div>

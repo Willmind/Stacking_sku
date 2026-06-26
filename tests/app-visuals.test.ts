@@ -151,6 +151,14 @@ describe("3D visual rendering source guards", () => {
     assert.match(cargo3dSceneV2Source, /contextCargoEdgeOpacity[\s\S]*0\.18/);
     assert.match(cargo3dSceneV2Source, /contextCargoEdgeColor[\s\S]*#dce8ee/);
     assert.match(cargo3dSceneV2Source, /:opacity="0\.9"/);
+    assert.match(coordinateDialogSource, /lightweight-coordinate-preview/);
+    assert.match(cargo3dSceneV2Source, /lightweightCoordinatePreview/);
+    assert.match(cargo3dSceneV2Source, /shouldUseLightweightCoordinatePreview/);
+    assert.match(cargo3dSceneV2Source, /shouldRenderContextCargoFaces/);
+    assert.match(
+      cargo3dSceneV2Source,
+      /<template v-if="shouldRenderContextCargoFaces">[\s\S]*v-for="box in sceneBoxes"[\s\S]*name="cargo-box"/,
+    );
     assert.doesNotMatch(coordinateDialogSource, /show-selected-coordinate-points/);
     assert.doesNotMatch(cargo3dSceneV2Source, /showSelectedCoordinatePoints/);
     assert.doesNotMatch(cargo3dSceneV2Source, /toSceneCoordinatePoints/);
