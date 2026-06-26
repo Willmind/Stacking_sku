@@ -518,6 +518,8 @@ describe("2D plan source guards", () => {
     assert.match(baseDialogSource, /DialogRoot/);
     assert.match(baseDialogSource, /<DialogPortal v-if="dialogOpen">/);
     assert.match(baseDialogSource, /base-dialog-overlay/);
+    assert.match(baseDialogSource, /\$slots\.toolbar/);
+    assert.match(baseDialogSource, /base-dialog-toolbar/);
     assert.match(baseDialogSource, /DIALOG_ANIMATION_MS = 240/);
     assert.match(baseDialogSource, /isClosing/);
     assert.match(baseDialogSource, /base-dialog-content--closing/);
@@ -529,17 +531,20 @@ describe("2D plan source guards", () => {
     assert.match(baseDialogSource, /\.base-dialog-content--stable-height\s*\{[\s\S]*height:\s*min\(720px,\s*calc\(100dvh - 36px\)\)/);
     assert.match(baseDialogSource, /\.base-dialog-body--default\s*\{[\s\S]*align-content:\s*start/);
     assert.match(visualizationDialogSource, /BaseDialog/);
+    assert.match(visualizationDialogSource, /#toolbar/);
     assert.match(visualizationDialogSource, /open:\s*boolean/);
     assert.match(plan2dViewSource, /Maximize2/);
     assert.match(plan2dViewSource, /VisualizationDialog/);
     assert.match(plan2dViewSource, /:open="expandedPlanViewMode !== null"/);
     assert.doesNotMatch(plan2dViewSource, /<VisualizationDialog\s+v-if/);
     assert.match(plan2dViewSource, /expanded-plan-canvas/);
+    assert.match(plan2dViewSource, /expanded-plan-progress/);
     assert.match(cargo3dViewSource, /Maximize2/);
     assert.match(cargo3dViewSource, /VisualizationDialog/);
     assert.match(cargo3dViewSource, /:open="isExpanded"/);
     assert.doesNotMatch(cargo3dViewSource, /<VisualizationDialog\s+v-if/);
     assert.match(cargo3dViewSource, /expanded-scene-canvas/);
+    assert.match(cargo3dViewSource, /expanded-scene-progress/);
   });
 });
 
@@ -675,6 +680,7 @@ describe("range progress source guards", () => {
     assert.match(allVueAndCssSource, /var\(--range-progress,\s*0%\)/);
     assert.match(progressControlSource, /progressPercent/);
     assert.match(progressControlSource, /--range-progress/);
+    assert.match(progressControlSource, /controlId/);
     assert.match(skuEditorSource, /skuCountProgressPercent/);
     assert.match(skuEditorSource, /--range-progress/);
   });

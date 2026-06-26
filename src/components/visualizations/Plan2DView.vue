@@ -9,6 +9,7 @@ import {
   type Plan2DViewMode,
 } from "../../renderers/plan2d";
 import { usePackingStore } from "../../stores/packingStore";
+import ProgressControl from "../controls/ProgressControl.vue";
 import Plan2DKonvaStage from "./Plan2DKonvaStage.vue";
 import VisualizationDialog from "./VisualizationDialog.vue";
 
@@ -254,6 +255,10 @@ function getExpandedTitle(view: PlanViewItem) {
       :subtitle="expandedPlanView ? getExpandedSubtitle(expandedPlanView.id) : ''"
       @close="closeExpandedView"
     >
+      <template #toolbar>
+        <ProgressControl control-id="expanded-plan-progress" />
+      </template>
+
       <Plan2DKonvaStage
         v-if="expandedPlanView"
         stage-id="expanded-plan-canvas"

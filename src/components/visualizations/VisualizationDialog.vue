@@ -31,6 +31,10 @@ function handleOpenChange(open: boolean) {
     body-variant="grid"
     @update:open="handleOpenChange"
   >
+    <template #toolbar>
+      <slot name="toolbar" />
+    </template>
+
     <slot />
   </BaseDialog>
 </template>

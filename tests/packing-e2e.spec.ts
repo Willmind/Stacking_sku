@@ -310,6 +310,14 @@ test("opens expanded dialogs for 2D and 3D visualizations", async ({ page }) => 
   const planDialog = page.getByRole("dialog", { name: "放大查看 俯视图" });
   await expect(planDialog).toBeVisible();
   await expect(planDialog.locator("#expanded-plan-canvas")).toHaveCount(1);
+  await expect(planDialog.locator("#expanded-plan-progress")).toHaveValue(await page.locator("#stack-progress").inputValue());
+  await planDialog.locator("#expanded-plan-progress").evaluate((element) => {
+    const input = element as HTMLInputElement;
+    input.value = "300";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await expect(page.locator("#stack-progress")).toHaveValue("300");
   await planDialog.getByRole("button", { name: "关闭放大视图" }).click();
   await expect(planDialog).toHaveCount(0);
 
@@ -317,6 +325,7 @@ test("opens expanded dialogs for 2D and 3D visualizations", async ({ page }) => 
   const sceneDialog = page.getByRole("dialog", { name: "放大查看 3D 货柜渲染" });
   await expect(sceneDialog).toBeVisible();
   await expect(sceneDialog.locator("#expanded-scene-canvas")).toHaveCount(1);
+  await expect(sceneDialog.locator("#expanded-scene-progress")).toHaveValue("300");
   await page.keyboard.press("Escape");
   await expect(sceneDialog).toHaveCount(0);
 });
