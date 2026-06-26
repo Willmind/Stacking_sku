@@ -6,6 +6,8 @@ import { describe, it } from "vitest";
 const rendererSource = fs.readFileSync(path.join(__dirname, "..", "src/renderers/cargo3d.ts"), "utf8");
 const plan2dSource = fs.readFileSync(path.join(__dirname, "..", "src/renderers/plan2d.ts"), "utf8");
 const appSource = fs.readFileSync(path.join(__dirname, "..", "src/App.vue"), "utf8");
+const packageSource = fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8");
+const viteConfigSource = fs.readFileSync(path.join(__dirname, "..", "vite.config.ts"), "utf8");
 const tokensSource = fs.readFileSync(path.join(__dirname, "..", "src/styles/tokens.css"), "utf8");
 const plan2dViewSource = fs.readFileSync(
   path.join(__dirname, "..", "src/components/visualizations/Plan2DView.vue"),
@@ -15,6 +17,8 @@ const cargo3dViewSource = fs.readFileSync(
   path.join(__dirname, "..", "src/components/visualizations/Cargo3DView.vue"),
   "utf8",
 );
+const cargo3dSceneV2Path = path.join(__dirname, "..", "src/components/visualizations/Cargo3DSceneV2.vue");
+const cargo3dSceneV2Source = fs.existsSync(cargo3dSceneV2Path) ? fs.readFileSync(cargo3dSceneV2Path, "utf8") : "";
 const visualizationDialogSource = fs.existsSync(
   path.join(__dirname, "..", "src/components/visualizations/VisualizationDialog.vue"),
 )
@@ -72,6 +76,97 @@ const allVueAndCssSource = fs
   .join("\n");
 
 describe("3D visual rendering source guards", () => {
+  it("configures TresJS for Vue-rendered 3D scenes", () => {
+    assert.match(viteConfigSource, /templateCompilerOptions/);
+    assert.match(viteConfigSource, /@tresjs\/core/);
+    assert.match(packageSource, /"@tresjs\/core"/);
+    assert.match(packageSource, /"@tresjs\/cientos"/);
+  });
+
+  it("renders the cargo scene through a TresJS V2 component", () => {
+    assert.match(cargo3dViewSource, /Cargo3DSceneV2/);
+    assert.match(cargo3dSceneV2Source, /TresCanvas/);
+    assert.match(cargo3dSceneV2Source, /OrbitControls/);
+    assert.match(cargo3dSceneV2Source, /:enable-zoom="true"/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /Html/);
+    assert.match(cargo3dSceneV2Source, /toSceneBox/);
+    assert.match(cargo3dSceneV2Source, /endpointLabels/);
+    assert.match(cargo3dSceneV2Source, /endpointSurfaces/);
+    assert.match(cargo3dSceneV2Source, /endpoint-legend/);
+    assert.match(cargo3dSceneV2Source, /projection-label-layer/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /endpointLabels\.forEach\(\(label\) => addSpriteLabel/);
+    assert.doesNotMatch(cargo3dViewSource, /scene-label--inner/);
+    assert.doesNotMatch(cargo3dViewSource, /door-marker/);
+  });
+
+  it("uses the TresJS cargo scene for both compact and expanded 3D views", () => {
+    assert.doesNotMatch(cargo3dViewSource, /createCargoScene/);
+    assert.doesNotMatch(cargo3dViewSource, /expandedCanvasRef/);
+    assert.doesNotMatch(cargo3dViewSource, /<canvas id="expanded-scene-canvas"/);
+    assert.match(cargo3dSceneV2Source, /canvasId/);
+    assert.match(cargo3dViewSource, /canvas-id="scene-canvas"[\s\S]*show-coordinate-axes/);
+    assert.match(cargo3dViewSource, /canvas-id="expanded-scene-canvas"[\s\S]*show-coordinate-axes/);
+    assert.match(cargo3dViewSource, /class="cargo-scene-shell cargo-scene-shell--unified"/);
+    assert.match(cargo3dViewSource, /class="expanded-scene-shell cargo-scene-shell--unified"/);
+  });
+
+  it("uses closer initial camera framing for all 3D cargo views", () => {
+    assert.match(cargo3dSceneV2Source, /cameraZoom/);
+    assert.match(cargo3dSceneV2Source, /:zoom="cameraZoom"/);
+    assert.match(cargo3dViewSource, /canvas-id="scene-canvas"[\s\S]*:camera-zoom="1\.85"/);
+    assert.match(cargo3dViewSource, /canvas-id="expanded-scene-canvas"[\s\S]*:camera-zoom="1\.65"/);
+    assert.match(coordinateDialogSource, /canvas-id="coordinate-preview-canvas"[\s\S]*:camera-zoom="1\.6"/);
+  });
+
+  it("uses the TresJS cargo scene for coordinate previews", () => {
+    assert.match(coordinateDialogSource, /Cargo3DSceneV2/);
+    assert.doesNotMatch(coordinateDialogSource, /createCargoScene/);
+    assert.doesNotMatch(coordinateDialogSource, /previewCanvasRef/);
+    assert.doesNotMatch(coordinateDialogSource, /<canvas\s+[\s\S]*coordinate-preview-canvas/);
+    assert.match(coordinateDialogSource, /canvas-id="coordinate-preview-canvas"/);
+    assert.match(coordinateDialogSource, /show-coordinate-axes/);
+    assert.match(coordinateDialogSource, /selected-loading-sequence/);
+  });
+
+  it("makes coordinate preview targets explicit for robot coordinate checks", () => {
+    assert.match(coordinateDialogSource, /selectedDoorFaceText/);
+    assert.match(coordinateDialogSource, /selectedTopFaceText/);
+    assert.match(coordinateDialogSource, /dim-cargo-when-selected/);
+    assert.match(cargo3dSceneV2Source, /coordinate-axis-shaft/);
+    assert.match(cargo3dSceneV2Source, /axisLegendItems/);
+    assert.match(cargo3dSceneV2Source, /sceneLegendItems/);
+    assert.match(cargo3dSceneV2Source, /endpoint-legend__swatch--axis/);
+    assert.match(cargo3dSceneV2Source, /coordinate-origin-marker/);
+    assert.match(cargo3dSceneV2Source, /selected-box-halo/);
+    assert.match(cargo3dSceneV2Source, /selected-box-glow/);
+    assert.match(cargo3dSceneV2Source, /selected-box-highlight/);
+    assert.match(cargo3dSceneV2Source, /selected-box-outline/);
+    assert.match(cargo3dSceneV2Source, /cargoFaceOpacity[\s\S]*0\.16/);
+    assert.match(cargo3dSceneV2Source, /cargoEdgeOpacity[\s\S]*0\.06/);
+    assert.match(cargo3dSceneV2Source, /:opacity="0\.68"/);
+    assert.doesNotMatch(coordinateDialogSource, /show-selected-coordinate-points/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /showSelectedCoordinatePoints/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /toSceneCoordinatePoints/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /selectedCoordinatePoints/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /coordinatePointLegendItems/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /selected-coordinate-point/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /coordinateAxisLabels/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /coordinateOriginLabel/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /selectedCoordinatePointLabels/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /projection-label--axis/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /projection-label--origin/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /projection-label--coordinate-point/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /endpoint-legend__swatch--point/);
+  });
+
+  it("keeps TresJS cargo boxes visually separable with scene context", () => {
+    assert.match(cargo3dSceneV2Source, /wireframe/);
+    assert.match(cargo3dSceneV2Source, /box-edge/);
+    assert.match(cargo3dSceneV2Source, /container-shell/);
+    assert.match(cargo3dSceneV2Source, /container-floor/);
+    assert.match(cargo3dSceneV2Source, /corner-block/);
+  });
+
   it("keeps cargo colors visible in 3D", () => {
     const edgeMaterialMatch = rendererSource.match(
       /const edgeMaterial = new THREE\.MeshBasicMaterial\(\{([\s\S]*?)\n  \}\);/,
@@ -161,15 +256,29 @@ describe("control panel layout source guards", () => {
     assert.doesNotMatch(baseNumberFieldSource, /\.base-number-stepper\s*\{[\s\S]*min-height:\s*20px/);
   });
 
-  it("keeps the primary result summary above batch import actions", () => {
-    const resultIndex = appSource.indexOf("<ResultSummary />");
+  it("keeps the result overview and calculate action at the top of the control panel", () => {
+    const brandIndex = appSource.indexOf("brand-lockup");
+    const overviewIndex = appSource.indexOf('<ResultSummary section="overview" />');
+    const buttonIndex = appSource.indexOf('class="calculate-button"');
+    const containerIndex = appSource.indexOf("<ContainerForm />");
+    const detailsIndex = appSource.indexOf('<ResultSummary section="details" />');
     const batchIndex = appSource.indexOf("<BatchImportDialog />");
 
-    assert.ok(resultIndex > -1, "ResultSummary should be rendered in the control panel");
+    assert.ok(brandIndex > -1, "Brand lockup should be rendered in the control panel");
+    assert.ok(overviewIndex > -1, "Result overview should be rendered in the control panel");
+    assert.ok(buttonIndex > -1, "Calculate button should be rendered in the control panel");
+    assert.ok(containerIndex > -1, "Container form should be rendered in the control panel");
+    assert.ok(detailsIndex > -1, "Result details should be rendered in the control panel");
     assert.ok(batchIndex > -1, "BatchImportDialog should be rendered in the control panel");
-    assert.ok(resultIndex < batchIndex, "Primary result summary should appear before batch import actions");
+    assert.ok(brandIndex < overviewIndex, "Result overview should appear directly after the brand area");
+    assert.ok(overviewIndex < buttonIndex, "Calculate action should follow the result overview");
+    assert.ok(buttonIndex < containerIndex, "Inputs should appear after the top action area");
+    assert.ok(containerIndex < detailsIndex, "Result details should stay below the input forms");
+    assert.ok(detailsIndex < batchIndex, "Result details should appear before batch import actions");
     assert.match(resultSummarySource, /summary-card--primary/);
     assert.match(resultSummarySource, /metric-grid--compact/);
+    assert.match(resultSummarySource, /section:\s*"overview"/);
+    assert.match(resultSummarySource, /props\.section === 'overview'/);
   });
 
   it("exposes the first-stage carton coordinate table after calculation", () => {
@@ -183,8 +292,8 @@ describe("control panel layout source guards", () => {
     assert.match(coordinateDialogSource, /上表面X/);
     assert.match(coordinateDialogSource, /createBoxCoordinateRows/);
     assert.match(coordinateDialogSource, /createBoxCoordinateCsv/);
-    assert.match(coordinateDialogSource, /createCargoScene/);
-    assert.match(coordinateDialogSource, /showCoordinateAxes:\s*true/);
+    assert.match(coordinateDialogSource, /Cargo3DSceneV2/);
+    assert.match(coordinateDialogSource, /show-coordinate-axes/);
     assert.match(coordinateDialogSource, /selectedRow/);
     assert.match(coordinateDialogSource, /coordinate-preview-canvas/);
     assert.match(coordinateDialogSource, /当前选中/);
@@ -196,6 +305,12 @@ describe("control panel layout source guards", () => {
     assert.match(baseDialogSource, /height:\s*min\(92dvh,\s*1080px\)/);
     assert.match(rendererSource, /getCargoCoordinateAxes/);
     assert.match(rendererSource, /addCoordinateAxes/);
+  });
+
+  it("keeps coordinate table cells centered without extra scroll gutters", () => {
+    assert.doesNotMatch(coordinateDialogSource, /scrollbar-gutter:\s*stable both-edges/);
+    assert.doesNotMatch(coordinateDialogSource, /padding:\s*0 10px 10px 0/);
+    assert.match(coordinateDialogSource, /th,\s*\ntd\s*\{[\s\S]*text-align:\s*center/);
   });
 
   it("uses distinct status-chip tones for calculation states", () => {
@@ -295,6 +410,18 @@ describe("2D plan source guards", () => {
     assert.match(plan2dViewSource, /showLabels:\s*false/);
     assert.match(plan2dSource, /showLabels\?:\s*boolean/);
     assert.match(plan2dSource, /if \(showLabels\)/);
+  });
+
+  it("frames 2D canvases as polished technical drawing surfaces", () => {
+    assert.match(plan2dViewSource, /plan-canvas-shell/);
+    assert.match(plan2dViewSource, /plan-canvas-shell--switchable/);
+    assert.match(plan2dViewSource, /plan-canvas-shell--front/);
+    assert.match(plan2dViewSource, /\.plan-canvas-shell::before/);
+    assert.match(plan2dViewSource, /\.plan-canvas-shell::after/);
+    assert.match(plan2dViewSource, /box-shadow:\s*inset 0 0 0 1px rgba\(255,\s*255,\s*255,\s*0\.05\)/);
+    assert.match(plan2dViewSource, /radial-gradient\(circle at 18% 12%/);
+    assert.match(plan2dViewSource, /background-size:\s*36px 36px/);
+    assert.doesNotMatch(plan2dViewSource, /background-size:\s*28px 28px/);
   });
 
   it("keeps top-view status aligned to the current loading progress", () => {

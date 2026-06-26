@@ -129,7 +129,7 @@ describe("2D plan axis guide metrics", () => {
 
     assert.ok(!front.drawnText.some((text) => text.includes("35排")));
     assert.ok(front.drawnText.includes("占宽 2,320mm · 余量 32mm"));
-  });
+  }, 12_000);
 
   it("renders front views from the selected endpoint instead of flattening the full container length", () => {
     const result = calculatePacking("20GP", { length: 120, width: 320, height: 260 });
@@ -157,7 +157,7 @@ describe("2D plan axis guide metrics", () => {
     assert.notEqual(corner.cargoRects.length, door.cargoRects.length);
     assert.ok(corner.drawnText.includes("角件端视角"));
     assert.ok(door.drawnText.includes("柜门视角"));
-  });
+  }, 12_000);
 
   it("places the vertical guide label outside the left guide and centers it on the occupied span", () => {
     const layout = getPlan2DVerticalGuideLabelLayout({

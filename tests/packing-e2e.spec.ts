@@ -238,7 +238,11 @@ test("calculates the 488 x 380 x 291 benchmark and renders both views", async ({
   await expect(page.locator("#plan-canvas-side")).toHaveCount(1);
   await expect(page.locator("#plan-canvas-front")).toHaveCount(1);
   await expect(page.locator("#scene-canvas")).toHaveCount(1);
-  await expect(page.locator(".door-marker")).toHaveText("柜门");
+  await expect(page.locator(".door-marker")).toHaveCount(0);
+  const sceneFrame = await readSceneCanvasScreenshotFrame(page);
+  expect(sceneFrame.screenshotBytes).toBeGreaterThan(1000);
+  expect(sceneFrame.litPixels).toBeGreaterThan(1000);
+  expect(sceneFrame.cargoPixels).toBeGreaterThan(1000);
 });
 
 test("calculates the 488 x 360 x 291 benchmark", async ({ page }) => {
@@ -929,6 +933,7 @@ test("keeps small viewport page height bounded", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await page.getByRole("button", { name: "计算装载" }).click();
+  await expect(page.locator("#status-chip")).toHaveText("已完成计算");
 
   const initial = await page.evaluate(() => ({
     viewportHeight: window.innerHeight,

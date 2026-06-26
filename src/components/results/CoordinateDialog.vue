@@ -1,19 +1,18 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { Crosshair, Download, MapPinned } from "@lucide/vue";
 import {
   createBoxCoordinateCsv,
   createBoxCoordinateRows,
   type BoxCoordinateRow,
 } from "../../core/boxCoordinates";
-import { createCargoScene, type CargoScene } from "../../renderers/cargo3d";
 import { usePackingStore } from "../../stores/packingStore";
 import BaseDialog from "../ui/BaseDialog.vue";
+import Cargo3DSceneV2 from "../visualizations/Cargo3DSceneV2.vue";
 
 const store = usePackingStore();
 const isOpen = ref(false);
 const selectedRow = ref<BoxCoordinateRow | null>(null);
-const previewCanvasRef = ref<HTMLCanvasElement | null>(null);
 const rows = computed(() => createBoxCoordinateRows(store.result));
 const hasRows = computed(() => rows.value.length > 0);
 const coordinateSummary = computed(() =>
@@ -23,8 +22,19 @@ const selectedText = computed(() => {
   if (!selectedRow.value) return "当前选中：-";
   return `当前选中：#${selectedRow.value.sequence} · 装载顺序 ${selectedRow.value.loadingSequence}`;
 });
-let previewScene: CargoScene | null = null;
-let previewResizeObserver: ResizeObserver | null = null;
+const selectedLabel = computed(() =>
+  selectedRow.value ? `#${selectedRow.value.sequence} · 顺序 ${selectedRow.value.loadingSequence}` : "",
+);
+const selectedDoorFaceText = computed(() => {
+  const row = selectedRow.value;
+  if (!row) return "-";
+  return `(${formatNumber(row.doorFaceX)}, ${formatNumber(row.doorFaceY)}, ${formatNumber(row.doorFaceZ)})`;
+});
+const selectedTopFaceText = computed(() => {
+  const row = selectedRow.value;
+  if (!row) return "-";
+  return `(${formatNumber(row.topFaceX)}, ${formatNumber(row.topFaceY)}, ${formatNumber(row.topFaceZ)})`;
+});
 
 function formatNumber(value: number) {
   return value.toLocaleString("zh-CN");
@@ -35,7 +45,6 @@ function openDialog() {
   const matchingRow = rows.value.find((row) => row.sequence === selectedRow.value?.sequence);
   selectedRow.value = matchingRow ?? rows.value[0];
   isOpen.value = true;
-  void nextTick(setupPreviewScene);
 }
 
 function downloadCsv() {
@@ -52,34 +61,8 @@ function downloadCsv() {
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-function renderPreview() {
-  previewScene?.render(store.result, store.result?.totalBoxes ?? 0, {
-    selectedLoadingSequence: selectedRow.value?.loadingSequence,
-    selectedLabel: selectedRow.value ? `#${selectedRow.value.sequence}` : "",
-    showCoordinateAxes: true,
-  });
-}
-
-function setupPreviewScene() {
-  if (!previewCanvasRef.value || !isOpen.value) return;
-  if (!previewScene) {
-    previewScene = createCargoScene(previewCanvasRef.value);
-    previewResizeObserver = new ResizeObserver(() => previewScene?.resize());
-    previewResizeObserver.observe(previewCanvasRef.value);
-  }
-  renderPreview();
-}
-
-function disposePreviewScene() {
-  previewResizeObserver?.disconnect();
-  previewResizeObserver = null;
-  previewScene?.dispose();
-  previewScene = null;
-}
-
 function selectRow(row: BoxCoordinateRow) {
   selectedRow.value = row;
-  renderPreview();
 }
 
 function coordinateCells(row: BoxCoordinateRow) {
@@ -111,27 +94,12 @@ watch(
   (nextRows) => {
     if (!nextRows.length) {
       selectedRow.value = null;
-      renderPreview();
       return;
     }
     const matchingRow = nextRows.find((row) => row.sequence === selectedRow.value?.sequence);
     selectedRow.value = matchingRow ?? nextRows[0];
-    renderPreview();
   },
 );
-
-watch(
-  isOpen,
-  (open) => {
-    if (open) {
-      void nextTick(setupPreviewScene);
-    } else {
-      disposePreviewScene();
-    }
-  },
-);
-
-onBeforeUnmount(disposePreviewScene);
 </script>
 
 <template>
@@ -209,14 +177,28 @@ onBeforeUnmount(disposePreviewScene);
           <div class="coordinate-preview-head">
             <strong>{{ selectedText }}</strong>
             <span>点击左侧任一行，高亮对应纸箱；XYZ 轴从原点伸出</span>
+            <dl class="coordinate-preview-metrics" aria-label="当前选中坐标点">
+              <div>
+                <dt>柜门面中心</dt>
+                <dd>{{ selectedDoorFaceText }}</dd>
+              </div>
+              <div>
+                <dt>上表面中心</dt>
+                <dd>{{ selectedTopFaceText }}</dd>
+              </div>
+            </dl>
           </div>
-          <canvas
-            id="coordinate-preview-canvas"
-            ref="previewCanvasRef"
+          <Cargo3DSceneV2
+            canvas-id="coordinate-preview-canvas"
             class="coordinate-preview-canvas"
-            width="640"
-            height="460"
-          ></canvas>
+            :result="store.result"
+            :visible-count="store.result?.totalBoxes ?? 0"
+            :selected-loading-sequence="selectedRow?.loadingSequence"
+            :selected-label="selectedLabel"
+            :camera-zoom="1.6"
+            show-coordinate-axes
+            dim-cargo-when-selected
+          />
         </aside>
       </div>
     </div>
@@ -313,6 +295,7 @@ onBeforeUnmount(disposePreviewScene);
   height: 100%;
   min-height: 0;
   overflow: auto;
+  overscroll-behavior: contain;
   border: 1px solid rgba(174, 184, 201, 0.18);
   border-radius: 8px;
 }
@@ -329,7 +312,7 @@ td {
   border-bottom: 1px solid rgba(174, 184, 201, 0.12);
   color: var(--text);
   font-size: 12px;
-  text-align: left;
+  text-align: center;
   white-space: nowrap;
 }
 
@@ -399,6 +382,37 @@ tr:last-child td {
   font-weight: 800;
 }
 
+.coordinate-preview-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 5px 0 0;
+}
+
+.coordinate-preview-metrics div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(174, 184, 201, 0.14);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.coordinate-preview-metrics dt {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.coordinate-preview-metrics dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
 .coordinate-preview-canvas {
   width: 100%;
   height: 100%;
@@ -436,6 +450,10 @@ tr:last-child td {
 
   .coordinate-preview-canvas {
     min-height: 320px;
+  }
+
+  .coordinate-preview-metrics {
+    grid-template-columns: 1fr;
   }
 }
 </style>

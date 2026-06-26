@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@lucide/vue": "^1.18.0",
+    "@tresjs/cientos": "^5.8.1",
+    "@tresjs/core": "^5.8.3",
     "fflate": "^0.8.3",
     "pinia": "latest",
     "read-excel-file": "^9.2.0",

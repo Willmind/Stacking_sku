@@ -114,7 +114,7 @@ function updateValue(value: number) {
 
 .base-number-actions {
   display: grid;
-  width: 26px;
+  width: 24px;
   min-height: 0;
   align-items: stretch;
   justify-items: stretch;

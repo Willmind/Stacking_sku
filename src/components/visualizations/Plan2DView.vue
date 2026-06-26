@@ -250,12 +250,14 @@ watch(
           <span class="plan-view-status">{{ getViewStatus() }}</span>
           <span class="plan-view-measure">{{ getViewMeasure(activePlanView.id) }}</span>
         </header>
-        <canvas
-          :id="activePlanView.canvasId"
-          :ref="(element) => setSwitchableCanvasRef(element)"
-          width="980"
-          height="620"
-        ></canvas>
+        <div class="plan-canvas-shell plan-canvas-shell--switchable">
+          <canvas
+            :id="activePlanView.canvasId"
+            :ref="(element) => setSwitchableCanvasRef(element)"
+            width="980"
+            height="620"
+          ></canvas>
+        </div>
       </section>
 
       <section class="plan-view-card plan-view-card--front">
@@ -294,12 +296,14 @@ watch(
           <span class="plan-view-status">{{ getViewStatus() }}</span>
           <span class="plan-view-measure">{{ getViewMeasure(frontPlanView.id) }}</span>
         </header>
-        <canvas
-          :id="frontPlanView.canvasId"
-          :ref="(element) => setFrontCanvasRef(element)"
-          width="980"
-          height="620"
-        ></canvas>
+        <div class="plan-canvas-shell plan-canvas-shell--front">
+          <canvas
+            :id="frontPlanView.canvasId"
+            :ref="(element) => setFrontCanvasRef(element)"
+            width="980"
+            height="620"
+          ></canvas>
+        </div>
       </section>
     </div>
     <div v-if="showGroupSummary && groupSummary.length" class="plan-group-summary" aria-label="2D 排布分区说明">
@@ -312,13 +316,15 @@ watch(
       :subtitle="expandedPlanView ? getExpandedSubtitle(expandedPlanView.id) : ''"
       @close="closeExpandedView"
     >
-      <canvas
-        id="expanded-plan-canvas"
-        class="expanded-plan-canvas"
-        :ref="(element) => setExpandedCanvasRef(element)"
-        width="1400"
-        height="860"
-      ></canvas>
+      <div class="plan-canvas-shell plan-canvas-shell--expanded">
+        <canvas
+          id="expanded-plan-canvas"
+          class="expanded-plan-canvas"
+          :ref="(element) => setExpandedCanvasRef(element)"
+          width="1400"
+          height="860"
+        ></canvas>
+      </div>
     </VisualizationDialog>
   </article>
 </template>
@@ -375,9 +381,11 @@ span {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid rgba(174, 184, 201, 0.16);
+  border: 1px solid rgba(174, 184, 201, 0.18);
   border-radius: 8px;
-  background: rgba(3, 8, 14, 0.52);
+  background:
+    linear-gradient(180deg, rgba(13, 24, 33, 0.9), rgba(4, 10, 16, 0.88)),
+    rgba(3, 8, 14, 0.52);
 }
 
 .plan-view-card--switchable {
@@ -505,19 +513,66 @@ span {
   line-height: 1.2;
 }
 
+.plan-canvas-shell {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(66, 214, 164, 0.1), transparent 34%),
+    radial-gradient(circle at 86% 78%, rgba(104, 166, 255, 0.09), transparent 30%),
+    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    rgba(3, 8, 14, 0.72);
+  background-size:
+    auto,
+    auto,
+    36px 36px,
+    36px 36px,
+    auto;
+}
+
+.plan-canvas-shell::before,
+.plan-canvas-shell::after {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  content: "";
+}
+
+.plan-canvas-shell::before {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.plan-canvas-shell::after {
+  background:
+    linear-gradient(90deg, rgba(66, 214, 164, 0.18), transparent 18%, transparent 82%, rgba(104, 166, 255, 0.12)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 24%);
+  opacity: 0.42;
+  mix-blend-mode: screen;
+}
+
 canvas {
+  position: relative;
+  z-index: 1;
   display: block;
   width: 100%;
   height: 100%;
   min-height: 0;
   background:
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px),
     rgba(3, 8, 14, 0.72);
-  background-size: 28px 28px;
+  background-size: 36px 36px;
 }
 
 .expanded-plan-canvas {
+  height: 100%;
+}
+
+.plan-canvas-shell--expanded {
+  width: 100%;
   height: 100%;
 }
 
@@ -546,7 +601,8 @@ canvas {
 @media (max-width: 720px) {
   .plan-view-grid {
     grid-template-columns: 1fr;
-    grid-template-rows: repeat(2, minmax(220px, 1fr));
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    gap: 8px;
   }
 
   .plan-view-card--switchable,

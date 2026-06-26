@@ -4,6 +4,14 @@ import { describePackingStrategy } from "../../core/packing";
 import { usePackingStore } from "../../stores/packingStore";
 
 const store = usePackingStore();
+const props = withDefaults(
+  defineProps<{
+    section?: "overview" | "details";
+  }>(),
+  {
+    section: "overview",
+  },
+);
 
 const layersWithBoxes = computed(() => store.result?.layers.filter((layer) => layer.boxCount > 0).length ?? 0);
 const isHeterogeneousResult = computed(() => store.result?.pattern?.family === "heterogeneous-zones");
@@ -31,7 +39,7 @@ function formatMm(value: number) {
 </script>
 
 <template>
-  <section class="result-stack" aria-label="装载结果">
+  <section v-if="props.section === 'overview'" class="result-stack result-stack--overview" aria-label="装载结果总览">
     <div class="summary-card summary-card--primary">
       <span>最大装载量</span>
       <strong id="total-boxes">{{ store.totalBoxesText }}</strong>
@@ -55,6 +63,8 @@ function formatMm(value: number) {
         <dd id="utilization">{{ ((store.result?.utilizationRatio ?? 0) * 100).toFixed(1) }}%</dd>
       </div>
     </dl>
+  </section>
+  <section v-else class="result-details" aria-label="装载详情">
     <dl class="detail-list">
       <div>
         <dt>排布模式</dt>
@@ -91,6 +101,11 @@ function formatMm(value: number) {
 
 <style scoped>
 .result-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.result-details {
   display: grid;
   gap: 10px;
 }
