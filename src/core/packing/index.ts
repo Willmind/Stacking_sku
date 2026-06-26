@@ -327,23 +327,33 @@ export type {
   }
 
   function orderFloorPositionsForPlacement(floorPositions) {
-    return floorPositions.slice().sort((a, b) => a.x - b.x || a.y - b.y);
+    return floorPositions.slice().sort(
+      (a, b) =>
+        getLoadingRowSortValue(a) - getLoadingRowSortValue(b) ||
+        a.x - b.x ||
+        a.y - b.y,
+    );
   }
 
-  function orderBoxPositionsForLoading(positions) {
-    return positions.slice().sort((a, b) => a.x - b.x || a.z - b.z || b.y - a.y);
+  function getLoadingRowSortValue(position) {
+    return Number.isFinite(position.loadingRowIndex) ? position.loadingRowIndex : position.x;
   }
 
-  function groupFloorPositionsByLoadingDepth(orderedFloor) {
+  function getLoadingRowKey(position) {
+    return Number.isFinite(position.loadingRowIndex) ? `row:${position.loadingRowIndex}` : `x:${position.x}`;
+  }
+
+  function groupFloorPositionsByLoadingRow(orderedFloor) {
     const groups = [];
 
     for (const item of orderedFloor) {
+      const key = getLoadingRowKey(item.basePosition);
       const previous = groups[groups.length - 1];
-      if (previous && previous.x === item.basePosition.x) {
+      if (previous && previous.key === key) {
         previous.items.push(item);
       } else {
         groups.push({
-          x: item.basePosition.x,
+          key,
           items: [item],
         });
       }
@@ -361,13 +371,13 @@ export type {
       basePosition,
       faceIndex,
     }));
-    const depthGroups = groupFloorPositionsByLoadingDepth(orderedFloor);
+    const loadingRows = groupFloorPositionsByLoadingRow(orderedFloor);
     const positions = [];
     const acceptedByStack = new Map();
 
-    for (const group of depthGroups) {
+    for (const row of loadingRows) {
       for (let stackIndex = 0; stackIndex < maxStackCount; stackIndex += 1) {
-        for (const { basePosition, faceIndex } of group.items) {
+        for (const { basePosition, faceIndex } of row.items) {
           if (stackIndex * basePosition.dz + basePosition.dz > container.height) continue;
           const acceptedPosition = acceptStackPosition(
             {
@@ -386,7 +396,7 @@ export type {
       }
     }
 
-    return assignSequenceIndexes(orderBoxPositionsForLoading(positions));
+    return assignSequenceIndexes(positions);
   }
 
   function evaluateCandidate(container, carton, pattern, cornerBlock) {

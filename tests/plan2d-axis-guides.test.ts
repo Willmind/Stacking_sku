@@ -157,7 +157,7 @@ describe("2D plan axis guide metrics", () => {
     });
 
     assert.ok(!front.drawnText.some((text) => text.includes("35排")));
-    assert.ok(front.drawnText.includes("占宽 2,320mm · 余量 32mm"));
+    assert.ok(front.drawnText.includes("占宽 2,352mm · 余量 0mm"));
   }, 12_000);
 
   it("renders front views from the selected endpoint instead of flattening the full container length", () => {
