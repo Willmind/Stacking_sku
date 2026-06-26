@@ -104,8 +104,10 @@ describe("3D visual rendering source guards", () => {
     assert.doesNotMatch(cargo3dViewSource, /expandedCanvasRef/);
     assert.doesNotMatch(cargo3dViewSource, /<canvas id="expanded-scene-canvas"/);
     assert.match(cargo3dSceneV2Source, /canvasId/);
-    assert.match(cargo3dViewSource, /canvas-id="scene-canvas"/);
-    assert.match(cargo3dViewSource, /canvas-id="expanded-scene-canvas"/);
+    assert.match(cargo3dViewSource, /canvas-id="scene-canvas"[\s\S]*show-coordinate-axes/);
+    assert.match(cargo3dViewSource, /canvas-id="expanded-scene-canvas"[\s\S]*show-coordinate-axes/);
+    assert.match(cargo3dViewSource, /class="cargo-scene-shell cargo-scene-shell--unified"/);
+    assert.match(cargo3dViewSource, /class="expanded-scene-shell cargo-scene-shell--unified"/);
   });
 
   it("uses closer initial camera framing for all 3D cargo views", () => {
@@ -408,6 +410,18 @@ describe("2D plan source guards", () => {
     assert.match(plan2dViewSource, /showLabels:\s*false/);
     assert.match(plan2dSource, /showLabels\?:\s*boolean/);
     assert.match(plan2dSource, /if \(showLabels\)/);
+  });
+
+  it("frames 2D canvases as polished technical drawing surfaces", () => {
+    assert.match(plan2dViewSource, /plan-canvas-shell/);
+    assert.match(plan2dViewSource, /plan-canvas-shell--switchable/);
+    assert.match(plan2dViewSource, /plan-canvas-shell--front/);
+    assert.match(plan2dViewSource, /\.plan-canvas-shell::before/);
+    assert.match(plan2dViewSource, /\.plan-canvas-shell::after/);
+    assert.match(plan2dViewSource, /box-shadow:\s*inset 0 0 0 1px rgba\(255,\s*255,\s*255,\s*0\.05\)/);
+    assert.match(plan2dViewSource, /radial-gradient\(circle at 18% 12%/);
+    assert.match(plan2dViewSource, /background-size:\s*36px 36px/);
+    assert.doesNotMatch(plan2dViewSource, /background-size:\s*28px 28px/);
   });
 
   it("keeps top-view status aligned to the current loading progress", () => {

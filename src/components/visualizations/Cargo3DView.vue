@@ -48,12 +48,13 @@ function closeExpandedScene() {
         </button>
       </div>
     </header>
-    <div class="cargo-scene-shell">
+    <div class="cargo-scene-shell cargo-scene-shell--unified">
       <Cargo3DSceneV2
         canvas-id="scene-canvas"
         :result="store.result"
         :visible-count="store.visibleCount"
         :camera-zoom="1.85"
+        show-coordinate-axes
       />
     </div>
 
@@ -63,12 +64,13 @@ function closeExpandedScene() {
       :subtitle="expandedSceneSubtitle"
       @close="closeExpandedScene"
     >
-      <div class="expanded-scene-shell">
+      <div class="expanded-scene-shell cargo-scene-shell--unified">
         <Cargo3DSceneV2
           canvas-id="expanded-scene-canvas"
           :result="store.result"
           :visible-count="store.visibleCount"
           :camera-zoom="1.65"
+          show-coordinate-axes
         />
       </div>
     </VisualizationDialog>
@@ -157,6 +159,25 @@ span {
   min-height: 0;
   overflow: hidden;
   background: rgba(3, 8, 14, 0.72);
+}
+
+.cargo-scene-shell--unified {
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(66, 214, 164, 0.12), transparent 34%),
+    radial-gradient(circle at 86% 82%, rgba(104, 166, 255, 0.1), transparent 30%),
+    rgba(3, 8, 14, 0.72);
+}
+
+.cargo-scene-shell--unified::after {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  content: "";
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.045),
+    inset 0 0 52px rgba(0, 0, 0, 0.16);
 }
 
 canvas {
