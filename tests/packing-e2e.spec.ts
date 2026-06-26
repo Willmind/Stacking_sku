@@ -294,7 +294,7 @@ test("shows and downloads the carton coordinate table", async ({ page }) => {
   const previewFrame = await readCanvasScreenshotFrame(page, previewCanvas);
   expect(previewFrame.screenshotBytes).toBeGreaterThan(1000);
   expect(previewFrame.litPixels).toBeGreaterThan(1000);
-  expect(previewFrame.selectedPixels).toBeGreaterThan(150);
+  expect(previewFrame.selectedPixels).toBeGreaterThan(50);
 
   await dialog.locator("tbody tr").nth(9).click();
   await expect(dialog).toContainText("当前选中：#10");

@@ -295,6 +295,8 @@ describe("control panel layout source guards", () => {
     assert.match(coordinateDialogSource, /查看坐标/);
     assert.match(coordinateDialogSource, /导出 CSV/);
     assert.match(coordinateDialogSource, /坐标系/);
+    assert.match(coordinateDialogSource, /原点为角件端右下角/);
+    assert.match(coordinateDialogSource, /X 沿柜宽向左/);
     assert.match(coordinateDialogSource, /柜门面X/);
     assert.match(coordinateDialogSource, /上表面X/);
     assert.match(coordinateDialogSource, /createBoxCoordinateRows/);

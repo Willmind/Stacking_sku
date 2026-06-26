@@ -48,8 +48,10 @@ function roundMm(value: number) {
   return Math.round(value * 1000) / 1000;
 }
 
-function rankBy(values: number[]) {
-  const sortedValues = Array.from(new Set(values.map(roundMm))).sort((first, second) => first - second);
+function rankBy(values: number[], direction: "asc" | "desc" = "asc") {
+  const sortedValues = Array.from(new Set(values.map(roundMm))).sort((first, second) =>
+    direction === "asc" ? first - second : second - first,
+  );
   return new Map(sortedValues.map((value, index) => [value, index + 1]));
 }
 
@@ -61,7 +63,7 @@ function compareBoxesByCoordinateOrder(first: BoxPosition, second: BoxPosition) 
   return (
     first.x - second.x ||
     first.z - second.z ||
-    first.y - second.y ||
+    second.y - first.y ||
     (first.sequenceIndex ?? 0) - (second.sequenceIndex ?? 0)
   );
 }
@@ -70,18 +72,28 @@ function orientationLabel(box: BoxPosition) {
   return box.label || box.orientation || box.orientationId || "";
 }
 
-function createRow(box: BoxPosition, sequence: number, ranks: { rows: Map<number, number>; layers: Map<number, number>; columns: Map<number, number> }): BoxCoordinateRow {
+function createRobotXCoordinate(box: BoxPosition, containerWidth: number) {
+  return roundMm(containerWidth - (box.y + box.dy / 2));
+}
+
+function createRow(
+  box: BoxPosition,
+  sequence: number,
+  ranks: { rows: Map<number, number>; layers: Map<number, number>; columns: Map<number, number> },
+  containerWidth: number,
+): BoxCoordinateRow {
+  const robotX = createRobotXCoordinate(box, containerWidth);
   return {
     sequence,
     loadingSequence: (box.sequenceIndex ?? sequence - 1) + 1,
     sku: box.skuLabel || "",
-    doorFaceX: roundMm(box.y + box.dy / 2),
+    doorFaceX: robotX,
     doorFaceY: roundMm(box.x + box.dx),
     doorFaceZ: roundMm(box.z + box.dz / 2),
-    topFaceX: roundMm(box.y + box.dy / 2),
+    topFaceX: robotX,
     topFaceY: roundMm(box.x + box.dx / 2),
     topFaceZ: roundMm(box.z + box.dz),
-    centerX: roundMm(box.y + box.dy / 2),
+    centerX: robotX,
     centerY: roundMm(box.x + box.dx / 2),
     centerZ: roundMm(box.z + box.dz / 2),
     length: roundMm(box.dx),
@@ -101,13 +113,13 @@ export function createBoxCoordinateRows(result: PackingResult | null): BoxCoordi
   const ranks = {
     rows: rankBy(boxes.map((box) => box.x)),
     layers: rankBy(boxes.map((box) => box.z)),
-    columns: rankBy(boxes.map((box) => box.y)),
+    columns: rankBy(boxes.map((box) => box.y), "desc"),
   };
 
   return boxes
     .slice()
     .sort(compareBoxesByCoordinateOrder)
-    .map((box, index) => createRow(box, index + 1, ranks));
+    .map((box, index) => createRow(box, index + 1, ranks, result.container.width));
 }
 
 function escapeCsvCell(value: string | number) {

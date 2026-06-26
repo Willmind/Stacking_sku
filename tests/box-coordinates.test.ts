@@ -8,7 +8,7 @@ function customContainer(length: number, width: number, height: number) {
 }
 
 describe("box coordinate rows", () => {
-  it("sorts cartons by coordinate scan order and maps door-facing center coordinates", () => {
+  it("sorts cartons from the corner-end right-bottom origin and maps robot coordinates", () => {
     const result = calculatePacking(
       customContainer(400, 200, 200),
       { length: 200, width: 100, height: 100 },
@@ -21,6 +21,7 @@ describe("box coordinate rows", () => {
     assert.deepEqual(
       rows.slice(0, 4).map((row) => [
         row.sequence,
+        row.loadingSequence,
         row.doorFaceX,
         row.doorFaceY,
         row.doorFaceZ,
@@ -32,17 +33,17 @@ describe("box coordinate rows", () => {
         row.column,
       ]),
       [
-        [1, 50, 200, 50, 50, 100, 100, 1, 1, 1],
-        [2, 150, 200, 50, 150, 100, 100, 1, 1, 2],
-        [3, 50, 200, 150, 50, 100, 200, 2, 1, 1],
-        [4, 150, 200, 150, 150, 100, 200, 2, 1, 2],
+        [1, 1, 50, 200, 50, 50, 100, 100, 1, 1, 1],
+        [2, 2, 150, 200, 50, 150, 100, 100, 1, 1, 2],
+        [3, 3, 50, 200, 150, 50, 100, 200, 2, 1, 1],
+        [4, 4, 150, 200, 150, 150, 100, 200, 2, 1, 2],
       ],
     );
     assert.deepEqual(
       rows.at(-1),
       {
         sequence: 8,
-        loadingSequence: 7,
+        loadingSequence: 8,
         sku: "",
         doorFaceX: 150,
         doorFaceY: 400,
@@ -75,6 +76,6 @@ describe("box coordinate rows", () => {
     const csv = createBoxCoordinateCsv(rows);
 
     assert.ok(csv.startsWith("\uFEFF序号,装载顺序,SKU,柜门面X,柜门面Y,柜门面Z,上表面X,上表面Y,上表面Z"));
-    assert.match(csv, /1,2,,50,200,50,50,100,100,50,100,50,200,100,100,1,1,1/);
+    assert.match(csv, /1,1,,50,200,50,50,100,100,50,100,50,200,100,100,1,1,1/);
   });
 });
