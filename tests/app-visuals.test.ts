@@ -446,10 +446,12 @@ describe("2D plan source guards", () => {
   });
 
   it("draws the container outline after cargo boxes", () => {
-    const boxLoopIndex = plan2dSource.indexOf("for (const drawingPosition of sortedDrawingPositions)");
-    const outlineIndex = plan2dSource.indexOf("drawContainerOutline(ctx, plane, scale)", boxLoopIndex);
+    assert.match(plan2dSource, /createPlan2DSceneModel/);
+    assert.match(plan2dSource, /drawPlan2DSceneModel/);
+    const boxLoopIndex = plan2dSource.indexOf("for (const box of model.boxes)");
+    const outlineIndex = plan2dSource.indexOf("drawSceneRect(ctx, model.containerOutline)", boxLoopIndex);
 
-    assert.ok(boxLoopIndex > -1, "2D renderer should draw cargo boxes in one predictable loop");
+    assert.ok(boxLoopIndex > -1, "2D scene model renderer should draw cargo boxes in one predictable loop");
     assert.ok(outlineIndex > boxLoopIndex, "container outline should sit above cargo boxes");
   });
 
