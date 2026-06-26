@@ -126,6 +126,37 @@ describe("3D visual rendering source guards", () => {
     assert.match(coordinateDialogSource, /selected-loading-sequence/);
   });
 
+  it("makes coordinate preview targets explicit for robot coordinate checks", () => {
+    assert.match(coordinateDialogSource, /selectedDoorFaceText/);
+    assert.match(coordinateDialogSource, /selectedTopFaceText/);
+    assert.match(coordinateDialogSource, /dim-cargo-when-selected/);
+    assert.match(cargo3dSceneV2Source, /coordinate-axis-shaft/);
+    assert.match(cargo3dSceneV2Source, /axisLegendItems/);
+    assert.match(cargo3dSceneV2Source, /sceneLegendItems/);
+    assert.match(cargo3dSceneV2Source, /endpoint-legend__swatch--axis/);
+    assert.match(cargo3dSceneV2Source, /coordinate-origin-marker/);
+    assert.match(cargo3dSceneV2Source, /selected-box-halo/);
+    assert.match(cargo3dSceneV2Source, /selected-box-glow/);
+    assert.match(cargo3dSceneV2Source, /selected-box-highlight/);
+    assert.match(cargo3dSceneV2Source, /selected-box-outline/);
+    assert.match(cargo3dSceneV2Source, /cargoFaceOpacity[\s\S]*0\.16/);
+    assert.match(cargo3dSceneV2Source, /cargoEdgeOpacity[\s\S]*0\.06/);
+    assert.match(cargo3dSceneV2Source, /:opacity="0\.68"/);
+    assert.doesNotMatch(coordinateDialogSource, /show-selected-coordinate-points/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /showSelectedCoordinatePoints/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /toSceneCoordinatePoints/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /selectedCoordinatePoints/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /coordinatePointLegendItems/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /selected-coordinate-point/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /coordinateAxisLabels/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /coordinateOriginLabel/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /selectedCoordinatePointLabels/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /projection-label--axis/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /projection-label--origin/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /projection-label--coordinate-point/);
+    assert.doesNotMatch(cargo3dSceneV2Source, /endpoint-legend__swatch--point/);
+  });
+
   it("keeps TresJS cargo boxes visually separable with scene context", () => {
     assert.match(cargo3dSceneV2Source, /wireframe/);
     assert.match(cargo3dSceneV2Source, /box-edge/);

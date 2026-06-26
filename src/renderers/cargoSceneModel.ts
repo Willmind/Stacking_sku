@@ -50,8 +50,16 @@ export interface SceneContainerModel {
   effectiveFrame: ScenePrimitiveModel | null;
 }
 
+export interface SceneCoordinatePointModel {
+  key: string;
+  label: string;
+  color: string;
+  position: [number, number, number];
+}
+
 export const DOOR_ENDPOINT_COLOR = "#42d6a4";
 export const INNER_ENDPOINT_COLOR = "#ffb24a";
+export const TOP_FACE_POINT_COLOR = "#68a6ff";
 
 function roundSceneUnit(value: number) {
   return Math.round(value * 1000) / 1000;
@@ -77,6 +85,34 @@ export function toSceneBox(
     label: box.skuLabel || "",
     loadingSequence: (box.sequenceIndex ?? 0) + 1,
   };
+}
+
+export function toSceneCoordinatePoints(
+  box: BoxPosition,
+  container: Pick<PackingResult["container"], "length" | "width" | "height">,
+): SceneCoordinatePointModel[] {
+  return [
+    {
+      key: "door-face-center",
+      label: "柜门面",
+      color: DOOR_ENDPOINT_COLOR,
+      position: [
+        roundSceneUnit((box.x + box.dx - container.length / 2) * 0.001),
+        roundSceneUnit((box.z + box.dz / 2 - container.height / 2) * 0.001),
+        roundSceneUnit((box.y + box.dy / 2 - container.width / 2) * 0.001),
+      ],
+    },
+    {
+      key: "top-face-center",
+      label: "上表面",
+      color: TOP_FACE_POINT_COLOR,
+      position: [
+        roundSceneUnit((box.x + box.dx / 2 - container.length / 2) * 0.001),
+        roundSceneUnit((box.z + box.dz - container.height / 2) * 0.001),
+        roundSceneUnit((box.y + box.dy / 2 - container.width / 2) * 0.001),
+      ],
+    },
+  ];
 }
 
 function hasActiveClearance(result: Pick<PackingResult, "clearance">) {

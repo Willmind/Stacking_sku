@@ -74,4 +74,37 @@ describe("cargo scene model", () => {
       ],
     );
   });
+
+  it("maps selected carton coordinate target points to Three/Tres scene coordinates", async () => {
+    const module = await import("../src/renderers/cargoSceneModel");
+    const points = module.toSceneCoordinatePoints(
+      {
+        x: 0,
+        y: 0,
+        z: 0,
+        dx: 500,
+        dy: 400,
+        dz: 300,
+        sequenceIndex: 0,
+        skuLabel: "SKU-1",
+        skuColor: "#d8923a",
+      },
+      { length: 12000, width: 2400, height: 2600 },
+    );
+
+    assert.deepEqual(points, [
+      {
+        key: "door-face-center",
+        label: "柜门面",
+        color: "#42d6a4",
+        position: [-5.5, -1.15, -1],
+      },
+      {
+        key: "top-face-center",
+        label: "上表面",
+        color: "#68a6ff",
+        position: [-5.75, -1, -1],
+      },
+    ]);
+  });
 });

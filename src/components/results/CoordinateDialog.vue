@@ -22,7 +22,19 @@ const selectedText = computed(() => {
   if (!selectedRow.value) return "当前选中：-";
   return `当前选中：#${selectedRow.value.sequence} · 装载顺序 ${selectedRow.value.loadingSequence}`;
 });
-const selectedLabel = computed(() => (selectedRow.value ? `#${selectedRow.value.sequence}` : ""));
+const selectedLabel = computed(() =>
+  selectedRow.value ? `#${selectedRow.value.sequence} · 顺序 ${selectedRow.value.loadingSequence}` : "",
+);
+const selectedDoorFaceText = computed(() => {
+  const row = selectedRow.value;
+  if (!row) return "-";
+  return `(${formatNumber(row.doorFaceX)}, ${formatNumber(row.doorFaceY)}, ${formatNumber(row.doorFaceZ)})`;
+});
+const selectedTopFaceText = computed(() => {
+  const row = selectedRow.value;
+  if (!row) return "-";
+  return `(${formatNumber(row.topFaceX)}, ${formatNumber(row.topFaceY)}, ${formatNumber(row.topFaceZ)})`;
+});
 
 function formatNumber(value: number) {
   return value.toLocaleString("zh-CN");
@@ -165,6 +177,16 @@ watch(
           <div class="coordinate-preview-head">
             <strong>{{ selectedText }}</strong>
             <span>点击左侧任一行，高亮对应纸箱；XYZ 轴从原点伸出</span>
+            <dl class="coordinate-preview-metrics" aria-label="当前选中坐标点">
+              <div>
+                <dt>柜门面中心</dt>
+                <dd>{{ selectedDoorFaceText }}</dd>
+              </div>
+              <div>
+                <dt>上表面中心</dt>
+                <dd>{{ selectedTopFaceText }}</dd>
+              </div>
+            </dl>
           </div>
           <Cargo3DSceneV2
             canvas-id="coordinate-preview-canvas"
@@ -175,6 +197,7 @@ watch(
             :selected-label="selectedLabel"
             :camera-zoom="1.6"
             show-coordinate-axes
+            dim-cargo-when-selected
           />
         </aside>
       </div>
@@ -359,6 +382,37 @@ tr:last-child td {
   font-weight: 800;
 }
 
+.coordinate-preview-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 5px 0 0;
+}
+
+.coordinate-preview-metrics div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(174, 184, 201, 0.14);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.coordinate-preview-metrics dt {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.coordinate-preview-metrics dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
 .coordinate-preview-canvas {
   width: 100%;
   height: 100%;
@@ -396,6 +450,10 @@ tr:last-child td {
 
   .coordinate-preview-canvas {
     min-height: 320px;
+  }
+
+  .coordinate-preview-metrics {
+    grid-template-columns: 1fr;
   }
 }
 </style>

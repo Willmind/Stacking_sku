@@ -14,12 +14,14 @@ const props = withDefaults(defineProps<{
   selectedLoadingSequence?: number | null;
   selectedLabel?: string;
   showCoordinateAxes?: boolean;
+  dimCargoWhenSelected?: boolean;
   cameraZoom?: number;
 }>(), {
   canvasId: "scene-canvas",
   selectedLoadingSequence: null,
   selectedLabel: "",
   showCoordinateAxes: false,
+  dimCargoWhenSelected: false,
   cameraZoom: 1,
 });
 
@@ -35,12 +37,19 @@ interface ProjectionLabelAnchor {
   text: string;
   color: string;
   position: [number, number, number];
-  variant: "endpoint" | "axis" | "selected";
+  variant: "endpoint" | "selected";
 }
 
 interface ProjectionLabelViewModel extends ProjectionLabelAnchor {
   style: CSSProperties;
   visible: boolean;
+}
+
+interface SceneLegendViewModel {
+  key: string;
+  label: string;
+  color: string;
+  kind: "endpoint" | "axis" | "selected";
 }
 
 const visiblePositions = computed(() => {
@@ -62,11 +71,17 @@ const sceneContainer = computed(() => {
   return toSceneContainer(result);
 });
 
-const selectedSceneBox = computed(() => {
+const selectedCargoBox = computed(() => {
   const result = props.result;
   if (!result?.pattern) return null;
-  const selectedBox = getSelectedCargoPosition(visiblePositions.value, props.selectedLoadingSequence);
-  return selectedBox ? toSceneBox(selectedBox, result.container) : null;
+  return getSelectedCargoPosition(visiblePositions.value, props.selectedLoadingSequence);
+});
+
+const selectedSceneBox = computed(() => {
+  const result = props.result;
+  const selectedBox = selectedCargoBox.value;
+  if (!result?.pattern || !selectedBox) return null;
+  return toSceneBox(selectedBox, result.container);
 });
 
 const selectedHighlight = computed(() => {
@@ -74,19 +89,69 @@ const selectedHighlight = computed(() => {
   if (!box) return null;
   return {
     ...box,
-    scale: box.scale.map((value) => Math.max(value * 1.018, 0.001)) as [number, number, number],
+    scale: box.scale.map((value) => Math.max(value * 1.08, 0.001)) as [number, number, number],
   };
 });
 
-const coordinateAxisLabels = computed<ProjectionLabelAnchor[]>(() => {
+const selectedGlow = computed(() => {
+  const box = selectedSceneBox.value;
+  if (!box) return null;
+  return {
+    ...box,
+    scale: box.scale.map((value) => Math.max(value * 1.24, 0.001)) as [number, number, number],
+  };
+});
+
+const selectedHalo = computed(() => {
+  const box = selectedSceneBox.value;
+  if (!box) return null;
+  return {
+    ...box,
+    scale: box.scale.map((value) => Math.max(value * 1.42, 0.001)) as [number, number, number],
+  };
+});
+
+const selectedOutline = computed(() => {
+  const box = selectedSceneBox.value;
+  if (!box) return null;
+  return {
+    ...box,
+    scale: box.scale.map((value) => Math.max(value * 1.14, 0.001)) as [number, number, number],
+  };
+});
+
+const coordinateAxes = computed(() => {
   if (!props.showCoordinateAxes || !props.result?.pattern) return [];
-  return getCargoCoordinateAxes(props.result.container).map((axis) => ({
-    key: `coordinate-axis-${axis.label}-label`,
-    text: axis.label,
+  return getCargoCoordinateAxes(props.result.container);
+});
+
+const coordinateOrigin = computed<[number, number, number] | null>(() => coordinateAxes.value[0]?.start ?? null);
+
+const axisLegendItems = computed<SceneLegendViewModel[]>(() =>
+  coordinateAxes.value.map((axis) => ({
+    key: `coordinate-axis-${axis.label.toLowerCase()}-legend`,
+    label: `${axis.label} 轴`,
     color: axis.color,
-    position: axis.labelPosition,
-    variant: "axis",
-  }));
+    kind: "axis",
+  })),
+);
+
+const sceneLegendItems = computed<SceneLegendViewModel[]>(() => {
+  const items: SceneLegendViewModel[] = [];
+  const container = sceneContainer.value;
+  if (container) {
+    items.push(...container.endpointLegend.map((item) => ({ ...item, kind: "endpoint" as const })));
+  }
+  items.push(...axisLegendItems.value);
+  if (selectedSceneBox.value) {
+    items.push({
+      key: "selected-box-legend",
+      label: "当前选中",
+      color: "#6efcff",
+      kind: "selected",
+    });
+  }
+  return items;
 });
 
 const selectedProjectionLabel = computed<ProjectionLabelAnchor | null>(() => {
@@ -96,7 +161,7 @@ const selectedProjectionLabel = computed<ProjectionLabelAnchor | null>(() => {
     key: "selected-box-label",
     text: props.selectedLabel,
     color: "#6efcff",
-    position: [box.position[0], box.position[1] + box.scale[1] / 2 + 0.26, box.position[2]],
+    position: [box.position[0] - 0.46, box.position[1] + box.scale[1] / 2 + 0.74, box.position[2]],
     variant: "selected",
   };
 });
@@ -115,7 +180,6 @@ const projectionLabelAnchors = computed<ProjectionLabelAnchor[]>(() => {
   const labels: ProjectionLabelAnchor[] = [];
   const container = sceneContainer.value;
   if (container) labels.push(...container.endpointLabels.map(toProjectionAnchor));
-  labels.push(...coordinateAxisLabels.value);
   const selected = selectedProjectionLabel.value;
   if (selected) labels.push(selected);
   return labels;
@@ -160,19 +224,25 @@ function addCoordinateAxes(group: THREE.Group, result: PackingResult) {
     const end = new THREE.Vector3(...axis.end);
     const direction = end.clone().sub(start).normalize();
     const axisLength = start.distanceTo(end);
-    const coneHeight = Math.min(0.22, Math.max(0.11, axisLength * 0.16));
-    const coneRadius = coneHeight * 0.34;
-    const line = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints([start, end]),
-      new THREE.LineBasicMaterial({
+    const axisRadius = Math.min(0.048, Math.max(0.028, axisLength * 0.018));
+    const coneHeight = Math.min(0.32, Math.max(0.16, axisLength * 0.18));
+    const coneRadius = axisRadius * 2.7;
+    const shaftLength = Math.max(axisLength - coneHeight * 0.48, 0.001);
+    const shaftCenter = start.clone().add(direction.clone().multiplyScalar(shaftLength / 2));
+    const shaft = new THREE.Mesh(
+      new THREE.CylinderGeometry(axisRadius, axisRadius, shaftLength, 20),
+      new THREE.MeshBasicMaterial({
         color: axis.colorHex,
         transparent: true,
-        opacity: 1,
+        opacity: 0.94,
         depthTest: false,
+        depthWrite: false,
       }),
     );
-    line.name = `coordinate-axis-${axis.label}`;
-    line.renderOrder = 41;
+    shaft.name = `coordinate-axis-shaft-${axis.label}`;
+    shaft.position.copy(shaftCenter);
+    shaft.quaternion.setFromUnitVectors(upVector, direction);
+    shaft.renderOrder = 41;
 
     const cone = new THREE.Mesh(
       new THREE.ConeGeometry(coneRadius, coneHeight, 20),
@@ -188,9 +258,13 @@ function addCoordinateAxes(group: THREE.Group, result: PackingResult) {
     cone.position.copy(end);
     cone.quaternion.setFromUnitVectors(upVector, direction);
     cone.renderOrder = 42;
-    group.add(line, cone);
+    group.add(shaft, cone);
   }
 }
+
+const isCargoDimmed = computed(() => Boolean(props.dimCargoWhenSelected && selectedSceneBox.value));
+const cargoFaceOpacity = computed(() => (isCargoDimmed.value ? 0.16 : 1));
+const cargoEdgeOpacity = computed(() => (isCargoDimmed.value ? 0.06 : 0.08));
 
 function rebuildOverlayGroup() {
   clearOverlayGroup();
@@ -385,7 +459,53 @@ onBeforeUnmount(() => {
         :scale="box.scale"
       >
         <TresBoxGeometry />
-        <TresMeshBasicMaterial :color="box.color" :side="DoubleSide" />
+        <TresMeshBasicMaterial
+          :color="box.color"
+          :side="DoubleSide"
+          :transparent="isCargoDimmed"
+          :opacity="cargoFaceOpacity"
+        />
+      </TresMesh>
+
+      <TresMesh
+        v-if="coordinateOrigin"
+        name="coordinate-origin-marker"
+        :position="coordinateOrigin"
+      >
+        <TresSphereGeometry :args="[0.07, 24, 24]" />
+        <TresMeshBasicMaterial color="#f5f7fb" :depth-test="false" :depth-write="false" />
+      </TresMesh>
+
+      <TresMesh
+        v-if="selectedHalo"
+        name="selected-box-halo"
+        :position="selectedHalo.position"
+        :scale="selectedHalo.scale"
+      >
+        <TresBoxGeometry />
+        <TresMeshBasicMaterial
+          color="#78ffff"
+          :transparent="true"
+          :opacity="0.16"
+          :depth-test="false"
+          :depth-write="false"
+        />
+      </TresMesh>
+
+      <TresMesh
+        v-if="selectedGlow"
+        name="selected-box-glow"
+        :position="selectedGlow.position"
+        :scale="selectedGlow.scale"
+      >
+        <TresBoxGeometry />
+        <TresMeshBasicMaterial
+          color="#a9ffff"
+          :transparent="true"
+          :opacity="0.34"
+          :depth-test="false"
+          :depth-write="false"
+        />
       </TresMesh>
 
       <TresMesh
@@ -396,9 +516,27 @@ onBeforeUnmount(() => {
       >
         <TresBoxGeometry />
         <TresMeshBasicMaterial
-          color="#6efcff"
+          color="#78ffff"
           :transparent="true"
-          :opacity="0.22"
+          :opacity="0.68"
+          :depth-test="false"
+          :depth-write="false"
+        />
+      </TresMesh>
+
+      <TresMesh
+        v-if="selectedOutline"
+        name="selected-box-outline"
+        :position="selectedOutline.position"
+        :scale="selectedOutline.scale"
+      >
+        <TresBoxGeometry />
+        <TresMeshBasicMaterial
+          color="#f6ffff"
+          :wireframe="true"
+          :transparent="true"
+          :opacity="1"
+          :depth-test="false"
           :depth-write="false"
         />
       </TresMesh>
@@ -411,11 +549,12 @@ onBeforeUnmount(() => {
       >
         <TresBoxGeometry />
         <TresMeshBasicMaterial
-          color="#6efcff"
+          color="#2dffff"
           :wireframe="true"
           :transparent="true"
           :opacity="1"
           :depth-test="false"
+          :depth-write="false"
         />
       </TresMesh>
 
@@ -431,7 +570,7 @@ onBeforeUnmount(() => {
           color="#b8fff0"
           :wireframe="true"
           :transparent="true"
-          :opacity="0.08"
+          :opacity="cargoEdgeOpacity"
           :depth-write="false"
         />
       </TresMesh>
@@ -452,9 +591,18 @@ onBeforeUnmount(() => {
       </span>
     </div>
 
-    <div v-if="sceneContainer" class="endpoint-legend" aria-label="3D 货柜端点图例">
-      <span v-for="item in sceneContainer.endpointLegend" :key="item.key" class="endpoint-legend__item">
-        <span class="endpoint-legend__swatch" :style="{ backgroundColor: item.color }"></span>
+    <div v-if="sceneLegendItems.length" class="endpoint-legend" aria-label="3D 货柜图例">
+      <span
+        v-for="item in sceneLegendItems"
+        :key="item.key"
+        class="endpoint-legend__item"
+        :class="`endpoint-legend__item--${item.kind}`"
+      >
+        <span
+          class="endpoint-legend__swatch"
+          :class="`endpoint-legend__swatch--${item.kind}`"
+          :style="{ backgroundColor: item.color, color: item.color }"
+        ></span>
         <span>{{ item.label }}</span>
       </span>
     </div>
@@ -515,16 +663,6 @@ onBeforeUnmount(() => {
   display: none;
 }
 
-.projection-label--axis {
-  min-width: 24px;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border-radius: 999px;
-  background: rgba(6, 11, 17, 0.82);
-  font-size: 12px;
-}
-
 .projection-label--selected {
   min-width: 32px;
   border-color: rgba(110, 252, 255, 0.92);
@@ -538,8 +676,11 @@ onBeforeUnmount(() => {
   bottom: 14px;
   z-index: 4;
   display: flex;
-  gap: 10px;
+  max-width: min(560px, calc(100% - 28px));
+  flex-wrap: wrap;
+  gap: 7px 10px;
   align-items: center;
+  justify-content: flex-end;
   padding: 7px 9px;
   border: 1px solid rgba(148, 163, 184, 0.22);
   border-radius: 7px;
@@ -563,5 +704,22 @@ onBeforeUnmount(() => {
   height: 10px;
   border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: 2px;
+}
+
+.endpoint-legend__swatch--axis {
+  width: 16px;
+  height: 4px;
+  border: 0;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28);
+}
+
+.endpoint-legend__swatch--selected {
+  width: 14px;
+  height: 10px;
+  border-color: #6efcff;
+  border-radius: 3px;
+  background: rgba(110, 252, 255, 0.18) !important;
+  box-shadow: 0 0 0 1px rgba(110, 252, 255, 0.36);
 }
 </style>
