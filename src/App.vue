@@ -53,11 +53,7 @@ async function handleCalculate() {
         </div>
       </div>
 
-      <ContainerForm />
-      <PackingModeSwitch />
-      <SingleSkuForm v-if="store.mode === 'single'" />
-      <SkuEditor v-else />
-
+      <ResultSummary section="overview" />
       <button
         class="calculate-button"
         :class="{ 'calculate-button--loading': isCalculating }"
@@ -78,7 +74,12 @@ async function handleCalculate() {
       </button>
       <p v-if="store.error" class="error">{{ store.error }}</p>
 
-      <ResultSummary />
+      <ContainerForm />
+      <PackingModeSwitch />
+      <SingleSkuForm v-if="store.mode === 'single'" />
+      <SkuEditor v-else />
+
+      <ResultSummary section="details" />
       <BatchImportDialog />
       <SkuBreakdown />
     </aside>

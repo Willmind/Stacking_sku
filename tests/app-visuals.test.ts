@@ -223,15 +223,29 @@ describe("control panel layout source guards", () => {
     assert.doesNotMatch(baseNumberFieldSource, /\.base-number-stepper\s*\{[\s\S]*min-height:\s*20px/);
   });
 
-  it("keeps the primary result summary above batch import actions", () => {
-    const resultIndex = appSource.indexOf("<ResultSummary />");
+  it("keeps the result overview and calculate action at the top of the control panel", () => {
+    const brandIndex = appSource.indexOf("brand-lockup");
+    const overviewIndex = appSource.indexOf('<ResultSummary section="overview" />');
+    const buttonIndex = appSource.indexOf('class="calculate-button"');
+    const containerIndex = appSource.indexOf("<ContainerForm />");
+    const detailsIndex = appSource.indexOf('<ResultSummary section="details" />');
     const batchIndex = appSource.indexOf("<BatchImportDialog />");
 
-    assert.ok(resultIndex > -1, "ResultSummary should be rendered in the control panel");
+    assert.ok(brandIndex > -1, "Brand lockup should be rendered in the control panel");
+    assert.ok(overviewIndex > -1, "Result overview should be rendered in the control panel");
+    assert.ok(buttonIndex > -1, "Calculate button should be rendered in the control panel");
+    assert.ok(containerIndex > -1, "Container form should be rendered in the control panel");
+    assert.ok(detailsIndex > -1, "Result details should be rendered in the control panel");
     assert.ok(batchIndex > -1, "BatchImportDialog should be rendered in the control panel");
-    assert.ok(resultIndex < batchIndex, "Primary result summary should appear before batch import actions");
+    assert.ok(brandIndex < overviewIndex, "Result overview should appear directly after the brand area");
+    assert.ok(overviewIndex < buttonIndex, "Calculate action should follow the result overview");
+    assert.ok(buttonIndex < containerIndex, "Inputs should appear after the top action area");
+    assert.ok(containerIndex < detailsIndex, "Result details should stay below the input forms");
+    assert.ok(detailsIndex < batchIndex, "Result details should appear before batch import actions");
     assert.match(resultSummarySource, /summary-card--primary/);
     assert.match(resultSummarySource, /metric-grid--compact/);
+    assert.match(resultSummarySource, /section:\s*"overview"/);
+    assert.match(resultSummarySource, /props\.section === 'overview'/);
   });
 
   it("exposes the first-stage carton coordinate table after calculation", () => {
