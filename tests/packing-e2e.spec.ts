@@ -228,8 +228,8 @@ test("calculates the 488 x 380 x 291 benchmark and renders both views", async ({
   await expect(page.locator("#plan-canvas-top")).toHaveCount(1);
   await expect(page.locator("#plan-canvas-side")).toHaveCount(0);
   await expect(page.locator("#plan-canvas-front")).toHaveCount(1);
-  await expect(page.locator(".plan-view-card--switchable .plan-guide-label--x")).toContainText("横放 24列 / 竖放 29列");
-  await expect(page.locator(".plan-view-card--switchable .plan-guide-label--x")).not.toContainText("横向 55列");
+  await expect(page.locator(".plan-view-card--switchable .plan-guide-label--x")).toContainText("横向 29列 / 竖向 26列");
+  await expect(page.locator(".plan-view-card--switchable .plan-guide-label--x")).not.toContainText("横放 24列 / 竖放 29列");
   await expect(page.locator(".plan-view-card--switchable .plan-guide-label--y")).toContainText("竖向");
   await expect(page.locator(".plan-view-card--switchable .plan-guide-label--y")).toContainText("占宽 2,332mm");
   await expect(page.locator(".plan-view-card--switchable .plan-guide-label--y")).toContainText("余量 20mm");

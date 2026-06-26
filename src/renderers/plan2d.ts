@@ -520,31 +520,20 @@ function formatAxisGuideCountText(metric: Plan2DAxisGuideMetric, axis: "x" | "y"
   return `${directionLabel} ${formatNumber(metric.count)}${metric.countLabel}`;
 }
 
-function getNumericPatternGroupValue(group: unknown, key: "boxesPerUnit" | "count") {
-  if (!group || typeof group !== "object") return 0;
-  const value = (group as Record<string, unknown>)[key];
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
-function getPatternGroupOrientationId(group: unknown) {
-  if (!group || typeof group !== "object") return "";
-  const value = (group as Record<string, unknown>).orientationId;
-  return typeof value === "string" ? value : "";
+function getUniqueLengthColumnCount(positions: BoxPosition[], orientationId: string) {
+  return new Set(
+    positions
+      .filter((position) => position.orientationId === orientationId)
+      .map((position) => `${position.x}:${position.dx}`),
+  ).size;
 }
 
 function getTopViewMixedOrientationColumnText(result: PackingResult) {
-  const groups = Array.isArray(result.pattern?.groups) ? result.pattern.groups : [];
-  const horizontalColumns = groups.reduce((maxColumns, group) => {
-    if (getPatternGroupOrientationId(group) !== "length-width-height") return maxColumns;
-    return Math.max(maxColumns, getNumericPatternGroupValue(group, "boxesPerUnit"));
-  }, 0);
-  const verticalColumns = groups.reduce((maxColumns, group) => {
-    if (getPatternGroupOrientationId(group) !== "width-length-height") return maxColumns;
-    return Math.max(maxColumns, getNumericPatternGroupValue(group, "boxesPerUnit"));
-  }, 0);
+  const horizontalColumns = getUniqueLengthColumnCount(result.layerPositions, "width-length-height");
+  const verticalColumns = getUniqueLengthColumnCount(result.layerPositions, "length-width-height");
 
   if (horizontalColumns <= 0 || verticalColumns <= 0) return "";
-  return `横放 ${formatNumber(horizontalColumns)}列 / 竖放 ${formatNumber(verticalColumns)}列`;
+  return `横向 ${formatNumber(horizontalColumns)}列 / 竖向 ${formatNumber(verticalColumns)}列`;
 }
 
 function formatAxisGuideText(metric: Plan2DAxisGuideMetric, axis: "x" | "y") {
@@ -913,18 +902,32 @@ function projectBox(box: BoxPosition, container: PackingResult["container"], vie
 }
 
 function getTopViewDrawingPositions(result: PackingResult, visibleCount: number): Plan2DDrawingPosition[] {
-  const visiblePositionByFace = getGeneratedBoxPositions(result, visibleCount)
-    .reduce((positions, position) => {
-      if (typeof position.faceIndex === "number" && Number.isFinite(position.faceIndex)) {
-        positions.set(position.faceIndex, position);
-      }
-      return positions;
-    }, new Map<number, BoxPosition>());
+  const normalizedVisibleCount = Math.max(0, Math.min(result.totalBoxes, Math.floor(visibleCount)));
+  if (normalizedVisibleCount >= result.totalBoxes) {
+    const visiblePositionByFace = getGeneratedBoxPositions(result, normalizedVisibleCount)
+      .reduce((positions, position) => {
+        if (typeof position.faceIndex === "number" && Number.isFinite(position.faceIndex)) {
+          positions.set(position.faceIndex, position);
+        }
+        return positions;
+      }, new Map<number, BoxPosition>());
 
-  return result.layerPositions.map((position, faceIndex) => ({
+    return result.layerPositions.map((position, faceIndex) => ({
       box: position,
       visibleBox: visiblePositionByFace.get(faceIndex) || null,
     }));
+  }
+
+  const footprintPositions = result.layerPositions.map((position) => ({
+    box: position,
+    visibleBox: null,
+  }));
+  const visiblePositions = getGeneratedBoxPositions(result, normalizedVisibleCount).map((position) => ({
+    box: position,
+    visibleBox: position,
+  }));
+
+  return [...footprintPositions, ...visiblePositions];
 }
 
 function getElevationDrawingPositions(result: PackingResult, visibleCount: number): Plan2DDrawingPosition[] {

@@ -112,7 +112,7 @@ describe("2D plan axis guide metrics", () => {
     assert.deepEqual(metrics.x, {
       count: 55,
       countLabel: "列",
-      countText: "横放 24列 / 竖放 29列",
+      countText: "横向 29列 / 竖向 26列",
       axisLabel: "柜长",
       occupied: 11996,
       remaining: 36,
@@ -134,8 +134,8 @@ describe("2D plan axis guide metrics", () => {
       devicePixelRatio: 1,
     });
 
-    assert.ok(recording.drawnText.includes("横放 24列 / 竖放 29列 · 占长 11,996mm · 余量 36mm"));
-    assert.ok(!recording.drawnText.includes("横向 55列 · 占长 11,996mm · 余量 36mm"));
+    assert.ok(recording.drawnText.includes("横向 29列 / 竖向 26列 · 占长 11,996mm · 余量 36mm"));
+    assert.ok(!recording.drawnText.includes("横放 24列 / 竖放 29列"));
     assert.ok(recording.drawnText.includes("占宽 2,332mm"));
     assert.ok(recording.drawnText.includes("余量 20mm"));
   });
