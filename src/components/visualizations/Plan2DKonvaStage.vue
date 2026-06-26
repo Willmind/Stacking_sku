@@ -67,6 +67,7 @@ function estimateTextWidth(text: string) {
 }
 
 function formatAxisGuideCountText(metric: Plan2DAxisGuideMetric, axis: "x" | "y") {
+  if (metric.countText) return metric.countText;
   if (!metric.countLabel) return "";
   const directionLabel = axis === "x" ? "横向" : "竖向";
   return `${directionLabel} ${formatNumber(metric.count)}${metric.countLabel}`;

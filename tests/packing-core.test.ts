@@ -365,10 +365,17 @@ describe("packing core", () => {
     Packing.CONTAINERS["40HQ"],
     carton(488, 380, 291),
   );
+  const summary = Packing.calculatePackingSummary(
+    Packing.CONTAINERS["40HQ"],
+    carton(488, 380, 291),
+  );
 
   assert.equal(result.totalBoxes, 1349);
   assert.equal(result.container.id, "40HQ");
   assert.equal(result.usedHeight, 2619);
+  assert.equal(result.pattern.occupiedWidth, 2332);
+  assert.equal(summary.occupiedWidth, 2332);
+  assert.equal(summary.effectiveContainer.width - summary.occupiedWidth, 20);
   assertLoadsFirstLayerBeforeNextLayer(result);
   assertMixedWidthLanesTouchBothSideWalls(result);
   assertTailOptimizedSource(result);

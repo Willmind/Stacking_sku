@@ -37,6 +37,7 @@ describe("batch import", () => {
       results.map((result) => result.difference),
       [-247, 9, 2, 9],
     );
+    assert.equal(results[3].remainingWidth, 20);
     assert.ok(results.every((result) => result.remainingLength !== null && result.remainingLength >= 0));
     assert.ok(results.every((result) => result.remainingWidth !== null && result.remainingWidth >= 0));
     assert.ok(results.every((result) => result.remainingHeight !== null && result.remainingHeight >= 0));
