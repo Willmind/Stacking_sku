@@ -155,6 +155,7 @@ async function readCanvasScreenshotFrame(page: Page, canvasLocator: Locator) {
     const { data: pixels } = context.getImageData(0, 0, width, height);
     let litPixels = 0;
     let cargoPixels = 0;
+    let selectedPixels = 0;
     let minX = width;
     let maxX = -1;
     let minY = height;
@@ -177,10 +178,14 @@ async function readCanvasScreenshotFrame(page: Page, canvasLocator: Locator) {
         maxY = Math.max(maxY, y);
 
         const isCargo = red > 120 && green > 70 && green < 190 && blue < 90;
-        if (!isCargo) continue;
-        cargoPixels += 1;
-        cargoMinY = Math.min(cargoMinY, y);
-        cargoMaxY = Math.max(cargoMaxY, y);
+        if (isCargo) {
+          cargoPixels += 1;
+          cargoMinY = Math.min(cargoMinY, y);
+          cargoMaxY = Math.max(cargoMaxY, y);
+        }
+
+        const isSelectedHighlight = red < 150 && green > 190 && blue > 190;
+        if (isSelectedHighlight) selectedPixels += 1;
       }
     }
 
@@ -189,6 +194,7 @@ async function readCanvasScreenshotFrame(page: Page, canvasLocator: Locator) {
       height,
       litPixels,
       cargoPixels,
+      selectedPixels,
       leftMargin: minX,
       rightMargin: width - 1 - maxX,
       topMargin: minY,
@@ -222,6 +228,8 @@ test("calculates the 488 x 380 x 291 benchmark and renders both views", async ({
   await expect(page.locator("#plan-canvas-top")).toHaveCount(1);
   await expect(page.locator("#plan-canvas-side")).toHaveCount(0);
   await expect(page.locator("#plan-canvas-front")).toHaveCount(1);
+  await expect(page.locator(".plan-view-card--switchable .plan-guide-label--x")).toContainText("横向");
+  await expect(page.locator(".plan-view-card--switchable .plan-guide-label--y")).toContainText("竖向");
   await expect(page.locator(".plan-view-card--front")).toContainText("端视图");
   await expect(page.locator(".plan-view-card--front .plan-view-measure")).toContainText("柜宽");
   await expect(page.locator(".plan-group-summary")).toHaveCount(0);
@@ -286,7 +294,7 @@ test("shows and downloads the carton coordinate table", async ({ page }) => {
   const previewFrame = await readCanvasScreenshotFrame(page, previewCanvas);
   expect(previewFrame.screenshotBytes).toBeGreaterThan(1000);
   expect(previewFrame.litPixels).toBeGreaterThan(1000);
-  expect(previewFrame.cargoPixels).toBeGreaterThan(1000);
+  expect(previewFrame.selectedPixels).toBeGreaterThan(50);
 
   await dialog.locator("tbody tr").nth(9).click();
   await expect(dialog).toContainText("当前选中：#10");
@@ -310,6 +318,14 @@ test("opens expanded dialogs for 2D and 3D visualizations", async ({ page }) => 
   const planDialog = page.getByRole("dialog", { name: "放大查看 俯视图" });
   await expect(planDialog).toBeVisible();
   await expect(planDialog.locator("#expanded-plan-canvas")).toHaveCount(1);
+  await expect(planDialog.locator("#expanded-plan-progress")).toHaveValue(await page.locator("#stack-progress").inputValue());
+  await planDialog.locator("#expanded-plan-progress").evaluate((element) => {
+    const input = element as HTMLInputElement;
+    input.value = "300";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await expect(page.locator("#stack-progress")).toHaveValue("300");
   await planDialog.getByRole("button", { name: "关闭放大视图" }).click();
   await expect(planDialog).toHaveCount(0);
 
@@ -317,6 +333,7 @@ test("opens expanded dialogs for 2D and 3D visualizations", async ({ page }) => 
   const sceneDialog = page.getByRole("dialog", { name: "放大查看 3D 货柜渲染" });
   await expect(sceneDialog).toBeVisible();
   await expect(sceneDialog.locator("#expanded-scene-canvas")).toHaveCount(1);
+  await expect(sceneDialog.locator("#expanded-scene-progress")).toHaveValue("300");
   await page.keyboard.press("Escape");
   await expect(sceneDialog).toHaveCount(0);
 });
@@ -346,7 +363,8 @@ test("scopes the carton color picker trigger and redraws canvas with the selecte
   await expect(page.locator("#status-chip")).toHaveText("已完成计算");
 
   const pixelCounts = await page.locator("#plan-canvas-top").evaluate((element) => {
-    const canvas = element as HTMLCanvasElement;
+    const canvas = element instanceof HTMLCanvasElement ? element : element.querySelector("canvas");
+    if (!canvas) throw new Error("2D canvas element is missing");
     const context = canvas.getContext("2d");
     if (!context) throw new Error("2D canvas context is missing");
     const { data } = context.getImageData(0, 0, canvas.width, canvas.height);

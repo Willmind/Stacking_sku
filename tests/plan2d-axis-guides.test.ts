@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import { calculatePacking } from "../src/core/packing";
-import { getPlan2DAxisGuideMetrics, getPlan2DVerticalGuideLabelLayout, renderPlan2D } from "../src/renderers/plan2d";
+import {
+  createPlan2DSceneModel,
+  getPlan2DAxisGuideMetrics,
+  getPlan2DVerticalGuideLabelLayout,
+  renderPlan2D,
+} from "../src/renderers/plan2d";
 
 function createRecordingCanvas(width = 980, height = 620) {
   const drawnText: string[] = [];
@@ -54,6 +59,30 @@ function createRecordingCanvas(width = 980, height = 620) {
 }
 
 describe("2D plan axis guide metrics", () => {
+  it("builds an objectized scene model for the next 2D renderer", () => {
+    const result = calculatePacking("20GP", { length: 480, width: 320, height: 260 });
+
+    const model = createPlan2DSceneModel({
+      result,
+      visibleCount: result.totalBoxes,
+      viewMode: "top",
+      width: 980,
+      height: 620,
+      showLabels: false,
+    });
+
+    assert.equal(model.backend, "plan2d-scene-model");
+    assert.equal(model.emptyMessage, undefined);
+    assert.equal(model.viewMode, "top");
+    assert.equal(model.container.width > 0, true);
+    assert.equal(model.container.height > 0, true);
+    assert.ok(model.boxes.length > 0);
+    assert.ok(model.boxes.every((box) => box.kind === "carton"));
+    assert.ok(model.boxes.some((box) => box.visible));
+    assert.ok(model.boxes.every((box) => box.fillStyle.startsWith("rgba(")));
+    assert.equal(model.containerOutline.strokeStyle, "rgba(255,255,255,0.78)");
+  });
+
   it("summarizes top-view occupied length and width from the visible footprints", () => {
     const result = calculatePacking("20GP", { length: 480, width: 320, height: 260 });
 

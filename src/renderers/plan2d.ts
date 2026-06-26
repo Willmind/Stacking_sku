@@ -14,6 +14,16 @@ export interface Plan2DRenderOptions {
   showLabels?: boolean;
 }
 
+export interface Plan2DSceneModelOptions {
+  result: PackingResult | null;
+  visibleCount: number;
+  viewMode?: Plan2DViewMode;
+  frontViewSide?: Plan2DFrontViewSide;
+  width: number;
+  height: number;
+  showLabels?: boolean;
+}
+
 export type Plan2DViewMode = "top" | "side" | "front";
 export type Plan2DFrontViewSide = "corner" | "door";
 
@@ -39,6 +49,42 @@ interface ProjectedRect {
   y: number;
   dx: number;
   dy: number;
+}
+
+export interface Plan2DSceneRectModel {
+  kind: "container-fill" | "carton" | "effective-space" | "container-outline";
+  key: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fillStyle?: string;
+  strokeStyle?: string;
+  lineWidth?: number;
+  lineDash?: number[];
+  visible?: boolean;
+  label?: {
+    text: string;
+    x: number;
+    y: number;
+  };
+}
+
+export interface Plan2DSceneModel {
+  backend: "plan2d-scene-model";
+  width: number;
+  height: number;
+  viewMode: Plan2DViewMode;
+  frontViewSide?: Plan2DFrontViewSide;
+  emptyMessage?: string;
+  compactCanvas: boolean;
+  scale: number;
+  origin: { x: number; y: number };
+  plane: ReturnType<typeof getPlan2DPlaneConfig> | null;
+  container: Plan2DSceneRectModel;
+  boxes: Plan2DSceneRectModel[];
+  effectiveSpaceBoundary: Plan2DSceneRectModel | null;
+  containerOutline: Plan2DSceneRectModel;
 }
 
 interface AxisGuideModel extends Plan2DAxisGuideMetrics {
@@ -128,7 +174,7 @@ function drawCanvasMessage(ctx: CanvasRenderingContext2D, width: number, height:
   ctx.restore();
 }
 
-function drawContainerFill(
+export function drawContainerFill(
   ctx: CanvasRenderingContext2D,
   plane: ReturnType<typeof getPlan2DPlaneConfig>,
   scale: number,
@@ -137,7 +183,7 @@ function drawContainerFill(
   ctx.fillRect(0, 0, plane.width * scale, plane.height * scale);
 }
 
-function drawContainerOutline(
+export function drawContainerOutline(
   ctx: CanvasRenderingContext2D,
   plane: ReturnType<typeof getPlan2DPlaneConfig>,
   scale: number,
@@ -191,7 +237,7 @@ function getEffectiveSpaceProjectionRect(
   };
 }
 
-function drawEffectiveSpaceBoundary(
+export function drawEffectiveSpaceBoundary(
   ctx: CanvasRenderingContext2D,
   rect: ProjectedRect | null,
   scale: number,
@@ -209,6 +255,41 @@ function drawEffectiveSpaceBoundary(
   ctx.textBaseline = "bottom";
   ctx.fillText("有效装载空间", rect.x * scale + 6, Math.max(14, rect.y * scale - 5));
   ctx.restore();
+}
+
+function drawSceneRect(ctx: CanvasRenderingContext2D, rect: Plan2DSceneRectModel) {
+  ctx.save();
+  if (rect.lineDash) ctx.setLineDash(rect.lineDash);
+  if (rect.fillStyle) {
+    ctx.fillStyle = rect.fillStyle;
+    ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+  }
+  if (rect.strokeStyle && rect.lineWidth) {
+    ctx.strokeStyle = rect.strokeStyle;
+    ctx.lineWidth = rect.lineWidth;
+    ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+  }
+  if (rect.label) {
+    ctx.setLineDash([]);
+    ctx.fillStyle = "rgba(66, 214, 164, 0.96)";
+    ctx.font = "800 10.5px Inter, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "bottom";
+    ctx.fillText(rect.label.text, rect.label.x, rect.label.y);
+  }
+  ctx.restore();
+}
+
+export function drawPlan2DSceneModel(ctx: CanvasRenderingContext2D, model: Plan2DSceneModel) {
+  if (model.emptyMessage) {
+    drawCanvasMessage(ctx, model.width, model.height, model.emptyMessage);
+    return;
+  }
+
+  drawSceneRect(ctx, model.container);
+  for (const box of model.boxes) drawSceneRect(ctx, box);
+  if (model.effectiveSpaceBoundary) drawSceneRect(ctx, model.effectiveSpaceBoundary);
+  drawSceneRect(ctx, model.containerOutline);
 }
 
 function getGeneratedBoxPositions(result: PackingResult, visibleCount: number): BoxPosition[] {
@@ -425,16 +506,24 @@ function drawGuideLabel(ctx: CanvasRenderingContext2D, text: string, x: number, 
   ctx.restore();
 }
 
-function formatAxisGuideText(metric: Plan2DAxisGuideMetric) {
-  const axisName = axisNameForLabel(metric.axisLabel);
-  const countText = metric.countLabel ? `${formatNumber(metric.count)}${metric.countLabel} · ` : "";
-  return `${countText}占${axisName} ${formatNumber(metric.occupied)}mm · 余量 ${formatNumber(metric.remaining)}mm`;
+function formatAxisGuideCountText(metric: Plan2DAxisGuideMetric, axis: "x" | "y") {
+  if (!metric.countLabel) return "";
+  const directionLabel = axis === "x" ? "横向" : "竖向";
+  return `${directionLabel} ${formatNumber(metric.count)}${metric.countLabel}`;
 }
 
-function formatAxisGuideLines(metric: Plan2DAxisGuideMetric) {
+function formatAxisGuideText(metric: Plan2DAxisGuideMetric, axis: "x" | "y") {
+  const axisName = axisNameForLabel(metric.axisLabel);
+  const countText = formatAxisGuideCountText(metric, axis);
+  const countPrefix = countText ? `${countText} · ` : "";
+  return `${countPrefix}占${axisName} ${formatNumber(metric.occupied)}mm · 余量 ${formatNumber(metric.remaining)}mm`;
+}
+
+function formatAxisGuideLines(metric: Plan2DAxisGuideMetric, axis: "x" | "y") {
   const axisName = axisNameForLabel(metric.axisLabel);
   const lines = [`占${axisName} ${formatNumber(metric.occupied)}mm`, `余量 ${formatNumber(metric.remaining)}mm`];
-  return metric.countLabel ? [`${formatNumber(metric.count)}${metric.countLabel}`, ...lines] : lines;
+  const countText = formatAxisGuideCountText(metric, axis);
+  return countText ? [countText, ...lines] : lines;
 }
 
 function getStackedGuideLabelSize(lines: string[], measureText: (text: string) => number) {
@@ -561,8 +650,8 @@ function drawOuterAxisGuides(
   ctx.stroke();
 
   ctx.setLineDash([]);
-  drawGuideLabel(ctx, formatAxisGuideText(model.x), clamp((x1 + x2) / 2, 80, canvasWidth - 80), xGuideY + 17);
-  const yGuideLines = formatAxisGuideLines(model.y);
+  drawGuideLabel(ctx, formatAxisGuideText(model.x, "x"), clamp((x1 + x2) / 2, 80, canvasWidth - 80), xGuideY + 17);
+  const yGuideLines = formatAxisGuideLines(model.y, "y");
   ctx.font = STACKED_GUIDE_LABEL_FONT;
   drawStackedGuideLabel(
     ctx,
@@ -831,6 +920,141 @@ function getFrontEndpointDrawingPositions(
   }));
 }
 
+export function createPlan2DSceneModel({
+  result,
+  visibleCount,
+  viewMode = "top",
+  frontViewSide,
+  width,
+  height,
+  showLabels = true,
+}: Plan2DSceneModelOptions): Plan2DSceneModel {
+  const emptyRect: Plan2DSceneRectModel = {
+    kind: "container-fill",
+    key: "container-fill",
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+  };
+  const compactCanvas = isCompactCanvas(width, height);
+
+  if (!result || !result.pattern) {
+    return {
+      backend: "plan2d-scene-model",
+      width,
+      height,
+      viewMode,
+      frontViewSide: normalizeFrontViewSide(frontViewSide),
+      emptyMessage: "请输入可装载的纸箱尺寸",
+      compactCanvas,
+      scale: 1,
+      origin: { x: 0, y: 0 },
+      plane: null,
+      container: emptyRect,
+      boxes: [],
+      effectiveSpaceBoundary: null,
+      containerOutline: { ...emptyRect, kind: "container-outline", key: "container-outline" },
+    };
+  }
+
+  const pad = showLabels ? (compactCanvas ? 34 : 48) : (compactCanvas ? 54 : 68);
+  const container = result.container;
+  const normalizedFrontViewSide = normalizeFrontViewSide(frontViewSide);
+  const plane = getPlan2DPlaneConfig(result, viewMode, {
+    frontViewSide: normalizedFrontViewSide,
+  });
+  const scale = Math.min((width - pad * 2) / plane.width, (height - pad * 2) / plane.height);
+  const boxX = (width - plane.width * scale) / 2;
+  const boxY = (height - plane.height * scale) / 2 + (showLabels ? (compactCanvas ? 4 : 10) : 0);
+  const containerWidth = plane.width * scale;
+  const containerHeight = plane.height * scale;
+  const drawingPositions: Plan2DDrawingPosition[] =
+    viewMode === "top"
+      ? getTopViewDrawingPositions(result, visibleCount)
+      : viewMode === "front"
+        ? getFrontEndpointDrawingPositions(result, visibleCount, normalizedFrontViewSide)
+        : getElevationDrawingPositions(result, visibleCount);
+  const sortedDrawingPositions = drawingPositions
+    .slice()
+    .sort((a, b) => Number(Boolean(a.visibleBox)) - Number(Boolean(b.visibleBox)));
+
+  const boxes = sortedDrawingPositions.map((drawingPosition, index): Plan2DSceneRectModel => {
+    const { box, visibleBox } = drawingPosition;
+    const isVisible = Boolean(visibleBox);
+    const boxRgb = hexToRgb(colorForBox(visibleBox || box));
+    const rect = drawingPosition.projectedRect || projectBox(box, container, viewMode);
+    return {
+      kind: "carton",
+      key: `carton-${box.sequenceIndex ?? index}-${index}-${Math.round(rect.x)}-${Math.round(rect.y)}`,
+      x: boxX + rect.x * scale,
+      y: boxY + rect.y * scale,
+      width: rect.dx * scale,
+      height: rect.dy * scale,
+      fillStyle: isVisible
+        ? `rgba(${boxRgb.r}, ${boxRgb.g}, ${boxRgb.b}, 0.82)`
+        : "rgba(255, 255, 255, 0.06)",
+      strokeStyle: "rgba(0, 0, 0, 0.9)",
+      lineWidth: Math.max(0.65, Math.min(1.2, scale * 14)),
+      visible: isVisible,
+    };
+  });
+  const effectiveSpaceRect = getEffectiveSpaceProjectionRect(result, viewMode, {
+    frontViewSide: normalizedFrontViewSide,
+  });
+  const effectiveSpaceBoundary = effectiveSpaceRect
+    ? {
+        kind: "effective-space" as const,
+        key: "effective-space",
+        x: boxX + effectiveSpaceRect.x * scale,
+        y: boxY + effectiveSpaceRect.y * scale,
+        width: effectiveSpaceRect.dx * scale,
+        height: effectiveSpaceRect.dy * scale,
+        strokeStyle: "rgba(66, 214, 164, 0.82)",
+        lineWidth: Math.max(1, Math.min(1.7, scale * 12)),
+        lineDash: [7, 5],
+        label: {
+          text: "有效装载空间",
+          x: boxX + effectiveSpaceRect.x * scale + 6,
+          y: Math.max(14, boxY + effectiveSpaceRect.y * scale - 5),
+        },
+      }
+    : null;
+
+  return {
+    backend: "plan2d-scene-model",
+    width,
+    height,
+    viewMode,
+    frontViewSide: normalizedFrontViewSide,
+    compactCanvas,
+    scale,
+    origin: { x: boxX, y: boxY },
+    plane,
+    container: {
+      kind: "container-fill",
+      key: "container-fill",
+      x: boxX,
+      y: boxY,
+      width: containerWidth,
+      height: containerHeight,
+      fillStyle: "rgba(20, 28, 37, 0.92)",
+    },
+    boxes,
+    effectiveSpaceBoundary,
+    containerOutline: {
+      kind: "container-outline",
+      key: "container-outline",
+      x: boxX,
+      y: boxY,
+      width: containerWidth,
+      height: containerHeight,
+      strokeStyle: "rgba(255,255,255,0.78)",
+      lineWidth: 1.5,
+    },
+  };
+}
+
 export function renderPlan2D({
   canvas,
   result,
@@ -843,61 +1067,37 @@ export function renderPlan2D({
   const { ctx, width, height } = resizeCanvas(canvas, devicePixelRatio);
   ctx.clearRect(0, 0, width, height);
 
-  if (!result || !result.pattern) {
-    drawCanvasMessage(ctx, width, height, "请输入可装载的纸箱尺寸");
+  const sceneModel = createPlan2DSceneModel({
+    result,
+    visibleCount,
+    viewMode,
+    frontViewSide,
+    width,
+    height,
+    showLabels,
+  });
+  drawPlan2DSceneModel(ctx, sceneModel);
+
+  if (!result || !result.pattern || sceneModel.emptyMessage || !sceneModel.plane) {
     return;
   }
 
-  const compactCanvas = isCompactCanvas(width, height);
-  const pad = showLabels ? (compactCanvas ? 34 : 48) : (compactCanvas ? 54 : 68);
-  const container = result.container;
-  const normalizedFrontViewSide = normalizeFrontViewSide(frontViewSide);
-  const plane = getPlan2DPlaneConfig(result, viewMode, {
-    frontViewSide: normalizedFrontViewSide,
-  });
-  const scale = Math.min((width - pad * 2) / plane.width, (height - pad * 2) / plane.height);
-  const boxX = (width - plane.width * scale) / 2;
-  const boxY = (height - plane.height * scale) / 2 + (showLabels ? (compactCanvas ? 4 : 10) : 0);
-  const effectiveSpaceRect = getEffectiveSpaceProjectionRect(result, viewMode, {
-    frontViewSide: normalizedFrontViewSide,
-  });
-
-  ctx.save();
-  ctx.translate(boxX, boxY);
-  drawContainerFill(ctx, plane, scale);
-
-  const drawingPositions: Plan2DDrawingPosition[] =
-    viewMode === "top"
-      ? getTopViewDrawingPositions(result, visibleCount)
-      : viewMode === "front"
-        ? getFrontEndpointDrawingPositions(result, visibleCount, normalizedFrontViewSide)
-        : getElevationDrawingPositions(result, visibleCount);
-  const sortedDrawingPositions = drawingPositions
-    .slice()
-    .sort((a, b) => Number(Boolean(a.visibleBox)) - Number(Boolean(b.visibleBox)));
-
-  for (const drawingPosition of sortedDrawingPositions) {
-    const { box, visibleBox } = drawingPosition;
-    const isVisible = Boolean(visibleBox);
-    const boxRgb = hexToRgb(colorForBox(visibleBox || box));
-    const rect = drawingPosition.projectedRect || projectBox(box, container, viewMode);
-
-    ctx.fillStyle = isVisible
-      ? `rgba(${boxRgb.r}, ${boxRgb.g}, ${boxRgb.b}, 0.82)`
-      : "rgba(255, 255, 255, 0.06)";
-    ctx.strokeStyle = "rgba(0, 0, 0, 0.9)";
-    ctx.lineWidth = Math.max(0.65, Math.min(1.2, scale * 14));
-    ctx.fillRect(rect.x * scale, rect.y * scale, rect.dx * scale, rect.dy * scale);
-    ctx.strokeRect(rect.x * scale, rect.y * scale, rect.dx * scale, rect.dy * scale);
-  }
-
-  drawEffectiveSpaceBoundary(ctx, effectiveSpaceRect, scale);
-  drawContainerOutline(ctx, plane, scale);
-  ctx.restore();
-  drawOuterAxisGuides(ctx, result, visibleCount, viewMode, plane, scale, boxX, boxY, width, height);
+  const normalizedFrontViewSide = sceneModel.frontViewSide ?? normalizeFrontViewSide(frontViewSide);
+  drawOuterAxisGuides(
+    ctx,
+    result,
+    visibleCount,
+    viewMode,
+    sceneModel.plane,
+    sceneModel.scale,
+    sceneModel.origin.x,
+    sceneModel.origin.y,
+    width,
+    height,
+  );
 
   if (showLabels) {
-    drawOuterPlanLabels(ctx, result, boxX, boxY, scale, width, height, viewMode, visibleCount, {
+    drawOuterPlanLabels(ctx, result, sceneModel.origin.x, sceneModel.origin.y, sceneModel.scale, width, height, viewMode, visibleCount, {
       frontViewSide: normalizedFrontViewSide,
     });
   }

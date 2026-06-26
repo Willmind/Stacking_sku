@@ -2,6 +2,7 @@
 import { Maximize2 } from "@lucide/vue";
 import { computed, ref } from "vue";
 import { usePackingStore } from "../../stores/packingStore";
+import ProgressControl from "../controls/ProgressControl.vue";
 import CoordinateDialog from "../results/CoordinateDialog.vue";
 import Cargo3DSceneV2 from "./Cargo3DSceneV2.vue";
 import VisualizationDialog from "./VisualizationDialog.vue";
@@ -64,6 +65,10 @@ function closeExpandedScene() {
       :subtitle="expandedSceneSubtitle"
       @close="closeExpandedScene"
     >
+      <template #toolbar>
+        <ProgressControl control-id="expanded-scene-progress" />
+      </template>
+
       <div class="expanded-scene-shell cargo-scene-shell--unified">
         <Cargo3DSceneV2
           canvas-id="expanded-scene-canvas"

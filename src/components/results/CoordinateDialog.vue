@@ -126,7 +126,7 @@ watch(
 
     <div class="coordinate-layout">
       <p class="coordinate-system-note">
-        坐标系：原点为柜内最里面左下角；X 向右，Y 向柜门，Z 向上；柜门面坐标为纸箱朝柜门面中心点，上表面坐标为纸箱顶面中心点。
+        坐标系：原点为角件端右下角；X 沿柜宽向左，Y 向柜门，Z 向上；柜门面坐标为纸箱朝柜门面中心点，上表面坐标为纸箱顶面中心点。
       </p>
 
       <div class="coordinate-content">

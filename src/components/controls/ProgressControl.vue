@@ -2,6 +2,15 @@
 import { computed } from "vue";
 import { usePackingStore } from "../../stores/packingStore";
 
+withDefaults(
+  defineProps<{
+    controlId?: string;
+  }>(),
+  {
+    controlId: "stack-progress",
+  },
+);
+
 const store = usePackingStore();
 
 const progressPercent = computed(() => {
@@ -24,7 +33,7 @@ const progressPercent = computed(() => {
       </span>
       <input
         :key="store.result?.totalBoxes ?? 0"
-        id="stack-progress"
+        :id="controlId"
         :max="store.result?.totalBoxes ?? 0"
         v-model.number="store.visibleCount"
         type="range"

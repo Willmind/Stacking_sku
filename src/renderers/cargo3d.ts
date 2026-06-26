@@ -105,7 +105,7 @@ export function getCargoCoordinateAxes(container: Pick<PackingResult["container"
   const origin: [number, number, number] = [
     roundSceneUnit(-container.length * 0.0005),
     roundSceneUnit(-container.height * 0.0005),
-    roundSceneUnit(-container.width * 0.0005),
+    roundSceneUnit(container.width * 0.0005),
   ];
   const xLength = visibleAxisLength(container.width);
   const yLength = visibleAxisLength(container.length);
@@ -115,8 +115,8 @@ export function getCargoCoordinateAxes(container: Pick<PackingResult["container"
     {
       label: "X",
       start: origin,
-      end: [origin[0], origin[1], roundSceneUnit(origin[2] + xLength)] as [number, number, number],
-      labelPosition: [origin[0], origin[1], roundSceneUnit(origin[2] + xLength + 0.18)] as [number, number, number],
+      end: [origin[0], origin[1], roundSceneUnit(origin[2] - xLength)] as [number, number, number],
+      labelPosition: [origin[0], origin[1], roundSceneUnit(origin[2] - xLength - 0.18)] as [number, number, number],
       color: "#ff5b5b",
       colorHex: 0xff5b5b,
     },

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { X } from "@lucide/vue";
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { Comment, computed, onBeforeUnmount, ref, useSlots, watch } from "vue";
 import {
   DialogClose,
   DialogContent,
@@ -36,9 +36,18 @@ const DIALOG_ANIMATION_MS = 240;
 const emit = defineEmits<{
   "update:open": [value: boolean];
 }>();
+const slots = useSlots();
 
 const isClosing = ref(false);
 const dialogOpen = computed(() => props.open || isClosing.value);
+const hasToolbarContent = computed(() => {
+  const nodes = slots.toolbar?.() ?? [];
+  return nodes.some((node) => {
+    if (node.type === Comment) return false;
+    if (typeof node.children === "string") return node.children.trim().length > 0;
+    return true;
+  });
+});
 let closeTimer: number | null = null;
 
 function clearCloseTimer() {
@@ -94,6 +103,7 @@ onBeforeUnmount(clearCloseTimer);
           {
             'base-dialog-content--closing': isClosing,
             'base-dialog-content--stable-height': stableHeight,
+            'base-dialog-content--has-toolbar': $slots.toolbar && hasToolbarContent,
           },
         ]"
         :aria-describedby="description ? undefined : undefined"
@@ -114,6 +124,10 @@ onBeforeUnmount(clearCloseTimer);
             <X :size="17" :stroke-width="2.35" aria-hidden="true" />
           </DialogClose>
         </header>
+
+        <div v-if="$slots.toolbar && hasToolbarContent" class="base-dialog-toolbar">
+          <slot name="toolbar" />
+        </div>
 
         <div class="base-dialog-body" :class="[`base-dialog-body--${bodyVariant}`]">
           <slot />
@@ -160,6 +174,10 @@ onBeforeUnmount(clearCloseTimer);
   box-shadow: 0 26px 80px rgba(0, 0, 0, 0.46), var(--panel-shadow);
   padding: 18px;
   animation: base-dialog-content-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.base-dialog-content--has-toolbar {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
 }
 
 .base-dialog-content--closing {
@@ -267,6 +285,23 @@ onBeforeUnmount(clearCloseTimer);
 .base-dialog-close:focus-visible {
   outline: 0;
   box-shadow: var(--focus-ring);
+}
+
+.base-dialog-toolbar {
+  min-width: 0;
+}
+
+.base-dialog-content--fullscreen .base-dialog-toolbar {
+  display: flex;
+  align-items: center;
+  padding: 11px 16px;
+  border-bottom: 1px solid rgba(174, 184, 201, 0.14);
+  background: rgba(7, 16, 22, 0.9);
+}
+
+.base-dialog-toolbar :deep(.progress-control) {
+  width: min(620px, 100%);
+  grid-template-columns: auto minmax(180px, 1fr);
 }
 
 .base-dialog-body {
