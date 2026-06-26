@@ -6,6 +6,7 @@ import { describe, it } from "vitest";
 const rendererSource = fs.readFileSync(path.join(__dirname, "..", "src/renderers/cargo3d.ts"), "utf8");
 const plan2dSource = fs.readFileSync(path.join(__dirname, "..", "src/renderers/plan2d.ts"), "utf8");
 const appSource = fs.readFileSync(path.join(__dirname, "..", "src/App.vue"), "utf8");
+const mainSource = fs.readFileSync(path.join(__dirname, "..", "src/main.ts"), "utf8");
 const packageSource = fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8");
 const viteConfigSource = fs.readFileSync(path.join(__dirname, "..", "vite.config.ts"), "utf8");
 const tokensSource = fs.readFileSync(path.join(__dirname, "..", "src/styles/tokens.css"), "utf8");
@@ -13,6 +14,10 @@ const plan2dViewSource = fs.readFileSync(
   path.join(__dirname, "..", "src/components/visualizations/Plan2DView.vue"),
   "utf8",
 );
+const plan2dKonvaStagePath = path.join(__dirname, "..", "src/components/visualizations/Plan2DKonvaStage.vue");
+const plan2dKonvaStageSource = fs.existsSync(plan2dKonvaStagePath)
+  ? fs.readFileSync(plan2dKonvaStagePath, "utf8")
+  : "";
 const cargo3dViewSource = fs.readFileSync(
   path.join(__dirname, "..", "src/components/visualizations/Cargo3DView.vue"),
   "utf8",
@@ -385,13 +390,33 @@ describe("2D plan source guards", () => {
     assert.doesNotMatch(plan2dViewSource, /plan-view-card--side/);
   });
 
+  it("renders 2D plans through Vue Konva scene layers", () => {
+    assert.match(packageSource, /"konva"/);
+    assert.match(packageSource, /"vue-konva"/);
+    assert.match(mainSource, /VueKonva/);
+    assert.match(mainSource, /\.use\(VueKonva\)/);
+    assert.match(plan2dViewSource, /Plan2DKonvaStage/);
+    assert.doesNotMatch(plan2dViewSource, /renderPlan2D/);
+    assert.doesNotMatch(plan2dViewSource, /HTMLCanvasElement/);
+    assert.match(plan2dKonvaStageSource, /createPlan2DSceneModel/);
+    assert.match(plan2dKonvaStageSource, /ResizeObserver/);
+    assert.match(plan2dKonvaStageSource, /<v-stage/);
+    assert.match(plan2dKonvaStageSource, /<v-layer/);
+    assert.match(plan2dKonvaStageSource, /<v-rect/);
+    assert.match(plan2dKonvaStageSource, /<v-line/);
+    assert.match(plan2dKonvaStageSource, /plan-konva-stage/);
+    assert.match(plan2dKonvaStageSource, /plan-guide-label/);
+    assert.match(plan2dKonvaStageSource, /width:\s*max-content/);
+    assert.match(plan2dKonvaStageSource, /translateX\(-50%\)/);
+  });
+
   it("keeps the front view switchable between corner and door endpoints", () => {
     assert.match(plan2dViewSource, /frontViewSides/);
     assert.match(plan2dViewSource, /activeFrontViewSide/);
     assert.match(plan2dViewSource, /plan-view-switch--front/);
     assert.match(plan2dViewSource, /角件端/);
     assert.match(plan2dViewSource, /柜门/);
-    assert.match(plan2dViewSource, /frontViewSide:/);
+    assert.match(plan2dViewSource, /front-view-side/);
     assert.match(plan2dSource, /Plan2DFrontViewSide/);
     assert.match(plan2dSource, /getFrontEndpointDrawingPositions/);
   });
@@ -407,21 +432,21 @@ describe("2D plan source guards", () => {
     assert.match(plan2dViewSource, /plan-view-measure/);
     assert.match(plan2dViewSource, /\.plan-view-status\s*\{[\s\S]*grid-column:\s*1 \/ -1/);
     assert.match(plan2dViewSource, /\.plan-view-measure\s*\{[\s\S]*grid-column:\s*1 \/ -1/);
-    assert.match(plan2dViewSource, /showLabels:\s*false/);
+    assert.match(plan2dViewSource, /show-labels/);
     assert.match(plan2dSource, /showLabels\?:\s*boolean/);
     assert.match(plan2dSource, /if \(showLabels\)/);
   });
 
   it("frames 2D canvases as polished technical drawing surfaces", () => {
-    assert.match(plan2dViewSource, /plan-canvas-shell/);
-    assert.match(plan2dViewSource, /plan-canvas-shell--switchable/);
-    assert.match(plan2dViewSource, /plan-canvas-shell--front/);
-    assert.match(plan2dViewSource, /\.plan-canvas-shell::before/);
-    assert.match(plan2dViewSource, /\.plan-canvas-shell::after/);
-    assert.match(plan2dViewSource, /box-shadow:\s*inset 0 0 0 1px rgba\(255,\s*255,\s*255,\s*0\.05\)/);
-    assert.match(plan2dViewSource, /radial-gradient\(circle at 18% 12%/);
-    assert.match(plan2dViewSource, /background-size:\s*36px 36px/);
-    assert.doesNotMatch(plan2dViewSource, /background-size:\s*28px 28px/);
+    assert.match(plan2dKonvaStageSource, /plan-canvas-shell/);
+    assert.match(plan2dViewSource, /stage-class="plan-canvas-shell plan-canvas-shell--switchable"/);
+    assert.match(plan2dViewSource, /stage-class="plan-canvas-shell plan-canvas-shell--front"/);
+    assert.match(plan2dKonvaStageSource, /\.plan-canvas-shell::before/);
+    assert.match(plan2dKonvaStageSource, /\.plan-canvas-shell::after/);
+    assert.match(plan2dKonvaStageSource, /box-shadow:\s*inset 0 0 0 1px rgba\(255,\s*255,\s*255,\s*0\.05\)/);
+    assert.match(plan2dKonvaStageSource, /radial-gradient\(circle at 18% 12%/);
+    assert.match(plan2dKonvaStageSource, /background-size:[\s\S]*36px 36px,[\s\S]*36px 36px/);
+    assert.doesNotMatch(plan2dKonvaStageSource, /background-size:\s*28px 28px/);
   });
 
   it("keeps top-view status aligned to the current loading progress", () => {
@@ -479,9 +504,14 @@ describe("2D plan source guards", () => {
     assert.match(plan2dSource, /function drawStackedGuideLabel/);
     assert.match(plan2dSource, /function formatAxisGuideLines/);
     assert.match(plan2dSource, /getPlan2DVerticalGuideLabelLayout/);
+    assert.match(plan2dKonvaStageSource, /formatAxisGuideLines/);
+    assert.match(plan2dKonvaStageSource, /verticalGuideLabelStyle/);
+    assert.match(plan2dKonvaStageSource, /axisGuideConfig\.yLabel\.lines/);
     assert.match(plan2dSource, /yGuideX,\s*yStart:\s*y1,\s*yEnd:\s*y2/);
     assert.doesNotMatch(plan2dSource, /boxX \+ 6,\s*boxY - 58/);
     assert.doesNotMatch(plan2dSource, /formatAxisGuideText\(model\.y\),\s*yGuideX[^)]*-\s*Math\.PI\s*\/\s*2/);
+    assert.doesNotMatch(plan2dKonvaStageSource, /rotation:\s*-90/);
+    assert.doesNotMatch(plan2dKonvaStageSource, /guideLabelCardConfig/);
   });
 
   it("provides expanded dialogs for detailed 2D and 3D inspection", () => {

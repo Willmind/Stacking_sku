@@ -1,19 +1,18 @@
 <script setup lang="ts">
 import { LayoutPanelTop, Maximize2, PanelBottom, PanelLeft } from "@lucide/vue";
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import type { Component, ComponentPublicInstance } from "vue";
+import { computed, ref } from "vue";
+import type { Component } from "vue";
 import {
   getPlan2DAxisGuideMetrics,
   getPlan2DPlaneConfig,
-  renderPlan2D,
   type Plan2DFrontViewSide,
   type Plan2DViewMode,
 } from "../../renderers/plan2d";
 import { usePackingStore } from "../../stores/packingStore";
+import Plan2DKonvaStage from "./Plan2DKonvaStage.vue";
 import VisualizationDialog from "./VisualizationDialog.vue";
 
 const store = usePackingStore();
-let resizeObserver: ResizeObserver | null = null;
 
 type SwitchablePlanViewMode = "top" | "side";
 
@@ -64,9 +63,6 @@ const activePlanView = computed(() => {
   return switchablePlanViews.find((item) => item.id === activePlanViewMode.value) ?? switchablePlanViews[0];
 });
 
-const switchableCanvasRef = ref<HTMLCanvasElement | null>(null);
-const frontCanvasRef = ref<HTMLCanvasElement | null>(null);
-const expandedCanvasRef = ref<HTMLCanvasElement | null>(null);
 const expandedPlanViewMode = ref<Plan2DViewMode | null>(null);
 const showGroupSummary = false;
 
@@ -111,18 +107,6 @@ function getViewMeasure(mode: Plan2DViewMode) {
   return `${plane.xLabel} ${formatNumber(plane.width)}mm · 占用 ${formatNumber(metrics.x.occupied)}mm`;
 }
 
-function setSwitchableCanvasRef(element: Element | ComponentPublicInstance | null) {
-  switchableCanvasRef.value = element instanceof HTMLCanvasElement ? element : null;
-}
-
-function setFrontCanvasRef(element: Element | ComponentPublicInstance | null) {
-  frontCanvasRef.value = element instanceof HTMLCanvasElement ? element : null;
-}
-
-function setExpandedCanvasRef(element: Element | ComponentPublicInstance | null) {
-  expandedCanvasRef.value = element instanceof HTMLCanvasElement ? element : null;
-}
-
 function setActivePlanView(mode: SwitchablePlanViewMode) {
   activePlanViewMode.value = mode;
 }
@@ -139,39 +123,11 @@ function getFrontViewSideLabel() {
   return frontViewSides.find((side) => side.id === activeFrontViewSide.value)?.label ?? frontViewSides[0].label;
 }
 
-function drawView(mode: Plan2DViewMode, canvas: HTMLCanvasElement | null) {
-  if (!canvas) return;
-  renderPlan2D({
-    canvas,
-    result: store.result,
-    visibleCount: store.visibleCount,
-    viewMode: mode,
-    frontViewSide: getFrontViewSideForMode(mode),
-    showLabels: false,
-  });
-}
-
-function draw() {
-  drawView(activePlanViewMode.value, switchableCanvasRef.value);
-  drawView(frontPlanView.id, frontCanvasRef.value);
-  drawExpandedView();
-}
-
-function drawExpandedView() {
-  if (!expandedPlanViewMode.value) return;
-  drawView(expandedPlanViewMode.value, expandedCanvasRef.value);
-}
-
 function openExpandedView(mode: Plan2DViewMode) {
   expandedPlanViewMode.value = mode;
-  void nextTick(() => {
-    drawExpandedView();
-    if (expandedCanvasRef.value && resizeObserver) resizeObserver.observe(expandedCanvasRef.value);
-  });
 }
 
 function closeExpandedView() {
-  if (expandedCanvasRef.value && resizeObserver) resizeObserver.unobserve(expandedCanvasRef.value);
   expandedPlanViewMode.value = null;
 }
 
@@ -182,26 +138,6 @@ function getExpandedSubtitle(mode: Plan2DViewMode) {
 function getExpandedTitle(view: PlanViewItem) {
   return view.id === "front" ? `${view.title} · ${getFrontViewSideLabel()}` : view.title;
 }
-
-onMounted(() => {
-  draw();
-  resizeObserver = new ResizeObserver(draw);
-  if (switchableCanvasRef.value) resizeObserver.observe(switchableCanvasRef.value);
-  if (frontCanvasRef.value) resizeObserver.observe(frontCanvasRef.value);
-});
-
-onBeforeUnmount(() => {
-  resizeObserver?.disconnect();
-  resizeObserver = null;
-});
-
-watch(
-  () => [store.result, store.visibleCount, activePlanViewMode.value, activeFrontViewSide.value],
-  () => {
-    void nextTick(draw);
-  },
-  { deep: true },
-);
 </script>
 
 <template>
@@ -250,14 +186,15 @@ watch(
           <span class="plan-view-status">{{ getViewStatus() }}</span>
           <span class="plan-view-measure">{{ getViewMeasure(activePlanView.id) }}</span>
         </header>
-        <div class="plan-canvas-shell plan-canvas-shell--switchable">
-          <canvas
-            :id="activePlanView.canvasId"
-            :ref="(element) => setSwitchableCanvasRef(element)"
-            width="980"
-            height="620"
-          ></canvas>
-        </div>
+        <Plan2DKonvaStage
+          :stage-id="activePlanView.canvasId"
+          stage-class="plan-canvas-shell plan-canvas-shell--switchable"
+          :result="store.result"
+          :visible-count="store.visibleCount"
+          :view-mode="activePlanView.id"
+          :front-view-side="getFrontViewSideForMode(activePlanView.id)"
+          :show-labels="false"
+        />
       </section>
 
       <section class="plan-view-card plan-view-card--front">
@@ -296,14 +233,15 @@ watch(
           <span class="plan-view-status">{{ getViewStatus() }}</span>
           <span class="plan-view-measure">{{ getViewMeasure(frontPlanView.id) }}</span>
         </header>
-        <div class="plan-canvas-shell plan-canvas-shell--front">
-          <canvas
-            :id="frontPlanView.canvasId"
-            :ref="(element) => setFrontCanvasRef(element)"
-            width="980"
-            height="620"
-          ></canvas>
-        </div>
+        <Plan2DKonvaStage
+          :stage-id="frontPlanView.canvasId"
+          stage-class="plan-canvas-shell plan-canvas-shell--front"
+          :result="store.result"
+          :visible-count="store.visibleCount"
+          :view-mode="frontPlanView.id"
+          :front-view-side="getFrontViewSideForMode(frontPlanView.id)"
+          :show-labels="false"
+        />
       </section>
     </div>
     <div v-if="showGroupSummary && groupSummary.length" class="plan-group-summary" aria-label="2D 排布分区说明">
@@ -316,15 +254,16 @@ watch(
       :subtitle="expandedPlanView ? getExpandedSubtitle(expandedPlanView.id) : ''"
       @close="closeExpandedView"
     >
-      <div class="plan-canvas-shell plan-canvas-shell--expanded">
-        <canvas
-          id="expanded-plan-canvas"
-          class="expanded-plan-canvas"
-          :ref="(element) => setExpandedCanvasRef(element)"
-          width="1400"
-          height="860"
-        ></canvas>
-      </div>
+      <Plan2DKonvaStage
+        v-if="expandedPlanView"
+        stage-id="expanded-plan-canvas"
+        stage-class="plan-canvas-shell plan-canvas-shell--expanded expanded-plan-canvas"
+        :result="store.result"
+        :visible-count="store.visibleCount"
+        :view-mode="expandedPlanView.id"
+        :front-view-side="getFrontViewSideForMode(expandedPlanView.id)"
+        :show-labels="false"
+      />
     </VisualizationDialog>
   </article>
 </template>
@@ -511,69 +450,6 @@ span {
   color: rgba(245, 247, 251, 0.78);
   font-size: 11px;
   line-height: 1.2;
-}
-
-.plan-canvas-shell {
-  position: relative;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  background:
-    radial-gradient(circle at 18% 12%, rgba(66, 214, 164, 0.1), transparent 34%),
-    radial-gradient(circle at 86% 78%, rgba(104, 166, 255, 0.09), transparent 30%),
-    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px),
-    rgba(3, 8, 14, 0.72);
-  background-size:
-    auto,
-    auto,
-    36px 36px,
-    36px 36px,
-    auto;
-}
-
-.plan-canvas-shell::before,
-.plan-canvas-shell::after {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
-  content: "";
-}
-
-.plan-canvas-shell::before {
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
-}
-
-.plan-canvas-shell::after {
-  background:
-    linear-gradient(90deg, rgba(66, 214, 164, 0.18), transparent 18%, transparent 82%, rgba(104, 166, 255, 0.12)),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 24%);
-  opacity: 0.42;
-  mix-blend-mode: screen;
-}
-
-canvas {
-  position: relative;
-  z-index: 1;
-  display: block;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  background:
-    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px),
-    rgba(3, 8, 14, 0.72);
-  background-size: 36px 36px;
-}
-
-.expanded-plan-canvas {
-  height: 100%;
-}
-
-.plan-canvas-shell--expanded {
-  width: 100%;
-  height: 100%;
 }
 
 .plan-group-summary {

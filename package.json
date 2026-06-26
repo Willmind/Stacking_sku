@@ -15,11 +15,13 @@
     "@tresjs/cientos": "^5.8.1",
     "@tresjs/core": "^5.8.3",
     "fflate": "^0.8.3",
+    "konva": "^10.3.0",
     "pinia": "latest",
     "read-excel-file": "^9.2.0",
     "reka-ui": "^2.9.10",
     "three": "latest",
-    "vue": "latest"
+    "vue": "latest",
+    "vue-konva": "^3.4.0"
   },
   "devDependencies": {
     "@playwright/test": "latest",

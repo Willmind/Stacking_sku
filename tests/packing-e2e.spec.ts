@@ -346,7 +346,8 @@ test("scopes the carton color picker trigger and redraws canvas with the selecte
   await expect(page.locator("#status-chip")).toHaveText("已完成计算");
 
   const pixelCounts = await page.locator("#plan-canvas-top").evaluate((element) => {
-    const canvas = element as HTMLCanvasElement;
+    const canvas = element instanceof HTMLCanvasElement ? element : element.querySelector("canvas");
+    if (!canvas) throw new Error("2D canvas element is missing");
     const context = canvas.getContext("2d");
     if (!context) throw new Error("2D canvas context is missing");
     const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
