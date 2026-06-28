@@ -59,13 +59,8 @@ function rankOf(ranks: Map<number, number>, value: number) {
   return ranks.get(roundMm(value)) ?? 0;
 }
 
-function compareBoxesByCoordinateOrder(first: BoxPosition, second: BoxPosition) {
-  return (
-    first.x - second.x ||
-    first.z - second.z ||
-    second.y - first.y ||
-    (first.sequenceIndex ?? 0) - (second.sequenceIndex ?? 0)
-  );
+function compareBoxesByLoadingSequence(first: BoxPosition, second: BoxPosition) {
+  return (first.sequenceIndex ?? 0) - (second.sequenceIndex ?? 0);
 }
 
 function orientationLabel(box: BoxPosition) {
@@ -118,7 +113,7 @@ export function createBoxCoordinateRows(result: PackingResult | null): BoxCoordi
 
   return boxes
     .slice()
-    .sort(compareBoxesByCoordinateOrder)
+    .sort(compareBoxesByLoadingSequence)
     .map((box, index) => createRow(box, index + 1, ranks, result.container.width));
 }
 

@@ -329,9 +329,9 @@ export type {
   function orderFloorPositionsForPlacement(floorPositions) {
     return floorPositions.slice().sort(
       (a, b) =>
-        getLoadingRowSortValue(a) - getLoadingRowSortValue(b) ||
         a.x - b.x ||
-        a.y - b.y,
+        a.y - b.y ||
+        getLoadingRowSortValue(a) - getLoadingRowSortValue(b),
     );
   }
 
@@ -340,7 +340,19 @@ export type {
   }
 
   function getLoadingRowKey(position) {
-    return Number.isFinite(position.loadingRowIndex) ? `row:${position.loadingRowIndex}` : `x:${position.x}`;
+    return `x:${position.x}`;
+  }
+
+  function orderPositionsByLoadingRowThenStack(positions) {
+    return positions.slice().sort(
+      (a, b) =>
+        getLoadingRowSortValue(a) - getLoadingRowSortValue(b) ||
+        (a.stackIndex || 0) - (b.stackIndex || 0) ||
+        (a.faceIndex || 0) - (b.faceIndex || 0) ||
+        a.x - b.x ||
+        a.y - b.y ||
+        (a.sequenceIndex || 0) - (b.sequenceIndex || 0),
+    );
   }
 
   function groupFloorPositionsByLoadingRow(orderedFloor) {
@@ -450,10 +462,10 @@ export type {
     );
   }
 
-  function countAcceptedPositionsForStack(basePositions, stackIndex, container, cornerBlock) {
+  function countAcceptedPositionsForStack(orderedBasePositions, stackIndex, container, cornerBlock) {
     const acceptedInStackBand = [];
 
-    for (const basePosition of orderFloorPositionsForPlacement(basePositions)) {
+    for (const basePosition of orderedBasePositions) {
       const position = {
         ...basePosition,
         z: stackIndex * basePosition.dz,
@@ -491,12 +503,13 @@ export type {
       const [cartonHeight] = Array.from(uniqueHeights);
       const layerCount = Math.floor(container.height / cartonHeight);
       const perLayerBoxCount = basePositions.length;
+      const orderedBasePositions = orderFloorPositionsForPlacement(basePositions);
       let totalBoxes = 0;
       let highestAcceptedStackIndex = -1;
 
       for (let stackIndex = 0; stackIndex < layerCount; stackIndex += 1) {
         const acceptedCount = layerCollidesWithTopBand(stackIndex, cartonHeight, container, cornerBlock)
-          ? countAcceptedPositionsForStack(basePositions, stackIndex, container, cornerBlock)
+          ? countAcceptedPositionsForStack(orderedBasePositions, stackIndex, container, cornerBlock)
           : perLayerBoxCount;
         totalBoxes += acceptedCount;
         if (acceptedCount > 0) highestAcceptedStackIndex = stackIndex;
@@ -1093,7 +1106,8 @@ export type {
             cornerBlock: zoneCornerBlock,
           },
         );
-        const selectedPositions = zoneResult.orderedPositions.slice(0, remainingTarget);
+        const selectedPositions = orderPositionsByLoadingRowThenStack(zoneResult.orderedPositions)
+          .slice(0, remainingTarget);
         const offsetPositions = selectedPositions.map((position) => ({
           ...position,
           x: position.x + cursorX,
