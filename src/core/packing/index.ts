@@ -343,18 +343,6 @@ export type {
     return `x:${position.x}`;
   }
 
-  function orderPositionsByLoadingRowThenStack(positions) {
-    return positions.slice().sort(
-      (a, b) =>
-        getLoadingRowSortValue(a) - getLoadingRowSortValue(b) ||
-        (a.stackIndex || 0) - (b.stackIndex || 0) ||
-        (a.faceIndex || 0) - (b.faceIndex || 0) ||
-        a.x - b.x ||
-        a.y - b.y ||
-        (a.sequenceIndex || 0) - (b.sequenceIndex || 0),
-    );
-  }
-
   function groupFloorPositionsByLoadingRow(orderedFloor) {
     const groups = [];
 
@@ -1106,8 +1094,7 @@ export type {
             cornerBlock: zoneCornerBlock,
           },
         );
-        const selectedPositions = orderPositionsByLoadingRowThenStack(zoneResult.orderedPositions)
-          .slice(0, remainingTarget);
+        const selectedPositions = zoneResult.orderedPositions.slice(0, remainingTarget);
         const offsetPositions = selectedPositions.map((position) => ({
           ...position,
           x: position.x + cursorX,

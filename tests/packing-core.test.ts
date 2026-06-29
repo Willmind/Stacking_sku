@@ -670,7 +670,7 @@ describe("packing core", () => {
   assert.equal(result.totalBoxes, 200);
   assert.deepEqual(summarizeSkuCounts(result), { A: 100, B: 100 });
   assert.equal(aFootprints.length, 14);
-  assert.equal(bFootprints.length, 15);
+  assert.equal(bFootprints.length, 14);
   assert.equal(new Set(aFootprints.map(footprintKey)).size, aFootprints.length);
   assert.equal(new Set(bFootprints.map(footprintKey)).size, bFootprints.length);
   assert.equal(
@@ -708,6 +708,28 @@ describe("packing core", () => {
       ["A", 0, 0, 100],
     ],
   );
+}
+
+{
+  const result = Packing.calculateMultiSkuPacking(
+    customContainer(1200, 500, 300),
+    [
+      sku("A", 360, 140, 100, 11, "#d8923a"),
+      sku("B", 200, 100, 100, 1, "#42d6a4"),
+    ],
+    {
+      strategy: "multi-destination",
+      cornerBlock: { length: 0, width: 0, height: 0 },
+    },
+  );
+
+  const positions = Packing.generateBoxPositions(result, result.totalBoxes);
+
+  assert.equal(result.pattern.family, "heterogeneous-zones");
+  assert.equal(result.totalBoxes, 12);
+  assertLoadsCompleteFaceBeforeNextFace(result);
+  assertPositionsFitContainer(result, positions);
+  assertNoPositionOverlaps(positions);
 }
 
 {
