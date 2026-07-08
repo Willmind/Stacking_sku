@@ -268,13 +268,12 @@ function createWidthCandidate(
     occupiedLength = Math.max(occupiedLength, acrossCount * orientation.x);
     perLayerBoxCount += acrossCount;
   }
-  const alignedUnits = alignMixedWidthLaneUnitsToSideWalls(units, container.width);
-  const occupiedWidth = alignedUnits.reduce((maxWidth, unit) => Math.max(maxWidth, unit.y + unit.dy), 0);
+  const occupiedWidth = units.reduce((maxWidth, unit) => Math.max(maxWidth, unit.y + unit.dy), 0);
 
   return {
     family: "width-lanes",
     order,
-    units: alignedUnits,
+    units,
     groups: summarizeGroups(sequence, "width-lanes", container),
     lengthFacingCount: primaryCount,
     widthFacingCount: secondaryCount,
@@ -282,39 +281,6 @@ function createWidthCandidate(
     occupiedWidth,
     perLayerBoxCount,
   };
-}
-
-function alignMixedWidthLaneUnitsToSideWalls(units: CandidateUnit[], containerWidth: number): CandidateUnit[] {
-  const groups: Array<{ orientationId: CartonOrientationId; start: number; end: number }> = [];
-
-  for (const unit of units) {
-    const previous = groups[groups.length - 1];
-    if (previous && previous.orientationId === unit.orientationId) {
-      previous.end += 1;
-    } else {
-      groups.push({
-        orientationId: unit.orientationId,
-        start: groups.length === 0 ? 0 : groups[groups.length - 1].end,
-        end: groups.length === 0 ? 1 : groups[groups.length - 1].end + 1,
-      });
-    }
-  }
-
-  if (groups.length < 2) return units;
-
-  const occupiedWidth = units.reduce((maxWidth, unit) => Math.max(maxWidth, unit.y + unit.dy), 0);
-  const sideGap = containerWidth - occupiedWidth;
-  if (sideGap <= 0) return units;
-
-  const rightGroup = groups[groups.length - 1];
-  return units.map((unit, index) =>
-    index >= rightGroup.start && index < rightGroup.end
-      ? {
-          ...unit,
-          y: unit.y + sideGap,
-        }
-      : unit,
-  );
 }
 
 function getFloorOccupiedLength(positions: CandidateBoxPosition[]): number {

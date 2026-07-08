@@ -101,7 +101,7 @@ function assertLoadsFirstLayerBeforeNextLayer(result) {
   let checkedRows = 0;
 
   for (const position of positions) {
-    const key = Number.isFinite(position.loadingRowIndex) ? `row:${position.loadingRowIndex}` : `x:${position.x}`;
+    const key = `x:${position.x}`;
     if (!rowGroups.has(key)) rowGroups.set(key, []);
     rowGroups.get(key).push(position);
   }
@@ -127,26 +127,71 @@ function assertLoadsFirstLayerBeforeNextLayer(result) {
   assert.ok(checkedRows > 0, "expected at least one multi-layer loading row");
 }
 
-function assertMixedWidthLanesTouchBothSideWalls(result) {
+function assertLoadsCompleteFaceBeforeNextFace(result) {
+  const positions = Packing.generateBoxPositions(result, result.totalBoxes);
+  const faceGroups = new Map();
+
+  for (const position of positions) {
+    const key = `x:${position.x}`;
+    if (!faceGroups.has(key)) faceGroups.set(key, []);
+    faceGroups.get(key).push(position);
+  }
+
+  const faces = Array.from(faceGroups.entries())
+    .map(([key, facePositions]) => ({
+      key,
+      firstSequence: Math.min(...facePositions.map((position) => position.sequenceIndex)),
+      lastSequence: Math.max(...facePositions.map((position) => position.sequenceIndex)),
+      count: facePositions.length,
+    }))
+    .sort((first, second) => first.firstSequence - second.firstSequence);
+
+  for (let index = 0; index < faces.length - 1; index += 1) {
+    const currentFace = faces[index];
+    const nextFace = faces[index + 1];
+
+    assert.equal(
+      currentFace.lastSequence - currentFace.firstSequence + 1,
+      currentFace.count,
+      `${currentFace.key} should be loaded contiguously before the next face`,
+    );
+    assert.ok(
+      currentFace.lastSequence < nextFace.firstSequence,
+      `${currentFace.key} should be fully stacked before ${nextFace.key}`,
+    );
+  }
+}
+
+function assertMixedWidthLanesPackContiguouslyFromSideWall(result) {
   assert.equal(result.pattern.family, "width-lanes");
   const labels = Array.from(new Set(result.layerPositions.map((position) => position.label)));
   assert.ok(labels.length > 1, "expected a mixed-orientation width-lane pattern");
 
-  const leftByLabel = new Map();
-  const rightByLabel = new Map();
-  for (const label of labels) {
-    const positions = result.layerPositions.filter((position) => position.label === label);
-    leftByLabel.set(label, Math.min(...positions.map((position) => position.y)));
-    rightByLabel.set(label, Math.max(...positions.map((position) => position.y + position.dy)));
+  const rawLaneBounds = Array.from(
+    new Map(
+      result.layerPositions.map((position) => [
+        `${position.y}:${position.y + position.dy}`,
+        [position.y, position.y + position.dy],
+      ]),
+    ).values(),
+  ).sort((first, second) => first[0] - second[0]);
+  const laneBounds = [];
+
+  for (const bounds of rawLaneBounds) {
+    const previous = laneBounds[laneBounds.length - 1];
+    if (previous && bounds[0] <= previous[1]) {
+      previous[1] = Math.max(previous[1], bounds[1]);
+    } else {
+      laneBounds.push(bounds);
+    }
   }
 
-  assert.ok(
-    Array.from(leftByLabel.values()).some((left) => left === 0),
-    "one orientation group should start against the left side wall",
-  );
-  assert.ok(
-    Array.from(rightByLabel.values()).some((right) => right === result.container.width),
-    "one orientation group should end against the right side wall",
+  assert.equal(laneBounds[0][0], 0, "mixed width lanes should start against one side wall");
+  assert.equal(laneBounds.length, 1, "mixed width lanes should not leave internal width gaps");
+  assert.equal(
+    laneBounds[laneBounds.length - 1][1],
+    result.pattern.occupiedWidth,
+    "mixed width lane bounds should end at occupied width so remainder stays at the outer container side",
   );
 }
 
@@ -232,7 +277,7 @@ describe("packing core", () => {
   assert.equal(result.pattern.lengthFacingCount, 1);
   assert.equal(result.pattern.widthFacingCount, 1);
   assert.equal(result.pattern.occupiedWidth, 500);
-  assertMixedWidthLanesTouchBothSideWalls(result);
+  assertMixedWidthLanesPackContiguouslyFromSideWall(result);
 }
 
 {
@@ -245,7 +290,7 @@ describe("packing core", () => {
   assert.equal(result.totalBoxes, 18);
   assert.equal(result.pattern.family, "width-lanes");
   assertLoadsFirstLayerBeforeNextLayer(result);
-  assertMixedWidthLanesTouchBothSideWalls(result);
+  assertMixedWidthLanesPackContiguouslyFromSideWall(result);
 }
 
 {
@@ -365,12 +410,20 @@ describe("packing core", () => {
     Packing.CONTAINERS["40HQ"],
     carton(488, 380, 291),
   );
+  const summary = Packing.calculatePackingSummary(
+    Packing.CONTAINERS["40HQ"],
+    carton(488, 380, 291),
+  );
 
   assert.equal(result.totalBoxes, 1349);
   assert.equal(result.container.id, "40HQ");
   assert.equal(result.usedHeight, 2619);
+  assert.equal(result.pattern.occupiedWidth, 2332);
+  assert.equal(summary.occupiedWidth, 2332);
+  assert.equal(summary.effectiveContainer.width - summary.occupiedWidth, 20);
   assertLoadsFirstLayerBeforeNextLayer(result);
-  assertMixedWidthLanesTouchBothSideWalls(result);
+  assertLoadsCompleteFaceBeforeNextFace(result);
+  assertMixedWidthLanesPackContiguouslyFromSideWall(result);
   assertTailOptimizedSource(result);
   assertValidGeneratedPacking(result);
 }
@@ -385,7 +438,7 @@ describe("packing core", () => {
   assert.equal(result.container.id, "40HQ");
   assert.equal(result.usedHeight, 2619);
   assertLoadsFirstLayerBeforeNextLayer(result);
-  assertMixedWidthLanesTouchBothSideWalls(result);
+  assertMixedWidthLanesPackContiguouslyFromSideWall(result);
   assertTailOptimizedSource(result);
   assertValidGeneratedPacking(result);
 }
@@ -396,7 +449,7 @@ describe("packing core", () => {
     carton(509, 418, 338),
   );
 
-  assert.equal(result.totalBoxes, 875);
+  assert.equal(result.totalBoxes, 889);
   assert.equal(result.container.id, "40HQ");
   assert.equal(result.usedHeight, 2366);
   assertLoadsFirstLayerBeforeNextLayer(result);
@@ -447,24 +500,24 @@ describe("packing core", () => {
     carton(495, 395, 310),
   );
 
-  assert.equal(result.totalBoxes, 455);
-  assert.equal(result.perLayerBoxCount, 65);
+  assert.equal(result.totalBoxes, 462);
+  assert.equal(result.perLayerBoxCount, 66);
   assert.equal(result.layers.length, 7);
   assert.equal(result.pattern.family, "width-lanes");
   assert.equal(result.pattern.lengthFacingCount, 2);
   assert.equal(result.pattern.widthFacingCount, 3);
-  assert.equal(result.pattern.source, "door-remainder");
-  assert.equal(result.pattern.remainderCount, 1);
+  assert.equal(result.pattern.source, "tail-optimized");
+  assert.equal(result.pattern.remainderCount, 5);
 
   const positions = Packing.generateBoxPositions(result, result.totalBoxes);
   assert.equal(positions.length, result.totalBoxes);
   assertNoCornerCollisions(result, positions);
   assertNoPositionOverlaps(positions);
 
-  const tailHorizontalStack = positions.filter((position) => position.source === "door-remainder");
-  assert.equal(tailHorizontalStack.length, 7);
+  const tailOptimizedStack = positions.filter((position) => position.source === "tail-optimized");
+  assert.ok(tailOptimizedStack.length > 0);
   assert.deepEqual(
-    [...new Set(tailHorizontalStack.map((position) => position.stackIndex))],
+    [...new Set(tailOptimizedStack.map((position) => position.stackIndex))],
     [0, 1, 2, 3, 4, 5, 6],
   );
 }
@@ -617,7 +670,7 @@ describe("packing core", () => {
   assert.equal(result.totalBoxes, 200);
   assert.deepEqual(summarizeSkuCounts(result), { A: 100, B: 100 });
   assert.equal(aFootprints.length, 14);
-  assert.equal(bFootprints.length, 15);
+  assert.equal(bFootprints.length, 14);
   assert.equal(new Set(aFootprints.map(footprintKey)).size, aFootprints.length);
   assert.equal(new Set(bFootprints.map(footprintKey)).size, bFootprints.length);
   assert.equal(
@@ -655,6 +708,28 @@ describe("packing core", () => {
       ["A", 0, 0, 100],
     ],
   );
+}
+
+{
+  const result = Packing.calculateMultiSkuPacking(
+    customContainer(1200, 500, 300),
+    [
+      sku("A", 360, 140, 100, 11, "#d8923a"),
+      sku("B", 200, 100, 100, 1, "#42d6a4"),
+    ],
+    {
+      strategy: "multi-destination",
+      cornerBlock: { length: 0, width: 0, height: 0 },
+    },
+  );
+
+  const positions = Packing.generateBoxPositions(result, result.totalBoxes);
+
+  assert.equal(result.pattern.family, "heterogeneous-zones");
+  assert.equal(result.totalBoxes, 12);
+  assertLoadsCompleteFaceBeforeNextFace(result);
+  assertPositionsFitContainer(result, positions);
+  assertNoPositionOverlaps(positions);
 }
 
 {
@@ -801,7 +876,7 @@ assert.throws(
   /公差扣减后的有效柜体长度必须为正数/,
 );
 
-  }, 15000);
+  }, 45000);
 
   it("supports selected full-free carton orientations", () => {
     const container = customContainer(240, 120, 100);

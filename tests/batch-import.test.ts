@@ -37,12 +37,13 @@ describe("batch import", () => {
       results.map((result) => result.difference),
       [-247, 9, 2, 9],
     );
+    assert.equal(results[3].remainingWidth, 20);
     assert.ok(results.every((result) => result.remainingLength !== null && result.remainingLength >= 0));
     assert.ok(results.every((result) => result.remainingWidth !== null && result.remainingWidth >= 0));
     assert.ok(results.every((result) => result.remainingHeight !== null && result.remainingHeight >= 0));
   });
 
-  it("uses side-wall constrained maximum loads in batch calculations", () => {
+  it("uses compact width-lane maximum loads in batch calculations", () => {
     const results = calculateBatchPacking([
       { "人工码垛数量（原始）": 1349, "尺寸（长宽高 mm）": "488*380*291", 柜型: "40HQ" },
       { "人工码垛数量（原始）": 889, "尺寸（长宽高 mm）": "509*418*338", 柜型: "40HQ" },
@@ -51,11 +52,11 @@ describe("batch import", () => {
 
     assert.deepEqual(
       results.map((result) => result.totalBoxes),
-      [1349, 875, 927],
+      [1349, 889, 927],
     );
     assert.deepEqual(
       results.map((result) => result.difference),
-      [0, -14, 0],
+      [0, 0, 0],
     );
     assert.deepEqual(
       results.map((result) => result.status),

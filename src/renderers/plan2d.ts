@@ -34,6 +34,7 @@ export interface Plan2DProjectionOptions {
 export interface Plan2DAxisGuideMetric {
   count: number;
   countLabel: string;
+  countText?: string;
   axisLabel: string;
   occupied: number;
   remaining: number;
@@ -398,6 +399,7 @@ function getPlan2DAxisGuideModel(
   options: Plan2DProjectionOptions = {},
 ): AxisGuideModel {
   const plane = getPlan2DPlaneConfig(result, viewMode, options);
+  const normalizedVisibleCount = Math.max(0, Math.min(result.totalBoxes, Math.floor(visibleCount)));
   const rects = getVisibleProjectedRects(result, visibleCount, viewMode, options);
   const emptyMetric = (axisLabel: string, axis: "x" | "y"): Plan2DAxisGuideMetric => ({
     count: 0,
@@ -426,21 +428,26 @@ function getPlan2DAxisGuideModel(
   const yEnd = Math.max(...rects.map((rect) => rect.y + rect.dy));
   const occupiedX = Math.max(0, xEnd - xStart);
   const occupiedY = Math.max(0, yEnd - yStart);
+  const isFullTopView = viewMode === "top" && normalizedVisibleCount >= result.totalBoxes;
+  const labelOccupiedX = isFullTopView ? plane.occupiedWidth : occupiedX;
+  const labelOccupiedY = isFullTopView ? plane.occupiedHeight : occupiedY;
+  const xCountText = isFullTopView ? getTopViewMixedOrientationColumnText(result) : "";
 
   return {
     x: {
       count: uniqueProjectedCount(rects, "x"),
       countLabel: getVisibleCountLabel(rects, viewMode, plane.xLabel, "x"),
+      ...(xCountText ? { countText: xCountText } : {}),
       axisLabel: plane.xLabel,
-      occupied: occupiedX,
-      remaining: Math.max(0, plane.width - occupiedX),
+      occupied: labelOccupiedX,
+      remaining: Math.max(0, plane.width - labelOccupiedX),
     },
     y: {
       count: uniqueProjectedCount(rects, "y"),
       countLabel: getVisibleCountLabel(rects, viewMode, plane.yLabel, "y"),
       axisLabel: plane.yLabel,
-      occupied: occupiedY,
-      remaining: Math.max(0, plane.height - occupiedY),
+      occupied: labelOccupiedY,
+      remaining: Math.max(0, plane.height - labelOccupiedY),
     },
     bounds: {
       xStart,
@@ -507,9 +514,26 @@ function drawGuideLabel(ctx: CanvasRenderingContext2D, text: string, x: number, 
 }
 
 function formatAxisGuideCountText(metric: Plan2DAxisGuideMetric, axis: "x" | "y") {
+  if (metric.countText) return metric.countText;
   if (!metric.countLabel) return "";
   const directionLabel = axis === "x" ? "横向" : "竖向";
   return `${directionLabel} ${formatNumber(metric.count)}${metric.countLabel}`;
+}
+
+function getUniqueLengthColumnCount(positions: BoxPosition[], orientationId: string) {
+  return new Set(
+    positions
+      .filter((position) => position.orientationId === orientationId)
+      .map((position) => `${position.x}:${position.dx}`),
+  ).size;
+}
+
+function getTopViewMixedOrientationColumnText(result: PackingResult) {
+  const horizontalColumns = getUniqueLengthColumnCount(result.layerPositions, "width-length-height");
+  const verticalColumns = getUniqueLengthColumnCount(result.layerPositions, "length-width-height");
+
+  if (horizontalColumns <= 0 || verticalColumns <= 0) return "";
+  return `横向 ${formatNumber(horizontalColumns)}列 / 竖向 ${formatNumber(verticalColumns)}列`;
 }
 
 function formatAxisGuideText(metric: Plan2DAxisGuideMetric, axis: "x" | "y") {
@@ -878,18 +902,32 @@ function projectBox(box: BoxPosition, container: PackingResult["container"], vie
 }
 
 function getTopViewDrawingPositions(result: PackingResult, visibleCount: number): Plan2DDrawingPosition[] {
-  const visiblePositionByFace = getGeneratedBoxPositions(result, visibleCount)
-    .reduce((positions, position) => {
-      if (typeof position.faceIndex === "number" && Number.isFinite(position.faceIndex)) {
-        positions.set(position.faceIndex, position);
-      }
-      return positions;
-    }, new Map<number, BoxPosition>());
+  const normalizedVisibleCount = Math.max(0, Math.min(result.totalBoxes, Math.floor(visibleCount)));
+  if (normalizedVisibleCount >= result.totalBoxes) {
+    const visiblePositionByFace = getGeneratedBoxPositions(result, normalizedVisibleCount)
+      .reduce((positions, position) => {
+        if (typeof position.faceIndex === "number" && Number.isFinite(position.faceIndex)) {
+          positions.set(position.faceIndex, position);
+        }
+        return positions;
+      }, new Map<number, BoxPosition>());
 
-  return result.layerPositions.map((position, faceIndex) => ({
+    return result.layerPositions.map((position, faceIndex) => ({
       box: position,
       visibleBox: visiblePositionByFace.get(faceIndex) || null,
     }));
+  }
+
+  const footprintPositions = result.layerPositions.map((position) => ({
+    box: position,
+    visibleBox: null,
+  }));
+  const visiblePositions = getGeneratedBoxPositions(result, normalizedVisibleCount).map((position) => ({
+    box: position,
+    visibleBox: position,
+  }));
+
+  return [...footprintPositions, ...visiblePositions];
 }
 
 function getElevationDrawingPositions(result: PackingResult, visibleCount: number): Plan2DDrawingPosition[] {

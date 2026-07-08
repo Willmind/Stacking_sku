@@ -329,9 +329,9 @@ export type {
   function orderFloorPositionsForPlacement(floorPositions) {
     return floorPositions.slice().sort(
       (a, b) =>
-        getLoadingRowSortValue(a) - getLoadingRowSortValue(b) ||
         a.x - b.x ||
-        a.y - b.y,
+        a.y - b.y ||
+        getLoadingRowSortValue(a) - getLoadingRowSortValue(b),
     );
   }
 
@@ -340,7 +340,7 @@ export type {
   }
 
   function getLoadingRowKey(position) {
-    return Number.isFinite(position.loadingRowIndex) ? `row:${position.loadingRowIndex}` : `x:${position.x}`;
+    return `x:${position.x}`;
   }
 
   function groupFloorPositionsByLoadingRow(orderedFloor) {
@@ -404,6 +404,11 @@ export type {
       ...createLayerPositions(pattern),
       ...(pattern.extraLayerPositions || []),
     ].sort((a, b) => a.x - b.x || a.y - b.y);
+    const evaluatedPattern = {
+      ...pattern,
+      occupiedLength: getOccupiedLength(basePositions),
+      occupiedWidth: getOccupiedWidth(basePositions),
+    };
     const orderedPositions = createOrderedPositionsFromFloor(
       container,
       cornerBlock,
@@ -424,7 +429,7 @@ export type {
       container,
       carton,
       cornerBlock,
-      pattern,
+      pattern: evaluatedPattern,
       layerPositions: basePositions,
       orderedPositions,
       perLayerBoxCount: basePositions.length,
@@ -445,10 +450,10 @@ export type {
     );
   }
 
-  function countAcceptedPositionsForStack(basePositions, stackIndex, container, cornerBlock) {
+  function countAcceptedPositionsForStack(orderedBasePositions, stackIndex, container, cornerBlock) {
     const acceptedInStackBand = [];
 
-    for (const basePosition of orderFloorPositionsForPlacement(basePositions)) {
+    for (const basePosition of orderedBasePositions) {
       const position = {
         ...basePosition,
         z: stackIndex * basePosition.dz,
@@ -481,19 +486,18 @@ export type {
       ...(pattern.extraLayerPositions || []),
     ].sort((a, b) => a.x - b.x || a.y - b.y);
     const uniqueHeights = new Set(basePositions.map((position) => position.dz));
-    const occupiedLength = getOccupiedLength(basePositions);
-    const occupiedWidth = getOccupiedWidth(basePositions);
 
     if (uniqueHeights.size === 1) {
       const [cartonHeight] = Array.from(uniqueHeights);
       const layerCount = Math.floor(container.height / cartonHeight);
       const perLayerBoxCount = basePositions.length;
+      const orderedBasePositions = orderFloorPositionsForPlacement(basePositions);
       let totalBoxes = 0;
       let highestAcceptedStackIndex = -1;
 
       for (let stackIndex = 0; stackIndex < layerCount; stackIndex += 1) {
         const acceptedCount = layerCollidesWithTopBand(stackIndex, cartonHeight, container, cornerBlock)
-          ? countAcceptedPositionsForStack(basePositions, stackIndex, container, cornerBlock)
+          ? countAcceptedPositionsForStack(orderedBasePositions, stackIndex, container, cornerBlock)
           : perLayerBoxCount;
         totalBoxes += acceptedCount;
         if (acceptedCount > 0) highestAcceptedStackIndex = stackIndex;
@@ -503,8 +507,7 @@ export type {
         totalBoxes,
         blockedByCornerTotal: perLayerBoxCount * layerCount - totalBoxes,
         perLayerBoxCount,
-        occupiedLength,
-        occupiedWidth,
+        layerPositions: basePositions,
         usedHeight: highestAcceptedStackIndex >= 0 ? (highestAcceptedStackIndex + 1) * cartonHeight : 0,
       };
     }
@@ -519,8 +522,7 @@ export type {
       totalBoxes,
       blockedByCornerTotal: potentialBoxCount - totalBoxes,
       perLayerBoxCount: basePositions.length,
-      occupiedLength,
-      occupiedWidth,
+      layerPositions: basePositions,
       usedHeight: calculateUsedHeight(orderedPositions),
     };
   }
@@ -569,7 +571,40 @@ export type {
 
   function getOccupiedWidth(positions) {
     if (positions.length === 0) return 0;
-    return Math.max(...positions.map((position) => position.y + position.dy));
+    return mergeOccupiedAxisIntervals(
+      positions.map((position) => ({
+        start: position.y,
+        end: position.y + position.dy,
+      })),
+    );
+  }
+
+  function mergeOccupiedAxisIntervals(intervals) {
+    const sortedIntervals = intervals
+      .filter((interval) =>
+        Number.isFinite(interval.start) &&
+        Number.isFinite(interval.end) &&
+        interval.end > interval.start,
+      )
+      .sort((a, b) => a.start - b.start || a.end - b.end);
+    if (sortedIntervals.length === 0) return 0;
+
+    let occupied = 0;
+    let currentStart = sortedIntervals[0].start;
+    let currentEnd = sortedIntervals[0].end;
+
+    for (const interval of sortedIntervals.slice(1)) {
+      if (interval.start <= currentEnd) {
+        currentEnd = Math.max(currentEnd, interval.end);
+        continue;
+      }
+
+      occupied += currentEnd - currentStart;
+      currentStart = interval.start;
+      currentEnd = interval.end;
+    }
+
+    return occupied + currentEnd - currentStart;
   }
 
   function getPositionFootprint(position) {
@@ -1217,8 +1252,8 @@ export type {
       totalBoxes: best ? best.totalBoxes : 0,
       blockedByCornerTotal: best ? best.blockedByCornerTotal : 0,
       perLayerBoxCount: best ? best.perLayerBoxCount : 0,
-      occupiedLength: best ? best.occupiedLength : 0,
-      occupiedWidth: best ? best.occupiedWidth : 0,
+      occupiedLength: best ? getOccupiedLength(best.layerPositions) : 0,
+      occupiedWidth: best ? getOccupiedWidth(best.layerPositions) : 0,
       usedHeight: best ? best.usedHeight : 0,
     };
   }

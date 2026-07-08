@@ -104,6 +104,42 @@ describe("2D plan axis guide metrics", () => {
     });
   });
 
+  it("keeps top-view width labels aligned with the actual occupied width", () => {
+    const result = calculatePacking("40HQ", { length: 488, width: 380, height: 291 });
+    const metrics = getPlan2DAxisGuideMetrics(result, result.totalBoxes, "top");
+
+    assert.equal(result.pattern?.occupiedWidth, 2332);
+    assert.deepEqual(metrics.x, {
+      count: 55,
+      countLabel: "列",
+      countText: "横向 29列 / 竖向 26列",
+      axisLabel: "柜长",
+      occupied: 11996,
+      remaining: 36,
+    });
+    assert.deepEqual(metrics.y, {
+      count: 10,
+      countLabel: "排",
+      axisLabel: "柜宽",
+      occupied: 2332,
+      remaining: 20,
+    });
+
+    const recording = createRecordingCanvas();
+    renderPlan2D({
+      canvas: recording.canvas,
+      result,
+      visibleCount: result.totalBoxes,
+      viewMode: "top",
+      devicePixelRatio: 1,
+    });
+
+    assert.ok(recording.drawnText.includes("横向 29列 / 竖向 26列 · 占长 11,996mm · 余量 36mm"));
+    assert.ok(!recording.drawnText.includes("横放 24列 / 竖放 29列"));
+    assert.ok(recording.drawnText.includes("占宽 2,332mm"));
+    assert.ok(recording.drawnText.includes("余量 20mm"));
+  });
+
   it("summarizes side-view occupied length and stacked height from the visible boxes", () => {
     const result = calculatePacking("20GP", { length: 480, width: 320, height: 260 });
 
@@ -157,7 +193,7 @@ describe("2D plan axis guide metrics", () => {
     });
 
     assert.ok(!front.drawnText.some((text) => text.includes("35排")));
-    assert.ok(front.drawnText.includes("占宽 2,352mm · 余量 0mm"));
+    assert.ok(front.drawnText.includes("占宽 2,320mm · 余量 32mm"));
   }, 12_000);
 
   it("renders front views from the selected endpoint instead of flattening the full container length", () => {
