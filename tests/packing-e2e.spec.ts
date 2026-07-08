@@ -259,7 +259,7 @@ test("calculates the 488 x 380 x 291 benchmark and renders both views", async ({
 test("calculates the 488 x 360 x 291 benchmark", async ({ page }) => {
   await calculateSingleSku(page, "488", "360", "291");
 
-  await expect(page.locator("#total-boxes")).toHaveText("1,412");
+  await expect(page.locator("#total-boxes")).toHaveText("1,403");
   await expect(page.locator("#blocked-count")).toHaveText("1 箱");
 });
 

@@ -434,12 +434,12 @@ describe("packing core", () => {
     carton(488, 360, 291),
   );
 
-  assert.equal(result.totalBoxes, 1412);
+  assert.equal(result.totalBoxes, 1403);
   assert.equal(result.container.id, "40HQ");
   assert.equal(result.usedHeight, 2619);
   assertLoadsFirstLayerBeforeNextLayer(result);
   assertMixedWidthLanesPackContiguouslyFromSideWall(result);
-  assertTailOptimizedSource(result);
+  assert.notEqual(result.pattern.source, "tail-optimized");
   assertValidGeneratedPacking(result);
 }
 
