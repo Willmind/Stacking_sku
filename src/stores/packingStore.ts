@@ -16,13 +16,14 @@ import {
 } from "../core/packing";
 
 export type PackingMode = "single" | "multi";
+type ContainerType = keyof typeof CONTAINERS;
 
 const SKU_COLORS = ["#d8923a", "#42d6a4", "#6e8bff", "#ff7066", "#b7e35f"];
-const DEFAULT_CARTON: CartonSpec = { length: 480, width: 320, height: 260 };
+const DEFAULT_CONTAINER_TYPE: ContainerType = "40HQ";
+const DEFAULT_CARTON: CartonSpec = { length: 488, width: 380, height: 291 };
 const DEFAULT_CONTAINER_CLEARANCE = { front: 0, rear: 0, left: 0, right: 0, top: 0 };
 const DEFAULT_ALLOWED_ORIENTATIONS = [...DEFAULT_ALLOWED_ORIENTATION_IDS];
 const STACKING_SKU_CLEARANCE = "STACKING_SKU_CLEARANCE";
-type ContainerType = keyof typeof CONTAINERS;
 type ContainerClearanceKey = keyof typeof DEFAULT_CONTAINER_CLEARANCE;
 
 function isContainerType(type: string): type is ContainerType {
@@ -108,8 +109,8 @@ function applySingleColor(result: PackingResult, color: string): PackingResult {
 }
 
 export const usePackingStore = defineStore("packing", () => {
-  const containerType = ref<ContainerType>("20GP");
-  const container = ref<Required<ContainerSpec>>(cloneContainer("20GP"));
+  const containerType = ref<ContainerType>(DEFAULT_CONTAINER_TYPE);
+  const container = ref<Required<ContainerSpec>>(cloneContainer(DEFAULT_CONTAINER_TYPE));
   const mode = ref<PackingMode>("single");
   const containerClearance = ref(loadStoredContainerClearance());
   const singleCarton = ref<CartonSpec>({ ...DEFAULT_CARTON });
