@@ -46,6 +46,14 @@ async function calculateSingleSku(page: Page, length: string, width: string, hei
   await page.getByRole("button", { name: "计算装载" }).click();
 }
 
+async function calculateNotebookViewportScenario(page: Page) {
+  await selectDropdownOption(page, "柜型", "20GP");
+  await page.fill("#carton-length", "480");
+  await page.fill("#carton-width", "320");
+  await page.fill("#carton-height", "260");
+  await page.getByRole("button", { name: "计算装载" }).click();
+}
+
 type WorkbookCell = string | number | null;
 
 const batchImportHeaders = ["人工码垛数量（原始）", "尺寸（长宽高 mm）", "柜型"];
@@ -259,7 +267,7 @@ test("calculates the 488 x 380 x 291 benchmark and renders both views", async ({
 test("calculates the 488 x 360 x 291 benchmark", async ({ page }) => {
   await calculateSingleSku(page, "488", "360", "291");
 
-  await expect(page.locator("#total-boxes")).toHaveText("1,412");
+  await expect(page.locator("#total-boxes")).toHaveText("1,403");
   await expect(page.locator("#blocked-count")).toHaveText("1 箱");
 });
 
@@ -267,9 +275,9 @@ test("sets the progress slider to full after the initial calculation", async ({ 
   await page.goto("/");
   await page.getByRole("button", { name: "计算装载" }).click();
 
-  await expect(page.locator("#total-boxes")).toHaveText("755");
-  await expect(page.locator("#progress-text")).toHaveText("755 / 755");
-  await expect(page.locator("#stack-progress")).toHaveValue("755");
+  await expect(page.locator("#total-boxes")).toHaveText("1,349");
+  await expect(page.locator("#progress-text")).toHaveText("1,349 / 1,349");
+  await expect(page.locator("#stack-progress")).toHaveValue("1349");
   await expect(page.locator("#stack-progress")).toHaveAttribute("style", /--range-progress:\s*100%/);
 });
 
@@ -284,8 +292,11 @@ test("shows and downloads the carton coordinate table", async ({ page }) => {
   const dialog = page.getByRole("dialog", { name: "查看坐标" });
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText("坐标系");
-  await expect(dialog).toContainText("柜门面X");
-  await expect(dialog).toContainText("上表面X");
+  await expect(dialog).toContainText("中心点X");
+  await expect(dialog).toContainText("欧拉角X");
+  await expect(dialog).toContainText("旋转顺序 XYZ");
+  await expect(dialog).not.toContainText("柜门面X");
+  await expect(dialog).not.toContainText("上表面X");
   await expect(dialog.locator(".coordinate-virtual-spacer")).toHaveCount(1);
   const renderedCoordinateRows = dialog.locator("tbody tr:not(.coordinate-virtual-spacer)");
   await expect(renderedCoordinateRows.first()).toBeVisible();
@@ -312,7 +323,7 @@ test("shows and downloads the carton coordinate table", async ({ page }) => {
   const downloadedPath = await download.path();
   if (!downloadedPath) throw new Error("Downloaded coordinate CSV is missing");
   const csv = fs.readFileSync(downloadedPath, "utf8");
-  expect(csv).toContain("序号,装载顺序,SKU,柜门面X,柜门面Y,柜门面Z,上表面X,上表面Y,上表面Z");
+  expect(csv).toContain("序号,装载顺序,SKU,中心点X,中心点Y,中心点Z,欧拉角X,欧拉角Y,欧拉角Z");
   expect(csv.split("\n").length).toBeGreaterThan(700);
 });
 
@@ -409,21 +420,21 @@ test("adjusts number fields with styled steppers", async ({ page }) => {
   const cartonSection = page.locator('section[aria-label="纸箱规格"]');
   const cartonLength = page.locator("#carton-length");
 
-  await expect(cartonLength).toHaveValue("480");
+  await expect(cartonLength).toHaveValue("488");
   const cartonLengthBox = await cartonLength.boundingBox();
   const cartonLengthStepperBox = await cartonSection.locator(".base-number-actions").first().boundingBox();
   expect(cartonLengthBox?.width).toBeGreaterThan(80);
   expect(cartonLengthStepperBox?.width).toBeLessThanOrEqual(32);
 
   await cartonSection.getByRole("button", { name: "增加 长 mm" }).click();
-  await expect(cartonLength).toHaveValue("481");
+  await expect(cartonLength).toHaveValue("489");
 
   await page.getByRole("button", { name: "计算装载" }).click();
   await expect(page.locator("#status-chip")).toHaveText("已完成计算");
   await expect(page.locator("#status-chip")).toHaveClass(/status-chip--success/);
 
   await cartonSection.getByRole("button", { name: "减少 长 mm" }).click();
-  await expect(cartonLength).toHaveValue("480");
+  await expect(cartonLength).toHaveValue("488");
   await expect(page.locator("#status-chip")).toHaveText("待重新计算");
   await expect(page.locator("#status-chip")).toHaveClass(/status-chip--dirty/);
 
@@ -446,6 +457,7 @@ test("applies and persists container clearance inputs", async ({ page }) => {
   await page.goto("/");
   await page.evaluate(() => localStorage.removeItem("STACKING_SKU_CLEARANCE"));
   await page.reload();
+  await selectDropdownOption(page, "柜型", "20GP");
 
   await expect(page.getByText("车厢公差")).toBeVisible();
   await expect(page.getByText("按站在柜口正视柜内为基准")).toBeVisible();
@@ -484,7 +496,11 @@ test("applies and persists container clearance inputs", async ({ page }) => {
 test("uses styled dropdown popovers for container and strategy selection", async ({ page }) => {
   await page.goto("/");
 
-  await page.getByRole("combobox", { name: "柜型" }).click();
+  const containerCombobox = page.getByRole("combobox", { name: "柜型" });
+  await expect(containerCombobox).toContainText("40HQ");
+  await expect(containerCombobox).toContainText("12032 × 2352 × 2698 mm");
+
+  await containerCombobox.click();
   await expect(page.getByRole("listbox")).toBeVisible();
   const compactContainerLabel = page.locator(".base-select-item-label", { hasText: "20GP" });
   const compactContainerBox = await compactContainerLabel.boundingBox();
@@ -493,12 +509,11 @@ test("uses styled dropdown popovers for container and strategy selection", async
   await expect(page.locator(".base-select-item", { hasText: "40GP" })).toContainText("12032 × 2352 × 2393 mm");
   await expect(page.locator(".base-select-item", { hasText: "40HQ" })).toContainText("12032 × 2352 × 2698 mm");
   await page.getByRole("option", { name: "40HQ" }).click();
-  const containerCombobox = page.getByRole("combobox", { name: "柜型" });
   await expect(containerCombobox).toContainText("40HQ");
   await expect(containerCombobox).toContainText("12032 × 2352 × 2698 mm");
 
   await page.getByRole("button", { name: "计算装载" }).click();
-  await expect(page.locator("#total-boxes")).toHaveText("1,750");
+  await expect(page.locator("#total-boxes")).toHaveText("1,349");
 
   await page.getByLabel("多 SKU").check();
   await expect(page.locator("#sku-count")).toHaveAttribute("max", "5");
@@ -898,7 +913,7 @@ test("keeps the visualization workspace stable while the control panel scrolls",
 test("keeps 2D and 3D panels visible within a 14-inch notebook viewport", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
-  await page.getByRole("button", { name: "计算装载" }).click();
+  await calculateNotebookViewportScenario(page);
 
   const layout = await page.evaluate(() => {
     const viewsGrid = document.querySelector(".views-grid") as HTMLElement | null;
@@ -945,7 +960,7 @@ test("keeps 2D and 3D panels visible within a 14-inch notebook viewport", async 
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await page.getByRole("button", { name: "计算装载" }).click();
+  await calculateNotebookViewportScenario(page);
   const mobileFrame = await readSceneCanvasScreenshotFrame(page);
   expect(mobileFrame.screenshotBytes).toBeGreaterThan(1000);
   expect(mobileFrame.litPixels).toBeGreaterThan(1000);

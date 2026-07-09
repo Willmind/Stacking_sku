@@ -22,21 +22,21 @@ describe("box coordinate rows", () => {
       rows.slice(0, 4).map((row) => [
         row.sequence,
         row.loadingSequence,
-        row.doorFaceX,
-        row.doorFaceY,
-        row.doorFaceZ,
-        row.topFaceX,
-        row.topFaceY,
-        row.topFaceZ,
+        row.centerX,
+        row.centerY,
+        row.centerZ,
+        row.eulerX,
+        row.eulerY,
+        row.eulerZ,
         row.layer,
         row.row,
         row.column,
       ]),
       [
-        [1, 1, 150, 200, 50, 150, 100, 100, 1, 1, 2],
-        [2, 2, 50, 200, 50, 50, 100, 100, 1, 1, 1],
-        [3, 3, 150, 200, 150, 150, 100, 200, 2, 1, 2],
-        [4, 4, 50, 200, 150, 50, 100, 200, 2, 1, 1],
+        [1, 1, 150, 100, 50, 0, 0, 90, 1, 1, 2],
+        [2, 2, 50, 100, 50, 0, 0, 90, 1, 1, 1],
+        [3, 3, 150, 100, 150, 0, 0, 90, 2, 1, 2],
+        [4, 4, 50, 100, 150, 0, 0, 90, 2, 1, 1],
       ],
     );
     assert.deepEqual(
@@ -45,15 +45,12 @@ describe("box coordinate rows", () => {
         sequence: 8,
         loadingSequence: 8,
         sku: "",
-        doorFaceX: 50,
-        doorFaceY: 400,
-        doorFaceZ: 150,
-        topFaceX: 50,
-        topFaceY: 300,
-        topFaceZ: 200,
         centerX: 50,
         centerY: 300,
         centerZ: 150,
+        eulerX: 0,
+        eulerY: 0,
+        eulerZ: 90,
         length: 200,
         width: 100,
         height: 100,
@@ -61,6 +58,42 @@ describe("box coordinate rows", () => {
         row: 2,
         column: 1,
         orientation: "长×宽×高",
+      },
+    );
+  });
+
+  it("exports swapped carton orientation as XYZ Euler angles in degrees", () => {
+    const result = calculatePacking(
+      customContainer(400, 200, 100),
+      { length: 200, width: 100, height: 100 },
+      {
+        cornerBlock: { length: 0, width: 0, height: 0 },
+        allowedOrientations: ["width-length-height"],
+      },
+    );
+
+    const rows = createBoxCoordinateRows(result);
+
+    assert.ok(rows.length > 0);
+    assert.deepEqual(
+      rows[0],
+      {
+        sequence: 1,
+        loadingSequence: 1,
+        sku: "",
+        centerX: 100,
+        centerY: 50,
+        centerZ: 50,
+        eulerX: 0,
+        eulerY: 0,
+        eulerZ: 0,
+        length: 100,
+        width: 200,
+        height: 100,
+        layer: 1,
+        row: 1,
+        column: 1,
+        orientation: "宽×长×高",
       },
     );
   });
@@ -75,7 +108,8 @@ describe("box coordinate rows", () => {
 
     const csv = createBoxCoordinateCsv(rows);
 
-    assert.ok(csv.startsWith("\uFEFF序号,装载顺序,SKU,柜门面X,柜门面Y,柜门面Z,上表面X,上表面Y,上表面Z"));
-    assert.match(csv, /1,1,,150,200,50,150,100,100,150,100,50,200,100,100,1,1,2/);
+    assert.ok(csv.startsWith("\uFEFF序号,装载顺序,SKU,中心点X,中心点Y,中心点Z,欧拉角X,欧拉角Y,欧拉角Z"));
+    assert.doesNotMatch(csv, /柜门面|上表面/);
+    assert.match(csv, /1,1,,150,100,50,0,0,90,200,100,100,1,1,2/);
   });
 });

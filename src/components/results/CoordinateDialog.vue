@@ -22,15 +22,12 @@ const coordinateColumnSpecs: Array<{ key: CoordinateColumnKey; header: (typeof B
   { key: "sequence", header: "序号" },
   { key: "loadingSequence", header: "装载顺序" },
   { key: "sku", header: "SKU" },
-  { key: "doorFaceX", header: "柜门面X" },
-  { key: "doorFaceY", header: "柜门面Y" },
-  { key: "doorFaceZ", header: "柜门面Z" },
-  { key: "topFaceX", header: "上表面X" },
-  { key: "topFaceY", header: "上表面Y" },
-  { key: "topFaceZ", header: "上表面Z" },
   { key: "centerX", header: "中心点X" },
   { key: "centerY", header: "中心点Y" },
   { key: "centerZ", header: "中心点Z" },
+  { key: "eulerX", header: "欧拉角X" },
+  { key: "eulerY", header: "欧拉角Y" },
+  { key: "eulerZ", header: "欧拉角Z" },
   { key: "length", header: "长" },
   { key: "width", header: "宽" },
   { key: "height", header: "高" },
@@ -62,15 +59,15 @@ const selectedText = computed(() => {
 const selectedLabel = computed(() =>
   selectedRow.value ? `#${selectedRow.value.sequence} · 顺序 ${selectedRow.value.loadingSequence}` : "",
 );
-const selectedDoorFaceText = computed(() => {
+const selectedCenterText = computed(() => {
   const row = selectedRow.value;
   if (!row) return "-";
-  return `(${formatNumber(row.doorFaceX)}, ${formatNumber(row.doorFaceY)}, ${formatNumber(row.doorFaceZ)})`;
+  return `(${formatNumber(row.centerX)}, ${formatNumber(row.centerY)}, ${formatNumber(row.centerZ)})`;
 });
-const selectedTopFaceText = computed(() => {
+const selectedEulerText = computed(() => {
   const row = selectedRow.value;
   if (!row) return "-";
-  return `(${formatNumber(row.topFaceX)}, ${formatNumber(row.topFaceY)}, ${formatNumber(row.topFaceZ)})`;
+  return `(${formatNumber(row.eulerX)}°, ${formatNumber(row.eulerY)}°, ${formatNumber(row.eulerZ)}°)`;
 });
 
 function formatNumber(value: number) {
@@ -188,7 +185,7 @@ watch(
 
     <div class="coordinate-layout">
       <p class="coordinate-system-note">
-        坐标系：原点为角件端右下角；X 沿柜宽向左，Y 向柜门，Z 向上；柜门面坐标为纸箱朝柜门面中心点，上表面坐标为纸箱顶面中心点。
+        坐标系：原点为角件端右下角；X 沿柜宽向左，Y 向柜门，Z 向上；位置使用纸箱中心点；欧拉角使用角度制，旋转顺序 XYZ。
       </p>
 
       <div class="coordinate-content">
@@ -236,12 +233,12 @@ watch(
             <span>点击左侧任一行，高亮对应纸箱；XYZ 轴从原点伸出</span>
             <dl class="coordinate-preview-metrics" aria-label="当前选中坐标点">
               <div>
-                <dt>柜门面中心</dt>
-                <dd>{{ selectedDoorFaceText }}</dd>
+                <dt>中心点</dt>
+                <dd>{{ selectedCenterText }}</dd>
               </div>
               <div>
-                <dt>上表面中心</dt>
-                <dd>{{ selectedTopFaceText }}</dd>
+                <dt>欧拉角 XYZ</dt>
+                <dd>{{ selectedEulerText }}</dd>
               </div>
             </dl>
           </div>

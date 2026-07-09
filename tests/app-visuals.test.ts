@@ -134,8 +134,8 @@ describe("3D visual rendering source guards", () => {
   });
 
   it("makes coordinate preview targets explicit for robot coordinate checks", () => {
-    assert.match(coordinateDialogSource, /selectedDoorFaceText/);
-    assert.match(coordinateDialogSource, /selectedTopFaceText/);
+    assert.match(coordinateDialogSource, /selectedCenterText/);
+    assert.match(coordinateDialogSource, /selectedEulerText/);
     assert.match(coordinateDialogSource, /dim-cargo-when-selected/);
     assert.match(cargo3dSceneV2Source, /coordinate-axis-shaft/);
     assert.match(cargo3dSceneV2Source, /axisLegendItems/);
@@ -305,8 +305,11 @@ describe("control panel layout source guards", () => {
     assert.match(coordinateDialogSource, /坐标系/);
     assert.match(coordinateDialogSource, /原点为角件端右下角/);
     assert.match(coordinateDialogSource, /X 沿柜宽向左/);
-    assert.match(coordinateDialogSource, /柜门面X/);
-    assert.match(coordinateDialogSource, /上表面X/);
+    assert.match(coordinateDialogSource, /中心点X/);
+    assert.match(coordinateDialogSource, /欧拉角X/);
+    assert.match(coordinateDialogSource, /旋转顺序 XYZ/);
+    assert.doesNotMatch(coordinateDialogSource, /柜门面X/);
+    assert.doesNotMatch(coordinateDialogSource, /上表面X/);
     assert.match(coordinateDialogSource, /createBoxCoordinateRows/);
     assert.match(coordinateDialogSource, /createBoxCoordinateCsv/);
     assert.match(packageSource, /"@tanstack\/vue-table"/);
