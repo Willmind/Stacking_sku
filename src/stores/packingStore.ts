@@ -3,8 +3,6 @@ import { computed, ref } from "vue";
 import {
   CONTAINERS,
   DEFAULT_ALLOWED_ORIENTATION_IDS,
-  calculateMultiSkuPacking,
-  calculatePacking,
   type BoxPosition,
   type CartonOrientationId,
   type CartonSpec,
@@ -14,6 +12,7 @@ import {
   type PackingResult,
   type SkuInput,
 } from "../core/packing";
+import { PackingWorkerCancelledError, calculateMultiSkuPackingInWorker, calculatePackingInWorker } from "../core/packingWorkerClient";
 
 export type PackingMode = "single" | "multi";
 type ContainerType = keyof typeof CONTAINERS;
@@ -123,6 +122,9 @@ export const usePackingStore = defineStore("packing", () => {
   const visibleCount = ref(0);
   const status = ref("待计算");
   const error = ref("");
+  const isCalculating = ref(false);
+  let activeCalculation: AbortController | null = null;
+  let calculationVersion = 0;
 
   const progressText = computed(() => {
     const total = result.value?.totalBoxes ?? 0;
@@ -132,8 +134,25 @@ export const usePackingStore = defineStore("packing", () => {
   const totalBoxesText = computed(() => (result.value?.totalBoxes ?? 0).toLocaleString("zh-CN"));
   const hasActiveContainerClearance = computed(() => Object.values(containerClearance.value).some((value) => value > 0));
 
+  function stopActiveCalculation() {
+    if (!activeCalculation) return false;
+    calculationVersion += 1;
+    activeCalculation.abort();
+    activeCalculation = null;
+    isCalculating.value = false;
+    return true;
+  }
+
   function markDirty() {
+    stopActiveCalculation();
+    error.value = "";
     status.value = result.value ? "待重新计算" : "待计算";
+  }
+
+  function cancelCalculation() {
+    if (!stopActiveCalculation()) return;
+    error.value = "";
+    status.value = "已取消计算";
   }
 
   function setContainerType(type: string) {
@@ -197,30 +216,60 @@ export const usePackingStore = defineStore("packing", () => {
     markDirty();
   }
 
-  function calculate() {
+  async function calculate() {
+    stopActiveCalculation();
+    const controller = new AbortController();
+    const version = ++calculationVersion;
+    activeCalculation = controller;
+    isCalculating.value = true;
     error.value = "";
+
     try {
       const next: PackingResult =
         mode.value === "single"
           ? applySingleColor(
-              calculatePacking(container.value, singleCarton.value, {
-                clearance: containerClearance.value,
-                allowedOrientations: singleAllowedOrientations.value,
-              }),
+              await calculatePackingInWorker(
+                { ...container.value },
+                { ...singleCarton.value },
+                {
+                  clearance: { ...containerClearance.value },
+                  allowedOrientations: [...singleAllowedOrientations.value],
+                },
+                { signal: controller.signal },
+              ),
               singleColor.value,
             )
-          : (calculateMultiSkuPacking(container.value, skus.value, {
-              strategy: strategy.value,
-              clearance: containerClearance.value,
-            }) as PackingResult);
+          : await calculateMultiSkuPackingInWorker(
+              { ...container.value },
+              skus.value.map((sku) => ({
+                ...sku,
+                allowedOrientations: sku.allowedOrientations ? [...sku.allowedOrientations] : undefined,
+              })),
+              {
+                strategy: strategy.value,
+                clearance: { ...containerClearance.value },
+              },
+              { signal: controller.signal },
+            );
+      if (version !== calculationVersion) return;
       result.value = next;
       visibleCount.value = next.totalBoxes;
       status.value = next.totalBoxes > 0 ? "已完成计算" : "无法装载";
     } catch (caught) {
+      if (version !== calculationVersion) return;
+      if (caught instanceof PackingWorkerCancelledError) {
+        status.value = "已取消计算";
+        return;
+      }
       result.value = null;
       visibleCount.value = 0;
       status.value = "计算失败";
       error.value = caught instanceof Error ? caught.message : "计算失败";
+    } finally {
+      if (version === calculationVersion) {
+        activeCalculation = null;
+        isCalculating.value = false;
+      }
     }
   }
 
@@ -239,10 +288,12 @@ export const usePackingStore = defineStore("packing", () => {
     visibleCount,
     status,
     error,
+    isCalculating,
     progressText,
     totalBoxesText,
     hasActiveContainerClearance,
     calculate,
+    cancelCalculation,
     markDirty,
     moveSku,
     resetContainerClearance,

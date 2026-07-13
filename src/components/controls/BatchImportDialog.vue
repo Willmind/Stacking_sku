@@ -3,13 +3,8 @@ import { ArrowDown, ArrowUp, ArrowUpDown, Download, FileSpreadsheet, Upload } fr
 import { computed, nextTick, onBeforeUnmount, ref } from "vue";
 import templateFileUrl from "../../assets/batch-import-template.xlsx?url";
 import type { BatchResultWorkbookOptions } from "../../core/batchExport";
-import {
-  BatchImportCancelledError,
-  calculateBatchPackingAsync,
-  type BatchImportStatus,
-  type BatchPackingItem,
-  type BatchPackingRow,
-} from "../../core/batchImport";
+import { BatchImportCancelledError, type BatchImportStatus, type BatchPackingItem, type BatchPackingRow } from "../../core/batchImport";
+import { PackingWorkerCancelledError, calculateBatchPackingInWorker } from "../../core/packingWorkerClient";
 import { usePackingStore } from "../../stores/packingStore";
 import BaseDialog from "../ui/BaseDialog.vue";
 import BaseSelect, { type SelectOption } from "../ui/BaseSelect.vue";
@@ -350,18 +345,19 @@ async function handleFileChange(event: Event) {
     const rows = dataRows.map((row) => Object.fromEntries(headers.map((header, index) => [header, row[index] ?? ""])) as BatchPackingRow);
     totalRows.value = rows.length;
     importStage.value = rows.length ? `正在计算 0 / ${rows.length} 行` : "正在计算导入数据";
-    results.value = await calculateBatchPackingAsync(rows, {
-      clearance: store.containerClearance,
-      signal: controller.signal,
-      batchSize: 20,
-      onProgress: ({ processed, total, progress }) => {
-        processedRows.value = processed;
-        totalRows.value = total;
-        importProgress.value = 15 + progress * 75;
-        importStage.value = `正在计算 ${processed} / ${total} 行`;
+    results.value = await calculateBatchPackingInWorker(
+      rows,
+      { clearance: { ...store.containerClearance } },
+      {
+        signal: controller.signal,
+        onProgress: ({ processed, total, progress }) => {
+          processedRows.value = processed;
+          totalRows.value = total;
+          importProgress.value = 15 + progress * 75;
+          importStage.value = `正在计算 ${processed} / ${total} 行`;
+        },
       },
-      yieldToMain: nextFrame,
-    });
+    );
     importProgress.value = 100;
     importStage.value = "正在生成结果";
     resetFilters();
@@ -370,7 +366,7 @@ async function handleFileChange(event: Event) {
     }
   } catch (caught) {
     results.value = [];
-    if (caught instanceof BatchImportCancelledError || controller.signal.aborted) {
+    if (caught instanceof BatchImportCancelledError || caught instanceof PackingWorkerCancelledError || controller.signal.aborted) {
       importError.value = "已取消导入";
       shouldOpenDialog = false;
     } else {
