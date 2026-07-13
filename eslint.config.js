@@ -40,12 +40,5 @@ export default tseslint.config(
       "vue/multi-word-component-names": "off",
     },
   },
-  {
-    // 核心装载算法仍保留历史 JavaScript 风格；类型迁移应作为独立任务处理。
-    files: ["src/core/packing/index.ts"],
-    rules: {
-      "@typescript-eslint/ban-ts-comment": "off",
-    },
-  },
   prettier,
 );
