@@ -1,10 +1,4 @@
-import {
-  CONTAINERS,
-  calculatePackingSummary,
-  type CartonSpec,
-  type ContainerClearanceSpec,
-  type ContainerSpec,
-} from "./packing";
+import { CONTAINERS, calculatePackingSummary, type CartonSpec, type ContainerClearanceSpec, type ContainerSpec } from "./packing";
 
 export const BATCH_SIZE_COLUMN = "尺寸（长宽高 mm）";
 export const BATCH_CONTAINER_COLUMN = "柜型";
@@ -238,10 +232,7 @@ function calculateBatchRow(
   }
 }
 
-export function calculateBatchPacking(
-  rows: BatchPackingRow[],
-  options: CalculateBatchPackingOptions = {},
-): BatchPackingItem[] {
+export function calculateBatchPacking(rows: BatchPackingRow[], options: CalculateBatchPackingOptions = {}): BatchPackingItem[] {
   const metricsCache = new Map<string, BatchPackingMetrics>();
   return rows.flatMap((row, index) => {
     const item = calculateBatchRow(row, index, metricsCache, options);

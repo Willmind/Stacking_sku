@@ -1,9 +1,4 @@
-import {
-  CARTON_ORIENTATION_OPTIONS,
-  generateBoxPositions,
-  type BoxPosition,
-  type PackingResult,
-} from "./packing";
+import { CARTON_ORIENTATION_OPTIONS, generateBoxPositions, type BoxPosition, type PackingResult } from "./packing";
 import type { CartonDimensionKey } from "./packing/orientations";
 
 export interface BoxCoordinateRow {
@@ -88,10 +83,7 @@ function createRobotXCoordinate(box: BoxPosition, containerWidth: number) {
   return roundMm(containerWidth - (box.y + box.dy / 2));
 }
 
-function findInternalAxis(
-  axes: Record<InternalAxisKey, CartonDimensionKey>,
-  dimension: CartonDimensionKey,
-): InternalAxisKey | null {
+function findInternalAxis(axes: Record<InternalAxisKey, CartonDimensionKey>, dimension: CartonDimensionKey): InternalAxisKey | null {
   for (const axis of ["x", "y", "z"] as const) {
     if (axes[axis] === dimension) return axis;
   }
@@ -196,7 +188,10 @@ export function createBoxCoordinateRows(result: PackingResult | null): BoxCoordi
   const ranks = {
     rows: rankBy(boxes.map((box) => box.x)),
     layers: rankBy(boxes.map((box) => box.z)),
-    columns: rankBy(boxes.map((box) => box.y), "desc"),
+    columns: rankBy(
+      boxes.map((box) => box.y),
+      "desc",
+    ),
   };
 
   return boxes

@@ -1,10 +1,5 @@
 import { MIN_DOOR_SIDE_REMAINDER_CLEARANCE } from "./constants";
-import {
-  floorRectFromPosition,
-  hasDoorSideRemainderClearance,
-  overlapsAnyFloorRect,
-  positionFitsFloor,
-} from "./geometry";
+import { floorRectFromPosition, hasDoorSideRemainderClearance, overlapsAnyFloorRect, positionFitsFloor } from "./geometry";
 import { getOrientations, type CartonOrientation, type CartonOrientationId } from "./orientations";
 import { createTailOptimizedPatterns } from "./tailOptimizer";
 import type { BoxPosition, CartonSpec, ContainerSpec } from "./types";
@@ -68,11 +63,7 @@ const CANDIDATE_CACHE_LIMIT = 128;
 const candidateCache = new Map<string, CandidatePattern[]>();
 const layerCandidateKeyCache = new WeakMap<CandidatePattern[], Set<string>>();
 
-function createCandidateCacheKey(
-  container: ContainerSpec,
-  carton: CartonSpec,
-  orientations: CartonOrientation[],
-): string {
+function createCandidateCacheKey(container: ContainerSpec, carton: CartonSpec, orientations: CartonOrientation[]): string {
   return [
     container.length,
     container.width,
@@ -168,11 +159,9 @@ function summarizeGroupsFromUnits(units: CandidateUnit[], orientations: CartonOr
     if (previous && previous.orientationId === unit.orientationId) {
       previous.count += 1;
       previous.occupiedLength += unit.family === "length-segments" ? occupiedLength : 0;
-      previous.occupiedLength =
-        unit.family === "width-lanes" ? Math.max(previous.occupiedLength, occupiedLength) : previous.occupiedLength;
+      previous.occupiedLength = unit.family === "width-lanes" ? Math.max(previous.occupiedLength, occupiedLength) : previous.occupiedLength;
       previous.occupiedWidth += unit.family === "width-lanes" ? occupiedWidth : 0;
-      previous.occupiedWidth =
-        unit.family === "length-segments" ? Math.max(previous.occupiedWidth, occupiedWidth) : previous.occupiedWidth;
+      previous.occupiedWidth = unit.family === "length-segments" ? Math.max(previous.occupiedWidth, occupiedWidth) : previous.occupiedWidth;
       previous.occupiedHeight = Math.max(previous.occupiedHeight, unit.dz);
       previous.boxesPerUnit = Math.max(previous.boxesPerUnit, unit.acrossCount);
     } else {
@@ -288,32 +277,15 @@ function getFloorOccupiedLength(positions: CandidateBoxPosition[]): number {
 }
 
 function patternLayerPositions(pattern: CandidatePattern): CandidateBoxPosition[] {
-  return [
-    ...createLayerPositions(pattern),
-    ...(pattern.extraLayerPositions || []),
-  ].sort(
+  return [...createLayerPositions(pattern), ...(pattern.extraLayerPositions || [])].sort(
     (a, b) =>
-      a.x - b.x ||
-      a.y - b.y ||
-      a.dx - b.dx ||
-      a.dy - b.dy ||
-      a.dz - b.dz ||
-      (a.orientationId || "").localeCompare(b.orientationId || ""),
+      a.x - b.x || a.y - b.y || a.dx - b.dx || a.dy - b.dy || a.dz - b.dz || (a.orientationId || "").localeCompare(b.orientationId || ""),
   );
 }
 
 function candidateLayerKey(candidate: CandidatePattern): string {
   return patternLayerPositions(candidate)
-    .map((position) =>
-      [
-        position.x,
-        position.y,
-        position.dx,
-        position.dy,
-        position.dz,
-        position.orientationId || "",
-      ].join(":"),
-    )
+    .map((position) => [position.x, position.y, position.dx, position.dy, position.dz, position.orientationId || ""].join(":"))
     .join("|");
 }
 
@@ -347,13 +319,7 @@ function addWidthLaneCandidateVariants(
   };
   pushLayerCandidate(candidates, normalizedCandidate);
 
-  const extraPositions = createDoorSideRemainderPositions(
-    container,
-    carton,
-    basePositions,
-    orientations,
-    minDoorSideClearance,
-  );
+  const extraPositions = createDoorSideRemainderPositions(container, carton, basePositions, orientations, minDoorSideClearance);
   if (extraPositions.length === 0) {
     return;
   }
@@ -391,11 +357,7 @@ function addTailOptimizedCandidateVariants(
   }
 }
 
-function canTailOptimizeCandidate(
-  container: ContainerSpec,
-  orientations: CartonOrientation[],
-  candidate: CandidatePattern,
-) {
+function canTailOptimizeCandidate(container: ContainerSpec, orientations: CartonOrientation[], candidate: CandidatePattern) {
   if (candidate.family !== "width-lanes") return false;
   if (candidate.source || candidate.extraLayerPositions?.length) return false;
   if (new Set(candidate.units.map((unit) => unit.orientationId)).size < 2) return false;
@@ -419,10 +381,7 @@ function addTailOptimizedCandidates(
   if (maxSingleOrientationFloorCount > 220) return;
 
   const sourceCandidates = candidates.filter((candidate) => canTailOptimizeCandidate(container, orientations, candidate));
-  const bestSourceCount = sourceCandidates.reduce(
-    (bestCount, candidate) => Math.max(bestCount, candidate.perLayerBoxCount),
-    0,
-  );
+  const bestSourceCount = sourceCandidates.reduce((bestCount, candidate) => Math.max(bestCount, candidate.perLayerBoxCount), 0);
 
   for (const candidate of sourceCandidates) {
     if (candidate.perLayerBoxCount < bestSourceCount - TAIL_OPTIMIZATION_SOURCE_WINDOW) continue;
@@ -432,12 +391,7 @@ function addTailOptimizedCandidates(
 
 function isProtectedTailOptimizationBenchmark(container: ContainerSpec, carton: CartonSpec) {
   // This real 40HQ benchmark is an actual loading baseline, not a tail-optimized target.
-  return (
-    container.id === "40HQ" &&
-    carton.length === 488 &&
-    carton.width === 360 &&
-    carton.height === 291
-  );
+  return container.id === "40HQ" && carton.length === 488 && carton.width === 360 && carton.height === 291;
 }
 
 function addWidthLaneCandidates(
@@ -451,14 +405,7 @@ function addWidthLaneCandidates(
   secondaryCount: number,
   order: CandidateOrder,
 ) {
-  const baseCandidate = createWidthCandidate(
-    container,
-    primaryOrientation,
-    secondaryOrientation,
-    primaryCount,
-    secondaryCount,
-    order,
-  );
+  const baseCandidate = createWidthCandidate(container, primaryOrientation, secondaryOrientation, primaryCount, secondaryCount, order);
   addWidthLaneCandidateVariants(candidates, container, carton, orientations, baseCandidate);
 
   if (
@@ -470,14 +417,7 @@ function addWidthLaneCandidates(
 
   const seenReducedUnits = new Set<string>();
   for (let reduceWidthLaneDepth = 1; reduceWidthLaneDepth <= 2; reduceWidthLaneDepth += 1) {
-    const reduced = createWidthCandidate(
-      container,
-      primaryOrientation,
-      secondaryOrientation,
-      primaryCount,
-      secondaryCount,
-      order,
-    );
+    const reduced = createWidthCandidate(container, primaryOrientation, secondaryOrientation, primaryCount, secondaryCount, order);
     let reducedAnyUnit = false;
     const reducedUnits = reduced.units.map((unit) => {
       if (unit.orientationId !== secondaryOrientation.id) return unit;
@@ -498,14 +438,7 @@ function addWidthLaneCandidates(
       ...reduced,
       units: reducedUnits,
     };
-    addWidthLaneCandidateVariants(
-      candidates,
-      container,
-      carton,
-      orientations,
-      reducedCandidate,
-      MIN_DOOR_SIDE_REMAINDER_CLEARANCE,
-    );
+    addWidthLaneCandidateVariants(candidates, container, carton, orientations, reducedCandidate, MIN_DOOR_SIDE_REMAINDER_CLEARANCE);
   }
 }
 
@@ -513,9 +446,14 @@ function pushCandidate(candidates: CandidatePattern[], candidate: CandidatePatte
   const key = candidate.units
     .map((unit) => `${unit.family}:${unit.orientationId}:${unit.x}:${unit.y}:${unit.dx}:${unit.dy}:${unit.dz}:${unit.acrossCount}`)
     .join("|");
-  if (candidates.some((item) => item.units
-    .map((unit) => `${unit.family}:${unit.orientationId}:${unit.x}:${unit.y}:${unit.dx}:${unit.dy}:${unit.dz}:${unit.acrossCount}`)
-    .join("|") === key)) {
+  if (
+    candidates.some(
+      (item) =>
+        item.units
+          .map((unit) => `${unit.family}:${unit.orientationId}:${unit.x}:${unit.y}:${unit.dx}:${unit.dy}:${unit.dz}:${unit.acrossCount}`)
+          .join("|") === key,
+    )
+  ) {
     return;
   }
   candidates.push(candidate);
@@ -556,26 +494,12 @@ function enumerateMixedOrientationCandidates(
     if (primaryCount + secondaryCount > 0 && secondaryCount <= secondaryLengthMax) {
       pushCandidate(
         candidates,
-        createLengthCandidate(
-          container,
-          primaryOrientation,
-          secondaryOrientation,
-          primaryCount,
-          secondaryCount,
-          "length-first",
-        ),
+        createLengthCandidate(container, primaryOrientation, secondaryOrientation, primaryCount, secondaryCount, "length-first"),
       );
       if (primaryCount > 0 && secondaryCount > 0) {
         pushCandidate(
           candidates,
-          createLengthCandidate(
-            container,
-            primaryOrientation,
-            secondaryOrientation,
-            primaryCount,
-            secondaryCount,
-            "width-first",
-          ),
+          createLengthCandidate(container, primaryOrientation, secondaryOrientation, primaryCount, secondaryCount, "width-first"),
         );
       }
     }
@@ -634,14 +558,7 @@ export function enumerateCandidates(
   for (const primaryOrientation of orientations) {
     for (const secondaryOrientation of orientations) {
       if (primaryOrientation.id === secondaryOrientation.id) continue;
-      enumerateMixedOrientationCandidates(
-        candidates,
-        container,
-        carton,
-        orientations,
-        primaryOrientation,
-        secondaryOrientation,
-      );
+      enumerateMixedOrientationCandidates(candidates, container, carton, orientations, primaryOrientation, secondaryOrientation);
     }
   }
 
@@ -701,11 +618,7 @@ function createDoorSideRemainderPositions(
 
   for (const orientation of orientations) {
     const xStarts = Array.from(
-      new Set(
-        occupiedRects
-          .map((rect) => rect.x + rect.dx)
-          .filter((x) => x >= 0 && x + orientation.x <= container.length),
-      ),
+      new Set(occupiedRects.map((rect) => rect.x + rect.dx).filter((x) => x >= 0 && x + orientation.x <= container.length)),
     ).sort((a, b) => a - b);
 
     for (const x of xStarts) {

@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { Maximize2 } from "@lucide/vue";
-import { computed, ref } from "vue";
+import { computed, defineAsyncComponent, ref } from "vue";
 import { usePackingStore } from "../../stores/packingStore";
 import ProgressControl from "../controls/ProgressControl.vue";
-import CoordinateDialog from "../results/CoordinateDialog.vue";
 import Cargo3DSceneV2 from "./Cargo3DSceneV2.vue";
 import VisualizationDialog from "./VisualizationDialog.vue";
+
+const CoordinateDialog = defineAsyncComponent(() => import("../results/CoordinateDialog.vue"));
 
 const store = usePackingStore();
 const isExpanded = ref(false);
@@ -38,13 +39,7 @@ function closeExpandedScene() {
       </div>
       <div class="view-actions">
         <CoordinateDialog />
-        <button
-          class="view-expand-button"
-          type="button"
-          aria-label="放大 3D 货柜渲染"
-          title="放大 3D 货柜渲染"
-          @click="openExpandedScene"
-        >
+        <button class="view-expand-button" type="button" aria-label="放大 3D 货柜渲染" title="放大 3D 货柜渲染" @click="openExpandedScene">
           <Maximize2 :size="15" :stroke-width="2.3" aria-hidden="true" />
         </button>
       </div>
@@ -59,12 +54,7 @@ function closeExpandedScene() {
       />
     </div>
 
-    <VisualizationDialog
-      :open="isExpanded"
-      title="3D 货柜渲染"
-      :subtitle="expandedSceneSubtitle"
-      @close="closeExpandedScene"
-    >
+    <VisualizationDialog :open="isExpanded" title="3D 货柜渲染" :subtitle="expandedSceneSubtitle" @close="closeExpandedScene">
       <template #toolbar>
         <ProgressControl control-id="expanded-scene-progress" />
       </template>
@@ -170,8 +160,7 @@ span {
   isolation: isolate;
   background:
     radial-gradient(circle at 18% 12%, rgba(66, 214, 164, 0.12), transparent 34%),
-    radial-gradient(circle at 86% 82%, rgba(104, 166, 255, 0.1), transparent 30%),
-    rgba(3, 8, 14, 0.72);
+    radial-gradient(circle at 86% 82%, rgba(104, 166, 255, 0.1), transparent 30%), rgba(3, 8, 14, 0.72);
 }
 
 .cargo-scene-shell--unified::after {

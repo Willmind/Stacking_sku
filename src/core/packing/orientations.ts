@@ -65,14 +65,9 @@ export const CARTON_ORIENTATION_OPTIONS: CartonOrientationDefinition[] = [
   },
 ];
 
-export const DEFAULT_ALLOWED_ORIENTATION_IDS: CartonOrientationId[] = [
-  "length-width-height",
-  "width-length-height",
-];
+export const DEFAULT_ALLOWED_ORIENTATION_IDS: CartonOrientationId[] = ["length-width-height", "width-length-height"];
 
-const ORIENTATION_DEFINITION_BY_ID = new Map(
-  CARTON_ORIENTATION_OPTIONS.map((orientation) => [orientation.id, orientation]),
-);
+const ORIENTATION_DEFINITION_BY_ID = new Map(CARTON_ORIENTATION_OPTIONS.map((orientation) => [orientation.id, orientation]));
 
 export function isCartonOrientationId(value: unknown): value is CartonOrientationId {
   return typeof value === "string" && ORIENTATION_DEFINITION_BY_ID.has(value as CartonOrientationId);
@@ -102,10 +97,7 @@ export function normalizeAllowedOrientations(input?: readonly unknown[] | null):
   return ids;
 }
 
-export function getOrientations(
-  carton: CartonSpec,
-  allowedOrientations?: readonly unknown[] | null,
-): CartonOrientation[] {
+export function getOrientations(carton: CartonSpec, allowedOrientations?: readonly unknown[] | null): CartonOrientation[] {
   const allowedIds = normalizeAllowedOrientations(allowedOrientations);
   return allowedIds.map((id) => {
     const definition = ORIENTATION_DEFINITION_BY_ID.get(id)!;

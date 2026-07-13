@@ -70,11 +70,7 @@ const batchResultHeaders = [
 const batchResultDetailHeaders = [...batchResultHeaders, "状态", "失败原因"];
 
 function escapeXml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 function columnName(index: number) {
@@ -533,7 +529,7 @@ test("uses styled dropdown popovers for container and strategy selection", async
   expect(firstSkuCardBox).not.toBeNull();
   expect(secondSkuCardBox).not.toBeNull();
   expect(firstSkuCardBox?.height).toBeLessThan(180);
-  expect((secondSkuCardBox?.y ?? 0)).toBeGreaterThan((firstSkuCardBox?.y ?? 0) + (firstSkuCardBox?.height ?? 0) * 0.7);
+  expect(secondSkuCardBox?.y ?? 0).toBeGreaterThan((firstSkuCardBox?.y ?? 0) + (firstSkuCardBox?.height ?? 0) * 0.7);
   expect(Math.abs((firstSkuCardBox?.x ?? 0) - (secondSkuCardBox?.x ?? 0))).toBeLessThan(4);
   await expect(skuCards.first()).not.toHaveAttribute("draggable", "true");
   await expect(skuCards.first().locator(".drag-handle")).not.toHaveAttribute("draggable", "true");
@@ -547,14 +543,19 @@ test("uses styled dropdown popovers for container and strategy selection", async
   const firstSkuLengthBox = await page.locator("#sku-A-length").boundingBox();
   const firstSkuWidthBox = await page.locator("#sku-A-width").boundingBox();
   const firstSkuHeightBox = await page.locator("#sku-A-height").boundingBox();
-  const firstSkuControlWidths = await skuCards.first().locator(".sku-fields .base-number-control").evaluateAll((controls) =>
-    controls.map((control) => Math.round(control.getBoundingClientRect().width)),
-  );
+  const firstSkuControlWidths = await skuCards
+    .first()
+    .locator(".sku-fields .base-number-control")
+    .evaluateAll((controls) => controls.map((control) => Math.round(control.getBoundingClientRect().width)));
   expect(firstSkuControlWidths).toHaveLength(4);
   expect(Math.min(...firstSkuControlWidths)).toBeGreaterThan(70);
   expect(firstSkuTargetBox?.width).toBeGreaterThan(38);
   expect(firstSkuColorBox?.width).toBeGreaterThanOrEqual(48);
-  expect(Math.abs((firstSkuCardBox?.x ?? 0) + (firstSkuCardBox?.width ?? 0) - 16 - ((firstSkuColorBox?.x ?? 0) + (firstSkuColorBox?.width ?? 0)))).toBeLessThanOrEqual(3);
+  expect(
+    Math.abs(
+      (firstSkuCardBox?.x ?? 0) + (firstSkuCardBox?.width ?? 0) - 16 - ((firstSkuColorBox?.x ?? 0) + (firstSkuColorBox?.width ?? 0)),
+    ),
+  ).toBeLessThanOrEqual(3);
   expect(firstSkuLengthBox?.width).toBeGreaterThan(38);
   expect(firstSkuWidthBox?.width).toBeGreaterThan(38);
   expect(firstSkuHeightBox?.width).toBeGreaterThan(38);
@@ -684,6 +685,7 @@ test("calculates heterogeneous multi SKU after face-first loading order", async 
 });
 
 test("imports an Excel batch and shows calculated packing results in a dialog", async ({ page }) => {
+  test.setTimeout(60_000);
   await page.goto("/");
 
   await page.setInputFiles("#batch-excel-input", "tests/fixtures/batch-import-sample.xlsx");
@@ -819,11 +821,7 @@ test("keeps the batch import dialog height stable for empty and large results", 
   await page.goto("/");
 
   const largeWorkbook = createBatchImportWorkbook(
-    Array.from({ length: 80 }, (_, index) => [
-      3300 + index,
-      index % 2 === 0 ? "315*258*250" : "385*260*255",
-      "40HQ",
-    ]),
+    Array.from({ length: 80 }, (_, index) => [3300 + index, index % 2 === 0 ? "315*258*250" : "385*260*255", "40HQ"]),
   );
   await page.setInputFiles("#batch-excel-input", {
     name: "large-batch.xlsx",

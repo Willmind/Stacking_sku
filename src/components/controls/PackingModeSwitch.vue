@@ -63,7 +63,11 @@ label {
   font-size: 13px;
   font-weight: 800;
   cursor: pointer;
-  transition: border-color 140ms ease, background 140ms ease, color 140ms ease, transform 110ms ease;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease,
+    transform 110ms ease;
 }
 
 label:hover {

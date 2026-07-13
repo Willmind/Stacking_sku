@@ -29,16 +29,8 @@ export function floorRectFromPosition(position: FloorRect): FloorRect {
   };
 }
 
-export function positionFitsFloor(
-  position: FloorRect,
-  container: Pick<ContainerSpec, "length" | "width">,
-): boolean {
-  return (
-    position.x >= 0 &&
-    position.y >= 0 &&
-    position.x + position.dx <= container.length &&
-    position.y + position.dy <= container.width
-  );
+export function positionFitsFloor(position: FloorRect, container: Pick<ContainerSpec, "length" | "width">): boolean {
+  return position.x >= 0 && position.y >= 0 && position.x + position.dx <= container.length && position.y + position.dy <= container.width;
 }
 
 export function hasDoorSideRemainderClearance(
@@ -59,32 +51,18 @@ export function collidesCornerBlock(
   container: Pick<ContainerSpec, "length" | "width" | "height">,
   cornerBlock: CornerBlockSpec,
 ): boolean {
-  const entersTopBand = intersects(
-    box.z,
-    box.dz,
-    container.height - cornerBlock.height,
-    cornerBlock.height,
-  );
+  const entersTopBand = intersects(box.z, box.dz, container.height - cornerBlock.height, cornerBlock.height);
   if (!entersTopBand) return false;
 
   const entersInnerLength = intersects(box.x, box.dx, 0, cornerBlock.length);
   if (!entersInnerLength) return false;
 
   const leftCorner = intersects(box.y, box.dy, 0, cornerBlock.width);
-  const rightCorner = intersects(
-    box.y,
-    box.dy,
-    container.width - cornerBlock.width,
-    cornerBlock.width,
-  );
+  const rightCorner = intersects(box.y, box.dy, container.width - cornerBlock.width, cornerBlock.width);
 
   return leftCorner || rightCorner;
 }
 
 export function boxesOverlap3d(a: BoxPosition, b: BoxPosition): boolean {
-  return (
-    intersects(a.x, a.dx, b.x, b.dx) &&
-    intersects(a.y, a.dy, b.y, b.dy) &&
-    intersects(a.z, a.dz, b.z, b.dz)
-  );
+  return intersects(a.x, a.dx, b.x, b.dx) && intersects(a.y, a.dy, b.y, b.dy) && intersects(a.z, a.dz, b.z, b.dz);
 }

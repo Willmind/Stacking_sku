@@ -65,9 +65,7 @@ describe("batch import", () => {
   });
 
   it("applies the current container clearance to batch calculations", () => {
-    const rows = [
-      { "人工码垛数量（原始）": 8, "尺寸（长宽高 mm）": "2900*1150*1150", 柜型: "20GP" },
-    ];
+    const rows = [{ "人工码垛数量（原始）": 8, "尺寸（长宽高 mm）": "2900*1150*1150", 柜型: "20GP" }];
     const withoutClearance = calculateBatchPacking(rows);
     const withClearance = calculateBatchPacking(rows, {
       clearance: { front: 100 },
@@ -233,10 +231,13 @@ describe("batch import", () => {
       { "人工码垛数量（原始）": 1403, "尺寸（长宽高 mm）": "465-360-291", 柜型: "40HQ" },
     ]);
 
-    const workbook = createBatchResultWorkbook(results.filter((item) => item.status !== "成功"), {
-      includeErrorDetails: true,
-      title: "批量导入失败行",
-    });
+    const workbook = createBatchResultWorkbook(
+      results.filter((item) => item.status !== "成功"),
+      {
+        includeErrorDetails: true,
+        title: "批量导入失败行",
+      },
+    );
     const entries = unzipSync(workbook);
     const sheetXml = strFromU8(entries["xl/worksheets/sheet1.xml"]);
 

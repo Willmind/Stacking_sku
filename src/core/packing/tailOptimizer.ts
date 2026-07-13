@@ -1,18 +1,8 @@
-import {
-  floorRectFromPosition,
-  overlapsAnyFloorRect,
-  positionFitsFloor,
-  rectanglesOverlap,
-} from "./geometry";
+import { floorRectFromPosition, overlapsAnyFloorRect, positionFitsFloor, rectanglesOverlap } from "./geometry";
 import type { FloorRect } from "./geometry";
 import type { CartonOrientation } from "./orientations";
 import type { ContainerSpec } from "./types";
-import type {
-  CandidateBoxPosition,
-  CandidateGroup,
-  CandidatePattern,
-  CandidateUnit,
-} from "./candidates";
+import type { CandidateBoxPosition, CandidateGroup, CandidatePattern, CandidateUnit } from "./candidates";
 
 interface TailOptimizerOptions {
   maxReductionDepth?: number;
@@ -69,13 +59,9 @@ function summarizeGroupsFromUnits(units: CandidateUnit[], orientations: CartonOr
     if (previous && previous.orientationId === unit.orientationId) {
       previous.count += 1;
       previous.occupiedLength =
-        unit.family === "width-lanes"
-          ? Math.max(previous.occupiedLength, occupiedLength)
-          : previous.occupiedLength + occupiedLength;
+        unit.family === "width-lanes" ? Math.max(previous.occupiedLength, occupiedLength) : previous.occupiedLength + occupiedLength;
       previous.occupiedWidth =
-        unit.family === "length-segments"
-          ? Math.max(previous.occupiedWidth, occupiedWidth)
-          : previous.occupiedWidth + occupiedWidth;
+        unit.family === "length-segments" ? Math.max(previous.occupiedWidth, occupiedWidth) : previous.occupiedWidth + occupiedWidth;
       previous.occupiedHeight = Math.max(previous.occupiedHeight, unit.dz);
       previous.boxesPerUnit = Math.max(previous.boxesPerUnit, unit.acrossCount);
     } else {
@@ -112,10 +98,12 @@ function createReductionPlans(units: CandidateUnit[], maxReductionDepth: number)
 
   function visitOrientationPlans(index: number) {
     if (index >= orientationIds.length) {
-      addPlan(units.map((unit) => {
-        const orientationIndex = orientationIds.indexOf(unit.orientationId);
-        return Math.min(orientationDepths[orientationIndex], unit.acrossCount - 1);
-      }));
+      addPlan(
+        units.map((unit) => {
+          const orientationIndex = orientationIds.indexOf(unit.orientationId);
+          return Math.min(orientationDepths[orientationIndex], unit.acrossCount - 1);
+        }),
+      );
       return;
     }
 
@@ -135,10 +123,7 @@ function createReductionPlans(units: CandidateUnit[], maxReductionDepth: number)
 
   for (let start = 0; start < units.length; start += 1) {
     for (let end = start; end < units.length; end += 1) {
-      const maxDepth = Math.min(
-        maxReductionDepth,
-        ...units.slice(start, end + 1).map((unit) => unit.acrossCount - 1),
-      );
+      const maxDepth = Math.min(maxReductionDepth, ...units.slice(start, end + 1).map((unit) => unit.acrossCount - 1));
       for (let depth = 1; depth <= maxDepth; depth += 1) {
         const unitReductions = units.map(() => 0);
         for (let index = start; index <= end; index += 1) {
@@ -275,8 +260,16 @@ function createCandidateStarts(
 ) {
   const xSeeds = new Set(freeRects.map((rect) => rect.x));
   const ySeeds = new Set(freeRects.flatMap((rect) => [rect.y, rect.y + rect.dy]));
-  const xStarts = expandStarts(xSeeds, orientations.map((item) => item.x), container.length - orientation.x);
-  const yStarts = expandStarts(ySeeds, orientations.map((item) => item.y), container.width - orientation.y);
+  const xStarts = expandStarts(
+    xSeeds,
+    orientations.map((item) => item.x),
+    container.length - orientation.x,
+  );
+  const yStarts = expandStarts(
+    ySeeds,
+    orientations.map((item) => item.y),
+    container.width - orientation.y,
+  );
 
   return {
     xStarts,
@@ -337,12 +330,9 @@ function compareCandidateStable(left: CandidateBoxPosition, right: CandidateBoxP
 
 const TAIL_CANDIDATE_SORTERS = [
   compareCandidateStable,
-  (left: CandidateBoxPosition, right: CandidateBoxPosition) =>
-    left.y - right.y || left.x - right.x || compareCandidateStable(left, right),
-  (left: CandidateBoxPosition, right: CandidateBoxPosition) =>
-    left.x - right.x || right.y - left.y || compareCandidateStable(left, right),
-  (left: CandidateBoxPosition, right: CandidateBoxPosition) =>
-    left.y - right.y || right.x - left.x || compareCandidateStable(left, right),
+  (left: CandidateBoxPosition, right: CandidateBoxPosition) => left.y - right.y || left.x - right.x || compareCandidateStable(left, right),
+  (left: CandidateBoxPosition, right: CandidateBoxPosition) => left.x - right.x || right.y - left.y || compareCandidateStable(left, right),
+  (left: CandidateBoxPosition, right: CandidateBoxPosition) => left.y - right.y || right.x - left.x || compareCandidateStable(left, right),
   (left: CandidateBoxPosition, right: CandidateBoxPosition) =>
     (left.orientationId || "").localeCompare(right.orientationId || "") || compareCandidateStable(left, right),
   (left: CandidateBoxPosition, right: CandidateBoxPosition) =>
@@ -381,10 +371,7 @@ function selectGreedyTailPositions(
   };
 }
 
-function selectBestTailPositions(
-  tailCandidates: CandidateBoxPosition[],
-  maxSearchStates: number,
-): SearchResult {
+function selectBestTailPositions(tailCandidates: CandidateBoxPosition[], maxSearchStates: number): SearchResult {
   if (tailCandidates.length === 0) {
     return { positions: [], exploredStates: 0, stoppedByLimit: false };
   }
@@ -474,13 +461,7 @@ export function createTailOptimizedPatterns(
     if (optimizedCount <= originalBaseCount) continue;
 
     optimizedPatterns.push(
-      createPatternFromReducedUnits(
-        pattern,
-        orientations,
-        reducedUnits,
-        searchResult.positions,
-        searchResult.exploredStates,
-      ),
+      createPatternFromReducedUnits(pattern, orientations, reducedUnits, searchResult.positions, searchResult.exploredStates),
     );
   }
 

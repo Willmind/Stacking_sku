@@ -96,9 +96,7 @@ function onDocumentMouseUp(event: MouseEvent) {
 }
 
 function onDragStart(index: number, event: PointerEvent) {
-  const sourceCard = event.currentTarget instanceof HTMLElement
-    ? event.currentTarget.closest<HTMLElement>("[data-sku-drop-index]")
-    : null;
+  const sourceCard = event.currentTarget instanceof HTMLElement ? event.currentTarget.closest<HTMLElement>("[data-sku-drop-index]") : null;
   const rect = sourceCard?.getBoundingClientRect();
   const sku = store.skus[index];
   if (!rect || !sku) return;
@@ -163,7 +161,13 @@ onBeforeUnmount(finishDrag);
         <strong id="sku-count-value">{{ store.skuCount }}</strong>
       </span>
     </label>
-    <BaseSelect id="sku-strategy" label="装载策略" :model-value="store.strategy" :options="strategyOptions" @update:model-value="updateStrategy" />
+    <BaseSelect
+      id="sku-strategy"
+      label="装载策略"
+      :model-value="store.strategy"
+      :options="strategyOptions"
+      @update:model-value="updateStrategy"
+    />
     <div id="sku-list" class="sku-list">
       <SkuCard
         v-for="(skuItem, index) in store.skus"
@@ -189,7 +193,7 @@ onBeforeUnmount(finishDrag);
       >
         <div class="sku-drag-preview-header">
           <strong>SKU {{ dragPreview.label }}</strong>
-          <span>目标 {{ dragPreview.target.toLocaleString('zh-CN') }}</span>
+          <span>目标 {{ dragPreview.target.toLocaleString("zh-CN") }}</span>
         </div>
         <small>{{ dragPreview.size }} mm</small>
       </div>

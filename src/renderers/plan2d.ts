@@ -1,18 +1,4 @@
-import {
-  generateBoxPositions,
-  type BoxPosition,
-  type PackingResult,
-} from "../core/packing";
-
-export interface Plan2DRenderOptions {
-  canvas: HTMLCanvasElement;
-  result: PackingResult | null;
-  visibleCount: number;
-  viewMode?: Plan2DViewMode;
-  frontViewSide?: Plan2DFrontViewSide;
-  devicePixelRatio?: number;
-  showLabels?: boolean;
-}
+import { generateBoxPositions, type BoxPosition, type PackingResult } from "../core/packing";
 
 export interface Plan2DSceneModelOptions {
   result: PackingResult | null;
@@ -121,7 +107,6 @@ export interface Plan2DVerticalGuideLabelLayoutOptions {
   measureText: (text: string) => number;
 }
 
-const STACKED_GUIDE_LABEL_FONT = "800 10.5px Inter, sans-serif";
 const STACKED_GUIDE_LABEL_LINE_HEIGHT = 14;
 const STACKED_GUIDE_LABEL_PADDING_X = 8;
 const STACKED_GUIDE_LABEL_PADDING_Y = 7;
@@ -146,59 +131,10 @@ function colorForBox(box?: BoxPosition) {
   return box?.skuColor || "#d8923a";
 }
 
-function resizeCanvas(canvas: HTMLCanvasElement, devicePixelRatio = window.devicePixelRatio || 1) {
-  const rect = canvas.getBoundingClientRect();
-  const dpr = Math.max(1, devicePixelRatio);
-  const width = Math.max(320, Math.floor(rect.width * dpr));
-  const height = Math.max(280, Math.floor(rect.height * dpr));
-  if (canvas.width !== width || canvas.height !== height) {
-    canvas.width = width;
-    canvas.height = height;
-  }
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("2D canvas context is not available");
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return {
-    ctx,
-    width: width / dpr,
-    height: height / dpr,
-  };
-}
-
-function drawCanvasMessage(ctx: CanvasRenderingContext2D, width: number, height: number, message: string) {
-  ctx.save();
-  ctx.fillStyle = "rgba(245, 247, 251, 0.78)";
-  ctx.font = "700 16px Inter, sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(message, width / 2, height / 2);
-  ctx.restore();
-}
-
-export function drawContainerFill(
-  ctx: CanvasRenderingContext2D,
-  plane: ReturnType<typeof getPlan2DPlaneConfig>,
-  scale: number,
-) {
-  ctx.fillStyle = "rgba(20, 28, 37, 0.92)";
-  ctx.fillRect(0, 0, plane.width * scale, plane.height * scale);
-}
-
-export function drawContainerOutline(
-  ctx: CanvasRenderingContext2D,
-  plane: ReturnType<typeof getPlan2DPlaneConfig>,
-  scale: number,
-) {
-  ctx.strokeStyle = "rgba(255,255,255,0.78)";
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(0, 0, plane.width * scale, plane.height * scale);
-}
-
 function hasActiveClearance(result: PackingResult) {
   const clearance = result.clearance;
   return Boolean(
-    clearance &&
-      (clearance.front > 0 || clearance.rear > 0 || clearance.left > 0 || clearance.right > 0 || clearance.top > 0),
+    clearance && (clearance.front > 0 || clearance.rear > 0 || clearance.left > 0 || clearance.right > 0 || clearance.top > 0),
   );
 }
 
@@ -236,61 +172,6 @@ function getEffectiveSpaceProjectionRect(
     dx: effectiveContainer.length,
     dy: effectiveContainer.width,
   };
-}
-
-export function drawEffectiveSpaceBoundary(
-  ctx: CanvasRenderingContext2D,
-  rect: ProjectedRect | null,
-  scale: number,
-) {
-  if (!rect) return;
-  ctx.save();
-  ctx.setLineDash([7, 5]);
-  ctx.strokeStyle = "rgba(66, 214, 164, 0.82)";
-  ctx.lineWidth = Math.max(1, Math.min(1.7, scale * 12));
-  ctx.strokeRect(rect.x * scale, rect.y * scale, rect.dx * scale, rect.dy * scale);
-  ctx.setLineDash([]);
-  ctx.fillStyle = "rgba(66, 214, 164, 0.96)";
-  ctx.font = "800 10.5px Inter, sans-serif";
-  ctx.textAlign = "left";
-  ctx.textBaseline = "bottom";
-  ctx.fillText("有效装载空间", rect.x * scale + 6, Math.max(14, rect.y * scale - 5));
-  ctx.restore();
-}
-
-function drawSceneRect(ctx: CanvasRenderingContext2D, rect: Plan2DSceneRectModel) {
-  ctx.save();
-  if (rect.lineDash) ctx.setLineDash(rect.lineDash);
-  if (rect.fillStyle) {
-    ctx.fillStyle = rect.fillStyle;
-    ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
-  }
-  if (rect.strokeStyle && rect.lineWidth) {
-    ctx.strokeStyle = rect.strokeStyle;
-    ctx.lineWidth = rect.lineWidth;
-    ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
-  }
-  if (rect.label) {
-    ctx.setLineDash([]);
-    ctx.fillStyle = "rgba(66, 214, 164, 0.96)";
-    ctx.font = "800 10.5px Inter, sans-serif";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "bottom";
-    ctx.fillText(rect.label.text, rect.label.x, rect.label.y);
-  }
-  ctx.restore();
-}
-
-export function drawPlan2DSceneModel(ctx: CanvasRenderingContext2D, model: Plan2DSceneModel) {
-  if (model.emptyMessage) {
-    drawCanvasMessage(ctx, model.width, model.height, model.emptyMessage);
-    return;
-  }
-
-  drawSceneRect(ctx, model.container);
-  for (const box of model.boxes) drawSceneRect(ctx, box);
-  if (model.effectiveSpaceBoundary) drawSceneRect(ctx, model.effectiveSpaceBoundary);
-  drawSceneRect(ctx, model.containerOutline);
 }
 
 function getGeneratedBoxPositions(result: PackingResult, visibleCount: number): BoxPosition[] {
@@ -346,12 +227,7 @@ function uniqueProjectedSizeCount(rects: ProjectedRect[], axis: "x" | "y") {
   return new Set(sizes).size;
 }
 
-function getVisibleCountLabel(
-  rects: ProjectedRect[],
-  viewMode: Plan2DViewMode,
-  axisLabel: string,
-  axis: "x" | "y",
-) {
+function getVisibleCountLabel(rects: ProjectedRect[], viewMode: Plan2DViewMode, axisLabel: string, axis: "x" | "y") {
   const countLabel = countLabelForAxis(axisLabel, axis);
   const isElevationHorizontalAxis = viewMode !== "top" && axis === "x";
   if (isElevationHorizontalAxis && uniqueProjectedSizeCount(rects, axis) > 1) return "";
@@ -387,9 +263,7 @@ function getVisibleProjectedRects(
     ).map((item) => item.projectedRect);
   }
 
-  return getGeneratedBoxPositions(result, normalizedVisibleCount).map((position) =>
-    projectBox(position, container, viewMode),
-  );
+  return getGeneratedBoxPositions(result, normalizedVisibleCount).map((position) => projectBox(position, container, viewMode));
 }
 
 function getPlan2DAxisGuideModel(
@@ -479,40 +353,6 @@ function intersects(aStart: number, aSize: number, bStart: number, bSize: number
   return aStart < bStart + bSize && aStart + aSize > bStart;
 }
 
-function drawGuideLabel(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, angle = 0) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(angle);
-  ctx.font = "800 11px Inter, sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  const metrics = ctx.measureText(text);
-  const labelWidth = metrics.width + 14;
-  const labelHeight = 21;
-  const radius = 5;
-
-  ctx.fillStyle = "rgba(7, 13, 19, 0.82)";
-  ctx.strokeStyle = "rgba(245, 247, 251, 0.2)";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(-labelWidth / 2 + radius, -labelHeight / 2);
-  ctx.lineTo(labelWidth / 2 - radius, -labelHeight / 2);
-  ctx.quadraticCurveTo(labelWidth / 2, -labelHeight / 2, labelWidth / 2, -labelHeight / 2 + radius);
-  ctx.lineTo(labelWidth / 2, labelHeight / 2 - radius);
-  ctx.quadraticCurveTo(labelWidth / 2, labelHeight / 2, labelWidth / 2 - radius, labelHeight / 2);
-  ctx.lineTo(-labelWidth / 2 + radius, labelHeight / 2);
-  ctx.quadraticCurveTo(-labelWidth / 2, labelHeight / 2, -labelWidth / 2, labelHeight / 2 - radius);
-  ctx.lineTo(-labelWidth / 2, -labelHeight / 2 + radius);
-  ctx.quadraticCurveTo(-labelWidth / 2, -labelHeight / 2, -labelWidth / 2 + radius, -labelHeight / 2);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.fillStyle = "rgba(245, 247, 251, 0.94)";
-  ctx.fillText(text, 0, 0.5);
-  ctx.restore();
-}
-
 function formatAxisGuideCountText(metric: Plan2DAxisGuideMetric, axis: "x" | "y") {
   if (metric.countText) return metric.countText;
   if (!metric.countLabel) return "";
@@ -521,11 +361,8 @@ function formatAxisGuideCountText(metric: Plan2DAxisGuideMetric, axis: "x" | "y"
 }
 
 function getUniqueLengthColumnCount(positions: BoxPosition[], orientationId: string) {
-  return new Set(
-    positions
-      .filter((position) => position.orientationId === orientationId)
-      .map((position) => `${position.x}:${position.dx}`),
-  ).size;
+  return new Set(positions.filter((position) => position.orientationId === orientationId).map((position) => `${position.x}:${position.dx}`))
+    .size;
 }
 
 function getTopViewMixedOrientationColumnText(result: PackingResult) {
@@ -536,14 +373,14 @@ function getTopViewMixedOrientationColumnText(result: PackingResult) {
   return `横向 ${formatNumber(horizontalColumns)}列 / 竖向 ${formatNumber(verticalColumns)}列`;
 }
 
-function formatAxisGuideText(metric: Plan2DAxisGuideMetric, axis: "x" | "y") {
+export function formatPlan2DAxisGuideText(metric: Plan2DAxisGuideMetric, axis: "x" | "y") {
   const axisName = axisNameForLabel(metric.axisLabel);
   const countText = formatAxisGuideCountText(metric, axis);
   const countPrefix = countText ? `${countText} · ` : "";
   return `${countPrefix}占${axisName} ${formatNumber(metric.occupied)}mm · 余量 ${formatNumber(metric.remaining)}mm`;
 }
 
-function formatAxisGuideLines(metric: Plan2DAxisGuideMetric, axis: "x" | "y") {
+export function formatPlan2DAxisGuideLines(metric: Plan2DAxisGuideMetric, axis: "x" | "y") {
   const axisName = axisNameForLabel(metric.axisLabel);
   const lines = [`占${axisName} ${formatNumber(metric.occupied)}mm`, `余量 ${formatNumber(metric.remaining)}mm`];
   const countText = formatAxisGuideCountText(metric, axis);
@@ -579,185 +416,7 @@ export function getPlan2DVerticalGuideLabelLayout({
   };
 }
 
-function drawStackedGuideLabel(
-  ctx: CanvasRenderingContext2D,
-  lines: string[],
-  layout: Plan2DGuideLabelLayout,
-) {
-  ctx.save();
-  ctx.font = STACKED_GUIDE_LABEL_FONT;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
-
-  const labelX = layout.x;
-  const labelY = layout.y;
-  const labelWidth = layout.width;
-  const labelHeight = layout.height;
-  const radius = 5;
-
-  ctx.fillStyle = "rgba(7, 13, 19, 0.82)";
-  ctx.strokeStyle = "rgba(245, 247, 251, 0.2)";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(labelX + radius, labelY);
-  ctx.lineTo(labelX + labelWidth - radius, labelY);
-  ctx.quadraticCurveTo(labelX + labelWidth, labelY, labelX + labelWidth, labelY + radius);
-  ctx.lineTo(labelX + labelWidth, labelY + labelHeight - radius);
-  ctx.quadraticCurveTo(labelX + labelWidth, labelY + labelHeight, labelX + labelWidth - radius, labelY + labelHeight);
-  ctx.lineTo(labelX + radius, labelY + labelHeight);
-  ctx.quadraticCurveTo(labelX, labelY + labelHeight, labelX, labelY + labelHeight - radius);
-  ctx.lineTo(labelX, labelY + radius);
-  ctx.quadraticCurveTo(labelX, labelY, labelX + radius, labelY);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  lines.forEach((line, index) => {
-    ctx.fillStyle = index === 0 ? "rgba(66, 214, 164, 0.96)" : "rgba(245, 247, 251, 0.9)";
-    ctx.fillText(
-      line,
-      labelX + STACKED_GUIDE_LABEL_PADDING_X,
-      labelY + STACKED_GUIDE_LABEL_PADDING_Y + STACKED_GUIDE_LABEL_LINE_HEIGHT * index + STACKED_GUIDE_LABEL_LINE_HEIGHT / 2,
-    );
-  });
-  ctx.restore();
-}
-
-function drawOuterAxisGuides(
-  ctx: CanvasRenderingContext2D,
-  result: PackingResult,
-  visibleCount: number,
-  viewMode: Plan2DViewMode,
-  plane: ReturnType<typeof getPlan2DPlaneConfig>,
-  scale: number,
-  boxX: number,
-  boxY: number,
-  canvasWidth: number,
-  canvasHeight: number,
-) {
-  const model = getPlan2DAxisGuideModel(result, visibleCount, viewMode, {
-    frontViewSide: plane.frontViewSide,
-  });
-  if (model.x.occupied <= 0 || model.y.occupied <= 0) return;
-
-  const planWidth = plane.width * scale;
-  const planHeight = plane.height * scale;
-  const tick = 5;
-  const x1 = clamp(boxX + model.bounds.xStart * scale, boxX, boxX + planWidth);
-  const x2 = clamp(boxX + model.bounds.xEnd * scale, boxX, boxX + planWidth);
-  const y1 = clamp(boxY + model.bounds.yStart * scale, boxY, boxY + planHeight);
-  const y2 = clamp(boxY + model.bounds.yEnd * scale, boxY, boxY + planHeight);
-  const xGuideY = clamp(boxY + planHeight + 16, boxY + planHeight + 10, canvasHeight - 30);
-  const yGuideX = Math.max(34, boxX - 16);
-
-  ctx.save();
-  ctx.strokeStyle = "rgba(245, 247, 251, 0.64)";
-  ctx.lineWidth = 1;
-  ctx.setLineDash([5, 4]);
-
-  ctx.beginPath();
-  ctx.moveTo(x1, xGuideY);
-  ctx.lineTo(x2, xGuideY);
-  ctx.moveTo(x1, xGuideY - tick);
-  ctx.lineTo(x1, xGuideY + tick);
-  ctx.moveTo(x2, xGuideY - tick);
-  ctx.lineTo(x2, xGuideY + tick);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(yGuideX, y1);
-  ctx.lineTo(yGuideX, y2);
-  ctx.moveTo(yGuideX - tick, y1);
-  ctx.lineTo(yGuideX + tick, y1);
-  ctx.moveTo(yGuideX - tick, y2);
-  ctx.lineTo(yGuideX + tick, y2);
-  ctx.stroke();
-
-  ctx.setLineDash([]);
-  drawGuideLabel(ctx, formatAxisGuideText(model.x, "x"), clamp((x1 + x2) / 2, 80, canvasWidth - 80), xGuideY + 17);
-  const yGuideLines = formatAxisGuideLines(model.y, "y");
-  ctx.font = STACKED_GUIDE_LABEL_FONT;
-  drawStackedGuideLabel(
-    ctx,
-    yGuideLines,
-    getPlan2DVerticalGuideLabelLayout({
-      lines: yGuideLines,
-      yGuideX,
-      yStart: y1,
-      yEnd: y2,
-      canvasWidth,
-      canvasHeight,
-      measureText: (line) => ctx.measureText(line).width,
-    }),
-  );
-  ctx.restore();
-}
-
-function drawOuterPlanLabels(
-  ctx: CanvasRenderingContext2D,
-  result: PackingResult,
-  boxX: number,
-  boxY: number,
-  scale: number,
-  width: number,
-  height: number,
-  viewMode: Plan2DViewMode,
-  visibleCount: number,
-  options: Plan2DProjectionOptions = {},
-) {
-  const plane = getPlan2DPlaneConfig(result, viewMode, options);
-  const planWidth = plane.width * scale;
-  const planHeight = plane.height * scale;
-  const compactCanvas = isCompactCanvas(width, height);
-  const showMeasurementLabels = !compactCanvas;
-  const showDirectionLabel = !compactCanvas || width >= 560;
-  ctx.save();
-  ctx.font = "700 12px Inter, sans-serif";
-  ctx.fillStyle = "rgba(245, 247, 251, 0.92)";
-  ctx.strokeStyle = "rgba(255,255,255,0.48)";
-  ctx.lineWidth = 1;
-
-  ctx.beginPath();
-  ctx.moveTo(boxX, boxY + planHeight + 22);
-  ctx.lineTo(boxX + planWidth, boxY + planHeight + 22);
-  ctx.stroke();
-  ctx.textAlign = "center";
-  if (showMeasurementLabels) {
-    ctx.fillText(
-      `${plane.xLabel} ${formatNumber(plane.width)}mm · 占用 ${formatNumber(plane.occupiedWidth)}mm`,
-      boxX + planWidth / 2,
-      boxY + planHeight + 42,
-    );
-  }
-
-  ctx.beginPath();
-  ctx.moveTo(boxX - 22, boxY);
-  ctx.lineTo(boxX - 22, boxY + planHeight);
-  ctx.stroke();
-  if (showMeasurementLabels) {
-    ctx.save();
-    ctx.translate(Math.max(16, boxX - 38), boxY + planHeight / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.fillText(`${plane.yLabel} ${formatNumber(plane.height)}mm · 占用 ${formatNumber(plane.occupiedHeight)}mm`, 0, 0);
-    ctx.restore();
-  }
-
-  ctx.textAlign = "left";
-  ctx.fillStyle = "rgba(66, 214, 164, 0.96)";
-  ctx.fillText(`当前显示：${formatNumber(Math.min(result.totalBoxes, visibleCount))} / ${formatNumber(result.totalBoxes)} 箱`, 18, 24);
-  if (showDirectionLabel) {
-    ctx.fillStyle = "rgba(174, 184, 201, 0.9)";
-    ctx.textAlign = "right";
-    ctx.fillText(plane.directionLabel, width - 18, 24);
-  }
-  ctx.restore();
-}
-
-export function getPlan2DPlaneConfig(
-  result: PackingResult,
-  viewMode: Plan2DViewMode,
-  options: Plan2DProjectionOptions = {},
-) {
+export function getPlan2DPlaneConfig(result: PackingResult, viewMode: Plan2DViewMode, options: Plan2DProjectionOptions = {}) {
   const { container, pattern } = result;
   const frontViewSide = normalizeFrontViewSide(options.frontViewSide);
   if (viewMode === "side") {
@@ -838,17 +497,11 @@ function getFrontEndpointDepth(position: BoxPosition, frontViewSide: Plan2DFront
   return frontViewSide === "door" ? -(position.x + position.dx) : position.x;
 }
 
-function getFrontEndpointSurfaceItems(
-  positions: BoxPosition[],
-  container: PackingResult["container"],
-  frontViewSide: Plan2DFrontViewSide,
-) {
-  const sortedPositions = positions
-    .slice()
-    .sort((a, b) => {
-      const depthDiff = getFrontEndpointDepth(a, frontViewSide) - getFrontEndpointDepth(b, frontViewSide);
-      return depthDiff || a.z - b.z || a.y - b.y || a.x - b.x;
-    });
+function getFrontEndpointSurfaceItems(positions: BoxPosition[], container: PackingResult["container"], frontViewSide: Plan2DFrontViewSide) {
+  const sortedPositions = positions.slice().sort((a, b) => {
+    const depthDiff = getFrontEndpointDepth(a, frontViewSide) - getFrontEndpointDepth(b, frontViewSide);
+    return depthDiff || a.z - b.z || a.y - b.y || a.x - b.x;
+  });
   const surfaceItems: Array<{ box: BoxPosition; projectedRect: ProjectedRect }> = [];
   const occludingRects: ProjectedRect[] = [];
   let cursor = 0;
@@ -856,10 +509,7 @@ function getFrontEndpointSurfaceItems(
   while (cursor < sortedPositions.length) {
     const depth = getFrontEndpointDepth(sortedPositions[cursor], frontViewSide);
     const sameDepthPositions: BoxPosition[] = [];
-    while (
-      cursor < sortedPositions.length &&
-      getFrontEndpointDepth(sortedPositions[cursor], frontViewSide) === depth
-    ) {
+    while (cursor < sortedPositions.length && getFrontEndpointDepth(sortedPositions[cursor], frontViewSide) === depth) {
       sameDepthPositions.push(sortedPositions[cursor]);
       cursor += 1;
     }
@@ -904,13 +554,12 @@ function projectBox(box: BoxPosition, container: PackingResult["container"], vie
 function getTopViewDrawingPositions(result: PackingResult, visibleCount: number): Plan2DDrawingPosition[] {
   const normalizedVisibleCount = Math.max(0, Math.min(result.totalBoxes, Math.floor(visibleCount)));
   if (normalizedVisibleCount >= result.totalBoxes) {
-    const visiblePositionByFace = getGeneratedBoxPositions(result, normalizedVisibleCount)
-      .reduce((positions, position) => {
-        if (typeof position.faceIndex === "number" && Number.isFinite(position.faceIndex)) {
-          positions.set(position.faceIndex, position);
-        }
-        return positions;
-      }, new Map<number, BoxPosition>());
+    const visiblePositionByFace = getGeneratedBoxPositions(result, normalizedVisibleCount).reduce((positions, position) => {
+      if (typeof position.faceIndex === "number" && Number.isFinite(position.faceIndex)) {
+        positions.set(position.faceIndex, position);
+      }
+      return positions;
+    }, new Map<number, BoxPosition>());
 
     return result.layerPositions.map((position, faceIndex) => ({
       box: position,
@@ -996,7 +645,7 @@ export function createPlan2DSceneModel({
     };
   }
 
-  const pad = showLabels ? (compactCanvas ? 34 : 48) : (compactCanvas ? 54 : 68);
+  const pad = showLabels ? (compactCanvas ? 34 : 48) : compactCanvas ? 54 : 68;
   const container = result.container;
   const normalizedFrontViewSide = normalizeFrontViewSide(frontViewSide);
   const plane = getPlan2DPlaneConfig(result, viewMode, {
@@ -1013,9 +662,7 @@ export function createPlan2DSceneModel({
       : viewMode === "front"
         ? getFrontEndpointDrawingPositions(result, visibleCount, normalizedFrontViewSide)
         : getElevationDrawingPositions(result, visibleCount);
-  const sortedDrawingPositions = drawingPositions
-    .slice()
-    .sort((a, b) => Number(Boolean(a.visibleBox)) - Number(Boolean(b.visibleBox)));
+  const sortedDrawingPositions = drawingPositions.slice().sort((a, b) => Number(Boolean(a.visibleBox)) - Number(Boolean(b.visibleBox)));
 
   const boxes = sortedDrawingPositions.map((drawingPosition, index): Plan2DSceneRectModel => {
     const { box, visibleBox } = drawingPosition;
@@ -1029,9 +676,7 @@ export function createPlan2DSceneModel({
       y: boxY + rect.y * scale,
       width: rect.dx * scale,
       height: rect.dy * scale,
-      fillStyle: isVisible
-        ? `rgba(${boxRgb.r}, ${boxRgb.g}, ${boxRgb.b}, 0.82)`
-        : "rgba(255, 255, 255, 0.06)",
+      fillStyle: isVisible ? `rgba(${boxRgb.r}, ${boxRgb.g}, ${boxRgb.b}, 0.82)` : "rgba(255, 255, 255, 0.06)",
       strokeStyle: "rgba(0, 0, 0, 0.9)",
       lineWidth: Math.max(0.65, Math.min(1.2, scale * 14)),
       visible: isVisible,
@@ -1091,52 +736,4 @@ export function createPlan2DSceneModel({
       lineWidth: 1.5,
     },
   };
-}
-
-export function renderPlan2D({
-  canvas,
-  result,
-  visibleCount,
-  viewMode = "top",
-  frontViewSide,
-  devicePixelRatio,
-  showLabels = true,
-}: Plan2DRenderOptions): void {
-  const { ctx, width, height } = resizeCanvas(canvas, devicePixelRatio);
-  ctx.clearRect(0, 0, width, height);
-
-  const sceneModel = createPlan2DSceneModel({
-    result,
-    visibleCount,
-    viewMode,
-    frontViewSide,
-    width,
-    height,
-    showLabels,
-  });
-  drawPlan2DSceneModel(ctx, sceneModel);
-
-  if (!result || !result.pattern || sceneModel.emptyMessage || !sceneModel.plane) {
-    return;
-  }
-
-  const normalizedFrontViewSide = sceneModel.frontViewSide ?? normalizeFrontViewSide(frontViewSide);
-  drawOuterAxisGuides(
-    ctx,
-    result,
-    visibleCount,
-    viewMode,
-    sceneModel.plane,
-    sceneModel.scale,
-    sceneModel.origin.x,
-    sceneModel.origin.y,
-    width,
-    height,
-  );
-
-  if (showLabels) {
-    drawOuterPlanLabels(ctx, result, sceneModel.origin.x, sceneModel.origin.y, sceneModel.scale, width, height, viewMode, visibleCount, {
-      frontViewSide: normalizedFrontViewSide,
-    });
-  }
 }
