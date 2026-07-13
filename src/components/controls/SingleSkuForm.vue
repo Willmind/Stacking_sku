@@ -11,9 +11,21 @@ const store = usePackingStore();
   <section class="field-group" aria-label="纸箱规格">
     <h2>纸箱规格</h2>
     <div class="triple-grid">
-      <BaseNumberField id="carton-length" label="长 mm" v-model="store.singleCarton.length" :min="1" @update:model-value="store.markDirty" />
+      <BaseNumberField
+        id="carton-length"
+        label="长 mm"
+        v-model="store.singleCarton.length"
+        :min="1"
+        @update:model-value="store.markDirty"
+      />
       <BaseNumberField id="carton-width" label="宽 mm" v-model="store.singleCarton.width" :min="1" @update:model-value="store.markDirty" />
-      <BaseNumberField id="carton-height" label="高 mm" v-model="store.singleCarton.height" :min="1" @update:model-value="store.markDirty" />
+      <BaseNumberField
+        id="carton-height"
+        label="高 mm"
+        v-model="store.singleCarton.height"
+        :min="1"
+        @update:model-value="store.markDirty"
+      />
     </div>
     <div class="color-field">
       <span id="carton-color-label" class="field-label">箱体颜色</span>

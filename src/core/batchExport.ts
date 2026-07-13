@@ -21,11 +21,7 @@ export interface BatchResultWorkbookOptions {
 }
 
 function escapeXml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 function columnName(index: number) {
@@ -195,10 +191,7 @@ function appXml() {
 </Properties>`;
 }
 
-export function createBatchResultWorkbook(
-  results: BatchPackingItem[],
-  options: BatchResultWorkbookOptions = {},
-): Uint8Array {
+export function createBatchResultWorkbook(results: BatchPackingItem[], options: BatchResultWorkbookOptions = {}): Uint8Array {
   const resolvedOptions = {
     title: options.title || "批量导入结果",
     includeStatus: options.includeStatus ?? false,

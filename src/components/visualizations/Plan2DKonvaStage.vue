@@ -3,8 +3,9 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import type { PackingResult } from "../../core/packing";
 import {
   createPlan2DSceneModel,
+  formatPlan2DAxisGuideLines,
+  formatPlan2DAxisGuideText,
   getPlan2DAxisGuideMetrics,
-  type Plan2DAxisGuideMetric,
   type Plan2DFrontViewSide,
   type Plan2DSceneRectModel,
   type Plan2DViewMode,
@@ -34,10 +35,6 @@ const GUIDE_LABEL_PADDING_Y = 8;
 const GUIDE_LABEL_LINE_HEIGHT = 17;
 const VERTICAL_GUIDE_LABEL_GAP = 22;
 
-function formatNumber(value: number) {
-  return Math.round(value).toLocaleString("zh-CN");
-}
-
 function updateStageSize() {
   const element = stageHostRef.value;
   if (!element) return;
@@ -53,10 +50,6 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-function axisNameForLabel(axisLabel: string) {
-  return axisLabel.replace("柜", "");
-}
-
 function estimateTextWidth(text: string) {
   return Array.from(text).reduce((width, character) => {
     if (/[\u4e00-\u9fff]/.test(character)) return width + 11;
@@ -64,27 +57,6 @@ function estimateTextWidth(text: string) {
     if (character === " ") return width + 4;
     return width + 6.5;
   }, 0);
-}
-
-function formatAxisGuideCountText(metric: Plan2DAxisGuideMetric, axis: "x" | "y") {
-  if (metric.countText) return metric.countText;
-  if (!metric.countLabel) return "";
-  const directionLabel = axis === "x" ? "横向" : "竖向";
-  return `${directionLabel} ${formatNumber(metric.count)}${metric.countLabel}`;
-}
-
-function formatAxisGuideText(metric: Plan2DAxisGuideMetric, axis: "x" | "y") {
-  const axisName = axisNameForLabel(metric.axisLabel);
-  const countText = formatAxisGuideCountText(metric, axis);
-  const countPrefix = countText ? `${countText} · ` : "";
-  return `${countPrefix}占${axisName} ${formatNumber(metric.occupied)}mm · 余量 ${formatNumber(metric.remaining)}mm`;
-}
-
-function formatAxisGuideLines(metric: Plan2DAxisGuideMetric, axis: "x" | "y") {
-  const axisName = axisNameForLabel(metric.axisLabel);
-  const lines = [`占${axisName} ${formatNumber(metric.occupied)}mm`, `余量 ${formatNumber(metric.remaining)}mm`];
-  const countText = formatAxisGuideCountText(metric, axis);
-  return countText ? [countText, ...lines] : lines;
 }
 
 function getStackedGuideLabelSize(lines: string[]) {
@@ -137,18 +109,14 @@ const axisGuideConfig = computed(() => {
   const tick = 5;
   const xGuideY = Math.min(model.height - 48, yEnd + (compact ? 14 : 18));
   const yGuideX = Math.max(34, xStart - (compact ? 12 : 16));
-  const xLabelText = formatAxisGuideText(metrics.x, "x");
+  const xLabelText = formatPlan2DAxisGuideText(metrics.x, "x");
   const xLabelWidth = Math.min(estimateTextWidth(xLabelText) + GUIDE_LABEL_PADDING_X * 2, stageSize.value.width - 16);
   const xLabelHeight = 25;
   const xLabelCenterX = clamp((xStart + xEnd) / 2, 8 + xLabelWidth / 2, stageSize.value.width - xLabelWidth / 2 - 8);
   const xLabelY = clamp(xGuideY + 13, 8, model.height - xLabelHeight - 8);
-  const yLabelLines = formatAxisGuideLines(metrics.y, "y");
+  const yLabelLines = formatPlan2DAxisGuideLines(metrics.y, "y");
   const yLabelSize = getStackedGuideLabelSize(yLabelLines);
-  const yLabelX = clamp(
-    yGuideX - yLabelSize.width - VERTICAL_GUIDE_LABEL_GAP,
-    8,
-    stageSize.value.width - yLabelSize.width - 8,
-  );
+  const yLabelX = clamp(yGuideX - yLabelSize.width - VERTICAL_GUIDE_LABEL_GAP, 8, stageSize.value.width - yLabelSize.width - 8);
   const yLabelY = clamp((yStart + yEnd) / 2 - yLabelSize.height / 2, 8, model.height - yLabelSize.height - 8);
   return {
     xLine: [xStart, xGuideY, xEnd, xGuideY],
@@ -260,10 +228,7 @@ onBeforeUnmount(() => {
           <v-group :config="sceneGroupConfig">
             <v-rect :config="rectConfig(sceneModel.container)" />
             <v-rect v-for="box in sceneModel.boxes" :key="box.key" :config="rectConfig(box)" />
-            <v-rect
-              v-if="sceneModel.effectiveSpaceBoundary"
-              :config="rectConfig(sceneModel.effectiveSpaceBoundary)"
-            />
+            <v-rect v-if="sceneModel.effectiveSpaceBoundary" :config="rectConfig(sceneModel.effectiveSpaceBoundary)" />
             <v-text v-if="sceneModel.effectiveSpaceBoundary?.label" :config="effectiveSpaceTextConfig" />
             <v-rect :config="rectConfig(sceneModel.containerOutline)" />
           </v-group>
@@ -348,8 +313,7 @@ onBeforeUnmount(() => {
     radial-gradient(circle at 18% 12%, rgba(66, 214, 164, 0.1), transparent 34%),
     radial-gradient(circle at 86% 78%, rgba(104, 166, 255, 0.09), transparent 30%),
     linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px),
-    rgba(3, 8, 14, 0.72);
+    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px), rgba(3, 8, 14, 0.72);
   background-size:
     auto,
     auto,

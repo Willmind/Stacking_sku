@@ -51,12 +51,7 @@ function startDrag(event: PointerEvent) {
     :data-sku-drop-index="props.index"
   >
     <div class="sku-card-header">
-      <button
-        class="drag-handle"
-        type="button"
-        aria-label="拖动 SKU"
-        @pointerdown="startDrag"
-      >
+      <button class="drag-handle" type="button" aria-label="拖动 SKU" @pointerdown="startDrag">
         <GripVertical :size="16" :stroke-width="2.45" aria-hidden="true" />
       </button>
       <strong>SKU {{ sku.label }}</strong>

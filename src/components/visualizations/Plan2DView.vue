@@ -2,12 +2,7 @@
 import { LayoutPanelTop, Maximize2, PanelBottom, PanelLeft } from "@lucide/vue";
 import { computed, ref } from "vue";
 import type { Component } from "vue";
-import {
-  getPlan2DAxisGuideMetrics,
-  getPlan2DPlaneConfig,
-  type Plan2DFrontViewSide,
-  type Plan2DViewMode,
-} from "../../renderers/plan2d";
+import { getPlan2DAxisGuideMetrics, getPlan2DPlaneConfig, type Plan2DFrontViewSide, type Plan2DViewMode } from "../../renderers/plan2d";
 import { usePackingStore } from "../../stores/packingStore";
 import ProgressControl from "../controls/ProgressControl.vue";
 import Plan2DKonvaStage from "./Plan2DKonvaStage.vue";
@@ -65,30 +60,10 @@ const activePlanView = computed(() => {
 });
 
 const expandedPlanViewMode = ref<Plan2DViewMode | null>(null);
-const showGroupSummary = false;
-
-interface PlanGroup {
-  label: string;
-  count: number;
-  occupiedLength: number;
-  occupiedWidth: number;
-}
 
 function formatNumber(value: number) {
   return Math.round(value).toLocaleString("zh-CN");
 }
-
-const groupSummary = computed(() => {
-  const pattern = store.result?.pattern;
-  const groups = Array.isArray(pattern?.groups) ? (pattern.groups as PlanGroup[]) : [];
-  if (!pattern || !groups.length) return [];
-  return groups.map((group) => {
-    if (pattern.family === "length-segments") {
-      return `${group.label} ${group.count}列 · 占长 ${formatNumber(group.occupiedLength)}mm`;
-    }
-    return `${group.label} ${group.count}排 · 占宽 ${formatNumber(group.occupiedWidth)}mm`;
-  });
-});
 
 const allPlanViews = computed(() => [...switchablePlanViews, frontPlanView]);
 const expandedPlanView = computed(() => allPlanViews.value.find((item) => item.id === expandedPlanViewMode.value) ?? null);
@@ -245,10 +220,6 @@ function getExpandedTitle(view: PlanViewItem) {
         />
       </section>
     </div>
-    <div v-if="showGroupSummary && groupSummary.length" class="plan-group-summary" aria-label="2D 排布分区说明">
-      <span v-for="item in groupSummary" :key="item">{{ item }}</span>
-    </div>
-
     <VisualizationDialog
       :open="expandedPlanViewMode !== null"
       :title="expandedPlanView ? getExpandedTitle(expandedPlanView) : '2D 视图'"
@@ -327,9 +298,7 @@ span {
   overflow: hidden;
   border: 1px solid rgba(174, 184, 201, 0.18);
   border-radius: 8px;
-  background:
-    linear-gradient(180deg, rgba(13, 24, 33, 0.9), rgba(4, 10, 16, 0.88)),
-    rgba(3, 8, 14, 0.52);
+  background: linear-gradient(180deg, rgba(13, 24, 33, 0.9), rgba(4, 10, 16, 0.88)), rgba(3, 8, 14, 0.52);
 }
 
 .plan-view-card--switchable {
@@ -455,28 +424,6 @@ span {
   color: rgba(245, 247, 251, 0.78);
   font-size: 11px;
   line-height: 1.2;
-}
-
-.plan-group-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 10px 12px 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(3, 8, 14, 0.48);
-}
-
-.plan-group-summary span {
-  display: inline-flex;
-  min-height: 26px;
-  align-items: center;
-  padding: 4px 8px;
-  border: 1px solid rgba(174, 184, 201, 0.22);
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.055);
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 800;
 }
 
 @media (max-width: 720px) {

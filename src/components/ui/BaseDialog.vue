@@ -1,15 +1,7 @@
 <script setup lang="ts">
 import { X } from "@lucide/vue";
 import { Comment, computed, onBeforeUnmount, ref, useSlots, watch } from "vue";
-import {
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogOverlay,
-  DialogPortal,
-  DialogRoot,
-  DialogTitle,
-} from "reka-ui";
+import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from "reka-ui";
 
 const props = withDefaults(
   defineProps<{
@@ -171,7 +163,9 @@ onBeforeUnmount(clearCloseTimer);
   border: 1px solid rgba(174, 184, 201, 0.24);
   border-radius: 8px;
   background: var(--panel);
-  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.46), var(--panel-shadow);
+  box-shadow:
+    0 26px 80px rgba(0, 0, 0, 0.46),
+    var(--panel-shadow);
   padding: 18px;
   animation: base-dialog-content-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -320,8 +314,7 @@ onBeforeUnmount(clearCloseTimer);
   padding: 14px;
   background:
     linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    rgba(3, 8, 14, 0.74);
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px), rgba(3, 8, 14, 0.74);
   background-size: 32px 32px;
 }
 

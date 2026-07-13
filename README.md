@@ -29,6 +29,8 @@
 
 ## 快速开始
 
+本地环境需要 Node.js `^20.19.0` 或 `>=22.12.0`，建议使用 npm 10 或更高版本。
+
 安装依赖：
 
 ```bash
@@ -124,6 +126,9 @@ base: "./"
 | `npm run test:unit` | 运行 Vitest 单元测试 |
 | `npm run test:e2e` | 运行 Playwright 端到端测试 |
 | `npm run test` | 运行默认单元测试 |
+| `npm run lint` | 运行 ESLint 静态检查 |
+| `npm run format` | 使用 Prettier 格式化源码和测试 |
+| `npm run format:check` | 检查源码和测试格式 |
 
 ## 验证基准
 
@@ -139,6 +144,8 @@ base: "./"
 ```bash
 npm run test:unit
 npm run test:e2e
+npm run lint
+npm run format:check
 npm run build
 ```
 
@@ -146,7 +153,7 @@ npm run build
 
 当前端到端测试还覆盖批量导入、结果文件下载、导入 loading 进度条、2D/3D 放大弹窗、颜色选择、下拉选择、桌面和移动视口布局。
 
-`npm run build` 当前可能输出两类非阻塞警告：Rolldown 忽略第三方依赖中的 `/* #__PURE__ */` 注释，以及主 JS chunk 超过 500 kB。只要命令退出码为 0，静态产物仍会生成到 `dist/`。
+`npm run build` 已将 3D、Excel 导入导出和主要可视化依赖拆分为按需加载 chunk。构建时仍可能看到 Rolldown 忽略第三方依赖中 `/* #__PURE__ */` 注释的非阻塞警告；只要命令退出码为 0，静态产物仍会生成到 `dist/`。
 
 ## 当前实现边界
 
@@ -154,7 +161,7 @@ npm run build
 - 单 SKU 和多 SKU 算法都只考虑纸箱底面长 / 宽两种水平朝向，不考虑高向旋转、承重、重心、层间稳定、装卸通道、纸箱压缩、公差和人工操作安全距离。
 - 页面目前只开放预设柜型选择，自定义柜体长宽高输入仍在代码中保留过痕迹，但未作为当前功能暴露。
 - 3D 渲染为前端实时展示，超大装载量场景会优先保证交互性能，不应把 3D 画面当作唯一交付依据；关键数量仍以算法结果和 2D 排布为准。
-- `src/core/packing/index.ts`、`src/renderers/plan2d.ts`、`src/renderers/cargo3d.ts` 仍有 `// @ts-nocheck`，后续重构时应逐步恢复类型检查。
+- `src/core/packing/index.ts` 仍有 `// @ts-nocheck`，核心算法的完整类型迁移应作为独立重构任务处理。
 
 ## 目录结构
 
@@ -166,10 +173,10 @@ npm run build
 │   │   ├── results/           # 装载结果和 SKU 明细
 │   │   └── visualizations/    # 2D/3D 可视化组件
 │   ├── core/packing/          # 装柜算法 TypeScript 模块
-│   ├── renderers/             # Canvas 2D 与 Three.js 渲染逻辑
+│   ├── renderers/             # 2D/3D 场景模型、布局和交互辅助逻辑
 │   ├── stores/                # Pinia 状态管理
 │   └── styles/                # 全局样式与设计 token
-├── tests/                     # 单元测试、可视化守卫测试、E2E 测试
+├── tests/                     # 算法与场景模型单元测试、E2E 测试
 ├── dist/                      # 构建产物，运行 build 后生成
 └── README.md
 ```
@@ -177,7 +184,7 @@ npm run build
 ## 开发注意事项
 
 - 核心装柜算法在 `src/core/packing/`，改动算法时需要同步跑两组实际数据回归测试。
-- 2D 渲染在 `src/renderers/plan2d.ts`，3D 渲染在 `src/renderers/cargo3d.ts`。
+- 2D 场景模型在 `src/renderers/plan2d.ts`，由 `Plan2DKonvaStage.vue` 负责渲染；3D 场景模型和坐标辅助分别在 `src/renderers/cargoSceneModel.ts`、`src/renderers/cargo3d.ts`，由 `Cargo3DSceneV2.vue` 负责渲染。
 - 页面状态集中在 `src/stores/packingStore.ts`，新增业务输入优先从 store 扩展。
 - 多 SKU 颜色会传递到 2D/3D 渲染，不同 SKU 应保持颜色可区分。
 - 批量导入逻辑在 `src/core/batchImport.ts`，结果导出逻辑在 `src/core/batchExport.ts`，入口组件在 `src/components/controls/BatchImportDialog.vue`。

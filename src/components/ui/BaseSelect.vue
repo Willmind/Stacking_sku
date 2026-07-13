@@ -74,10 +74,7 @@ function updateValue(value: unknown) {
       >
         <span class="base-select-trigger-copy">
           <span class="base-select-trigger-value">{{ selectedLabel }}</span>
-          <span
-            v-if="props.showSelectedDescription && selectedOption?.description"
-            class="base-select-trigger-description"
-          >
+          <span v-if="props.showSelectedDescription && selectedOption?.description" class="base-select-trigger-description">
             {{ selectedOption.description }}
           </span>
         </span>
@@ -93,10 +90,7 @@ function updateValue(value: unknown) {
           position="popper"
           :side-offset="7"
         >
-          <SelectViewport
-            class="base-select-viewport"
-            :class="{ 'base-select-viewport--compact': props.density === 'compact' }"
-          >
+          <SelectViewport class="base-select-viewport" :class="{ 'base-select-viewport--compact': props.density === 'compact' }">
             <SelectItem
               v-for="option in props.options"
               :key="option.value"
@@ -196,7 +190,9 @@ function updateValue(value: unknown) {
 .base-select-icon {
   display: inline-flex;
   color: var(--muted);
-  transition: color 140ms ease, transform 160ms ease;
+  transition:
+    color 140ms ease,
+    transform 160ms ease;
 }
 
 .base-select-trigger-copy {
@@ -347,5 +343,4 @@ function updateValue(value: unknown) {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 </style>

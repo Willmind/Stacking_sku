@@ -19,7 +19,13 @@ function getUsedOrientationLabels(result: PackingResult) {
   if (result.pattern?.family === "heterogeneous-zones") {
     return Array.from(new Set(result.orderedPositions.map((position) => position.label).filter(Boolean)));
   }
-  return Array.from(new Set(getPatternGroups(result).map((group) => group.label).filter(Boolean)));
+  return Array.from(
+    new Set(
+      getPatternGroups(result)
+        .map((group) => group.label)
+        .filter(Boolean),
+    ),
+  );
 }
 
 function getOrientationNote(result: PackingResult): PackingStrategyNote {
@@ -76,12 +82,11 @@ function getBackfillNote(result: PackingResult): PackingStrategyNote {
 
     return false;
   })();
-  const hasBackfill = result.orderedPositions.some(
-    (position) =>
-      position.source === "heterogeneous-backfill" ||
-      position.source === "door-remainder" ||
-      position.source === "tail-optimized",
-  ) || hasHeterogeneousFloorReuse;
+  const hasBackfill =
+    result.orderedPositions.some(
+      (position) =>
+        position.source === "heterogeneous-backfill" || position.source === "door-remainder" || position.source === "tail-optimized",
+    ) || hasHeterogeneousFloorReuse;
 
   if (hasBackfill) {
     return {
@@ -134,8 +139,7 @@ function getSkuNote(result: PackingResult): PackingStrategyNote {
 function getClearanceNote(result: PackingResult): PackingStrategyNote {
   const clearance = result.clearance;
   const hasClearance = Boolean(
-    clearance &&
-      (clearance.front > 0 || clearance.rear > 0 || clearance.left > 0 || clearance.right > 0 || clearance.top > 0),
+    clearance && (clearance.front > 0 || clearance.rear > 0 || clearance.left > 0 || clearance.right > 0 || clearance.top > 0),
   );
 
   if (!hasClearance) {

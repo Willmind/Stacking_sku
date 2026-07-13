@@ -2,8 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 import fs from "node:fs";
 
 const macChromePath = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-const executablePath =
-  process.env.PLAYWRIGHT_CHROME_EXECUTABLE_PATH || (fs.existsSync(macChromePath) ? macChromePath : undefined);
+const executablePath = process.env.PLAYWRIGHT_CHROME_EXECUTABLE_PATH || (fs.existsSync(macChromePath) ? macChromePath : undefined);
 
 export default defineConfig({
   testDir: "./tests",

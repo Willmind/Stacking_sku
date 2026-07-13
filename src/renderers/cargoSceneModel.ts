@@ -65,10 +65,7 @@ function roundSceneUnit(value: number) {
   return Math.round(value * 1000) / 1000;
 }
 
-export function toSceneBox(
-  box: BoxPosition,
-  container: Pick<PackingResult["container"], "length" | "width" | "height">,
-): SceneBoxModel {
+export function toSceneBox(box: BoxPosition, container: Pick<PackingResult["container"], "length" | "width" | "height">): SceneBoxModel {
   return {
     key: `${box.sequenceIndex ?? 0}-${box.x}-${box.y}-${box.z}`,
     position: [

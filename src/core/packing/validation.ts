@@ -119,10 +119,5 @@ export function normalizeSkus(inputs: unknown): SkuInput[] {
 
 export function hasSameSkuDimensions(skus: SkuInput[]): boolean {
   const [firstSku] = skus;
-  return skus.every(
-    (sku) =>
-      sku.length === firstSku.length &&
-      sku.width === firstSku.width &&
-      sku.height === firstSku.height,
-  );
+  return skus.every((sku) => sku.length === firstSku.length && sku.width === firstSku.width && sku.height === firstSku.height);
 }

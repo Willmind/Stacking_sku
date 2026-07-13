@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { ArrowDown, ArrowUp, ArrowUpDown, Download, FileSpreadsheet, Upload } from "@lucide/vue";
-import { readSheet } from "read-excel-file/browser";
 import { computed, nextTick, onBeforeUnmount, ref } from "vue";
 import templateFileUrl from "../../assets/batch-import-template.xlsx?url";
-import { createBatchResultWorkbook, type BatchResultWorkbookOptions } from "../../core/batchExport";
+import type { BatchResultWorkbookOptions } from "../../core/batchExport";
 import {
   BatchImportCancelledError,
   calculateBatchPackingAsync,
@@ -89,9 +88,7 @@ const sortColumns: SortColumn[] = [
 
 const successCount = computed(() => results.value.filter((item) => item.status === "成功").length);
 const failedResults = computed(() => results.value.filter((item) => item.status !== "成功"));
-const negativeDifferenceResults = computed(() =>
-  results.value.filter((item) => item.difference !== null && item.difference < 0),
-);
+const negativeDifferenceResults = computed(() => results.value.filter((item) => item.difference !== null && item.difference < 0));
 const reviewResults = computed(() => {
   const negativeRows = new Set(negativeDifferenceResults.value);
   return results.value.filter((item) => item.status !== "成功" || negativeRows.has(item));
@@ -129,9 +126,7 @@ const summaryText = computed(() => {
   const filteredText = filteredResults.value.length === results.value.length ? "" : ` · 当前显示 ${filteredResults.value.length} 条`;
   return `共 ${results.value.length} 条 · 成功 ${successCount.value} 条 · 异常 ${failedCount.value} 条${filteredText}`;
 });
-const loadingDescription = computed(() =>
-  isLongImporting.value ? `${importStage.value} · 文件较大，正在继续计算...` : importStage.value,
-);
+const loadingDescription = computed(() => (isLongImporting.value ? `${importStage.value} · 文件较大，正在继续计算...` : importStage.value));
 const progressPercent = computed(() => Math.max(0, Math.min(100, Math.round(importProgress.value))));
 const progressStyle = computed(() => ({ width: `${progressPercent.value}%` }));
 const hasActiveFilter = computed(
@@ -192,9 +187,10 @@ function currentFilteredFileName() {
   return `${baseName}-当前筛选结果.xlsx`;
 }
 
-function downloadWorkbook(items: BatchPackingItem[], downloadName: string, options: BatchResultWorkbookOptions = {}) {
+async function downloadWorkbook(items: BatchPackingItem[], downloadName: string, options: BatchResultWorkbookOptions = {}) {
   if (!items.length) return;
 
+  const { createBatchResultWorkbook } = await import("../../core/batchExport");
   const workbook = createBatchResultWorkbook(items, options);
   const workbookBuffer = new ArrayBuffer(workbook.byteLength);
   new Uint8Array(workbookBuffer).set(workbook);
@@ -211,19 +207,19 @@ function downloadWorkbook(items: BatchPackingItem[], downloadName: string, optio
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-function downloadResults() {
-  downloadWorkbook(results.value, resultFileName(), { title: "批量导入结果" });
+async function downloadResults() {
+  await downloadWorkbook(results.value, resultFileName(), { title: "批量导入结果" });
 }
 
-function downloadReviewResults() {
-  downloadWorkbook(reviewResults.value, reviewFileName(), {
+async function downloadReviewResults() {
+  await downloadWorkbook(reviewResults.value, reviewFileName(), {
     title: "批量导入需复核行",
     includeErrorDetails: true,
   });
 }
 
-function downloadCurrentFilteredResults() {
-  downloadWorkbook(sortedResults.value, currentFilteredFileName(), {
+async function downloadCurrentFilteredResults() {
+  await downloadWorkbook(sortedResults.value, currentFilteredFileName(), {
     title: "批量导入当前筛选结果",
     includeErrorDetails: true,
   });
@@ -340,6 +336,7 @@ async function handleFileChange(event: Event) {
   await waitForLoadingPaint();
 
   try {
+    const { readSheet } = await import("read-excel-file/browser");
     const sheetRows = await readSheet(file);
     if (controller.signal.aborted) throw new BatchImportCancelledError();
     importProgress.value = 15;
@@ -350,9 +347,7 @@ async function handleFileChange(event: Event) {
     }
 
     const headers = headerRow.map((cell) => String(cell ?? "").trim());
-    const rows = dataRows.map((row) =>
-      Object.fromEntries(headers.map((header, index) => [header, row[index] ?? ""])) as BatchPackingRow,
-    );
+    const rows = dataRows.map((row) => Object.fromEntries(headers.map((header, index) => [header, row[index] ?? ""])) as BatchPackingRow);
     totalRows.value = rows.length;
     importStage.value = rows.length ? `正在计算 0 / ${rows.length} 行` : "正在计算导入数据";
     results.value = await calculateBatchPackingAsync(rows, {
@@ -405,13 +400,7 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="batch-import" aria-label="批量导入">
-    <button
-      class="batch-import-button"
-      type="button"
-      :disabled="isImporting"
-      :aria-busy="isImporting"
-      @click="openFilePicker"
-    >
+    <button class="batch-import-button" type="button" :disabled="isImporting" :aria-busy="isImporting" @click="openFilePicker">
       <span v-if="isImporting" class="batch-import-spinner" aria-hidden="true"></span>
       <Upload v-else :size="16" :stroke-width="2.35" aria-hidden="true" />
       {{ isImporting ? "解析中..." : "批量导入 Excel" }}
@@ -420,14 +409,7 @@ onBeforeUnmount(() => {
       <Download :size="16" :stroke-width="2.35" aria-hidden="true" />
       下载模版
     </a>
-    <input
-      id="batch-excel-input"
-      ref="inputRef"
-      class="batch-file-input"
-      type="file"
-      accept=".xlsx"
-      @change="handleFileChange"
-    />
+    <input id="batch-excel-input" ref="inputRef" class="batch-file-input" type="file" accept=".xlsx" @change="handleFileChange" />
   </section>
 
   <Teleport to="body">
@@ -666,7 +648,9 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(174, 184, 201, 0.24);
   border-radius: 8px;
   background: linear-gradient(180deg, rgba(26, 36, 49, 0.98), rgba(18, 27, 38, 0.98));
-  box-shadow: 0 24px 72px rgba(0, 0, 0, 0.46), var(--panel-shadow);
+  box-shadow:
+    0 24px 72px rgba(0, 0, 0, 0.46),
+    var(--panel-shadow);
   padding: 24px 28px;
   text-align: center;
 }
@@ -751,7 +735,9 @@ onBeforeUnmount(() => {
 
 .batch-import-loading-enter-active .batch-import-loading-card,
 .batch-import-loading-leave-active .batch-import-loading-card {
-  transition: opacity 140ms ease, transform 140ms ease;
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
 }
 
 .batch-import-loading-enter-from,

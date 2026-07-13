@@ -146,9 +146,7 @@ function isSelectedColor(color: string) {
               @keydown.enter.prevent="commitHexValue"
             />
           </label>
-          <button class="carton-color-more-button" type="button" @click="openNativePicker">
-            更多颜色
-          </button>
+          <button class="carton-color-more-button" type="button" @click="openNativePicker">更多颜色</button>
         </PopoverContent>
       </PopoverPortal>
     </PopoverRoot>
@@ -231,9 +229,7 @@ function isSelectedColor(color: string) {
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 5px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 48%),
-    var(--carton-color-value);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 48%), var(--carton-color-value);
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.16);
   pointer-events: none;
 }
@@ -328,9 +324,7 @@ function isSelectedColor(color: string) {
   height: 18px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 5px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0) 52%),
-    var(--carton-color-value);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0) 52%), var(--carton-color-value);
 }
 
 :global(.carton-color-swatch-button--selected) {

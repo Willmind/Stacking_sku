@@ -3,12 +3,7 @@ import { computed, nextTick, ref, watch } from "vue";
 import { FlexRender, getCoreRowModel, useVueTable, type ColumnDef } from "@tanstack/vue-table";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import { Crosshair, Download, MapPinned } from "@lucide/vue";
-import {
-  BOX_COORDINATE_HEADERS,
-  createBoxCoordinateCsv,
-  createBoxCoordinateRows,
-  type BoxCoordinateRow,
-} from "../../core/boxCoordinates";
+import { BOX_COORDINATE_HEADERS, createBoxCoordinateCsv, createBoxCoordinateRows, type BoxCoordinateRow } from "../../core/boxCoordinates";
 import { usePackingStore } from "../../stores/packingStore";
 import BaseDialog from "../ui/BaseDialog.vue";
 import Cargo3DSceneV2 from "../visualizations/Cargo3DSceneV2.vue";
@@ -169,14 +164,7 @@ watch(
     </button>
   </section>
 
-  <BaseDialog
-    v-model:open="isOpen"
-    title="查看坐标"
-    :description="coordinateSummary"
-    size="fullscreen"
-    body-variant="flush"
-    stable-height
-  >
+  <BaseDialog v-model:open="isOpen" title="查看坐标" :description="coordinateSummary" size="fullscreen" body-variant="flush" stable-height>
     <template #icon>
       <span class="coordinate-dialog-icon" aria-hidden="true">
         <Crosshair :size="18" :stroke-width="2.3" />
@@ -194,11 +182,7 @@ watch(
             <thead>
               <tr v-for="headerGroup in coordinateTable.getHeaderGroups()" :key="headerGroup.id">
                 <th v-for="header in headerGroup.headers" :key="header.id">
-                  <FlexRender
-                    v-if="!header.isPlaceholder"
-                    :render="header.column.columnDef.header"
-                    :props="header.getContext()"
-                  />
+                  <FlexRender v-if="!header.isPlaceholder" :render="header.column.columnDef.header" :props="header.getContext()" />
                 </th>
               </tr>
             </thead>

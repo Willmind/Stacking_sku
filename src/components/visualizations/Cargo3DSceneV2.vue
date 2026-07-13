@@ -7,25 +7,28 @@ import { generateBoxPositions, type BoxPosition, type PackingResult } from "../.
 import { getCargoCoordinateAxes, getSelectedCargoPosition } from "../../renderers/cargo3d";
 import { toSceneBox, toSceneContainer, type SceneLabelModel } from "../../renderers/cargoSceneModel";
 
-const props = withDefaults(defineProps<{
-  result: PackingResult | null;
-  visibleCount: number;
-  canvasId?: string;
-  selectedLoadingSequence?: number | null;
-  selectedLabel?: string;
-  showCoordinateAxes?: boolean;
-  dimCargoWhenSelected?: boolean;
-  lightweightCoordinatePreview?: boolean;
-  cameraZoom?: number;
-}>(), {
-  canvasId: "scene-canvas",
-  selectedLoadingSequence: null,
-  selectedLabel: "",
-  showCoordinateAxes: false,
-  dimCargoWhenSelected: false,
-  lightweightCoordinatePreview: false,
-  cameraZoom: 1,
-});
+const props = withDefaults(
+  defineProps<{
+    result: PackingResult | null;
+    visibleCount: number;
+    canvasId?: string;
+    selectedLoadingSequence?: number | null;
+    selectedLabel?: string;
+    showCoordinateAxes?: boolean;
+    dimCargoWhenSelected?: boolean;
+    lightweightCoordinatePreview?: boolean;
+    cameraZoom?: number;
+  }>(),
+  {
+    canvasId: "scene-canvas",
+    selectedLoadingSequence: null,
+    selectedLabel: "",
+    showCoordinateAxes: false,
+    dimCargoWhenSelected: false,
+    lightweightCoordinatePreview: false,
+    cameraZoom: 1,
+  },
+);
 
 const DoubleSide = THREE.DoubleSide;
 const floorRotation: [number, number, number] = [-Math.PI / 2, 0, 0];
@@ -265,9 +268,7 @@ function addCoordinateAxes(group: THREE.Group, result: PackingResult) {
 }
 
 const isCoordinateFocusMode = computed(() => Boolean(props.dimCargoWhenSelected && selectedSceneBox.value));
-const shouldUseLightweightCoordinatePreview = computed(() =>
-  Boolean(props.lightweightCoordinatePreview && isCoordinateFocusMode.value),
-);
+const shouldUseLightweightCoordinatePreview = computed(() => Boolean(props.lightweightCoordinatePreview && isCoordinateFocusMode.value));
 const shouldRenderContextCargoFaces = computed(() => !shouldUseLightweightCoordinatePreview.value);
 const contextCargoFaceOpacity = computed(() => (isCoordinateFocusMode.value ? 0.025 : 1));
 const contextCargoEdgeOpacity = computed(() => (isCoordinateFocusMode.value ? 0.18 : 0.08));
@@ -344,11 +345,7 @@ function onTresReady(context: TresContext) {
   scheduleProjectionUpdate();
 }
 
-watch(
-  [() => props.showCoordinateAxes, () => props.result],
-  () => rebuildOverlayGroup(),
-  { immediate: true },
-);
+watch([() => props.showCoordinateAxes, () => props.result], () => rebuildOverlayGroup(), { immediate: true });
 
 watch(projectionLabelAnchors, updateProjectionLabels, { immediate: true });
 
@@ -360,13 +357,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="sceneRootRef" class="cargo-scene-v2">
-    <TresCanvas
-      :id="canvasId"
-      class="cargo-scene-v2-canvas"
-      clear-color="#071016"
-      :window-size="false"
-      @ready="onTresReady"
-    >
+    <TresCanvas :id="canvasId" class="cargo-scene-v2-canvas" clear-color="#071016" :window-size="false" @ready="onTresReady">
       <TresPerspectiveCamera :position="[9.8, 5.7, 9.6]" :look-at="[0, -0.2, 0]" :fov="48" :zoom="cameraZoom" />
       <OrbitControls :enable-zoom="true" :zoom-speed="0.84" />
       <TresAmbientLight :intensity="0.72" />
@@ -416,13 +407,7 @@ onBeforeUnmount(() => {
 
         <TresMesh name="container-shell" :scale="sceneContainer.scale">
           <TresBoxGeometry />
-          <TresMeshBasicMaterial
-            color="#42d6a4"
-            :transparent="true"
-            :opacity="0.015"
-            :side="DoubleSide"
-            :depth-write="false"
-          />
+          <TresMeshBasicMaterial color="#42d6a4" :transparent="true" :opacity="0.015" :side="DoubleSide" :depth-write="false" />
         </TresMesh>
 
         <TresMesh name="container-shell-edge" :scale="sceneContainer.scale">
@@ -460,13 +445,7 @@ onBeforeUnmount(() => {
       </template>
 
       <template v-if="shouldRenderContextCargoFaces">
-        <TresMesh
-          v-for="box in sceneBoxes"
-          :key="`${box.key}-face`"
-          name="cargo-box"
-          :position="box.position"
-          :scale="box.scale"
-        >
+        <TresMesh v-for="box in sceneBoxes" :key="`${box.key}-face`" name="cargo-box" :position="box.position" :scale="box.scale">
           <TresBoxGeometry />
           <TresMeshBasicMaterial
             :color="box.color"
@@ -478,45 +457,19 @@ onBeforeUnmount(() => {
         </TresMesh>
       </template>
 
-      <TresMesh
-        v-if="coordinateOrigin"
-        name="coordinate-origin-marker"
-        :position="coordinateOrigin"
-      >
+      <TresMesh v-if="coordinateOrigin" name="coordinate-origin-marker" :position="coordinateOrigin">
         <TresSphereGeometry :args="[0.07, 24, 24]" />
         <TresMeshBasicMaterial color="#f5f7fb" :depth-test="false" :depth-write="false" />
       </TresMesh>
 
-      <TresMesh
-        v-if="selectedHalo"
-        name="selected-box-halo"
-        :position="selectedHalo.position"
-        :scale="selectedHalo.scale"
-      >
+      <TresMesh v-if="selectedHalo" name="selected-box-halo" :position="selectedHalo.position" :scale="selectedHalo.scale">
         <TresBoxGeometry />
-        <TresMeshBasicMaterial
-          color="#78ffff"
-          :transparent="true"
-          :opacity="0.16"
-          :depth-test="false"
-          :depth-write="false"
-        />
+        <TresMeshBasicMaterial color="#78ffff" :transparent="true" :opacity="0.16" :depth-test="false" :depth-write="false" />
       </TresMesh>
 
-      <TresMesh
-        v-if="selectedGlow"
-        name="selected-box-glow"
-        :position="selectedGlow.position"
-        :scale="selectedGlow.scale"
-      >
+      <TresMesh v-if="selectedGlow" name="selected-box-glow" :position="selectedGlow.position" :scale="selectedGlow.scale">
         <TresBoxGeometry />
-        <TresMeshBasicMaterial
-          color="#a9ffff"
-          :transparent="true"
-          :opacity="0.34"
-          :depth-test="false"
-          :depth-write="false"
-        />
+        <TresMeshBasicMaterial color="#a9ffff" :transparent="true" :opacity="0.34" :depth-test="false" :depth-write="false" />
       </TresMesh>
 
       <TresMesh
@@ -526,21 +479,10 @@ onBeforeUnmount(() => {
         :scale="selectedHighlight.scale"
       >
         <TresBoxGeometry />
-        <TresMeshBasicMaterial
-          color="#78ffff"
-          :transparent="true"
-          :opacity="0.9"
-          :depth-test="false"
-          :depth-write="false"
-        />
+        <TresMeshBasicMaterial color="#78ffff" :transparent="true" :opacity="0.9" :depth-test="false" :depth-write="false" />
       </TresMesh>
 
-      <TresMesh
-        v-if="selectedOutline"
-        name="selected-box-outline"
-        :position="selectedOutline.position"
-        :scale="selectedOutline.scale"
-      >
+      <TresMesh v-if="selectedOutline" name="selected-box-outline" :position="selectedOutline.position" :scale="selectedOutline.scale">
         <TresBoxGeometry />
         <TresMeshBasicMaterial
           color="#f6ffff"
@@ -552,12 +494,7 @@ onBeforeUnmount(() => {
         />
       </TresMesh>
 
-      <TresMesh
-        v-if="selectedHighlight"
-        name="selected-box-edge"
-        :position="selectedHighlight.position"
-        :scale="selectedHighlight.scale"
-      >
+      <TresMesh v-if="selectedHighlight" name="selected-box-edge" :position="selectedHighlight.position" :scale="selectedHighlight.scale">
         <TresBoxGeometry />
         <TresMeshBasicMaterial
           color="#2dffff"
@@ -569,13 +506,7 @@ onBeforeUnmount(() => {
         />
       </TresMesh>
 
-      <TresMesh
-        v-for="box in sceneBoxes"
-        :key="`${box.key}-edge`"
-        name="box-edge"
-        :position="box.position"
-        :scale="box.scale"
-      >
+      <TresMesh v-for="box in sceneBoxes" :key="`${box.key}-edge`" name="box-edge" :position="box.position" :scale="box.scale">
         <TresBoxGeometry />
         <TresMeshBasicMaterial
           :color="contextCargoEdgeColor"
@@ -603,12 +534,7 @@ onBeforeUnmount(() => {
     </div>
 
     <div v-if="sceneLegendItems.length" class="endpoint-legend" aria-label="3D 货柜图例">
-      <span
-        v-for="item in sceneLegendItems"
-        :key="item.key"
-        class="endpoint-legend__item"
-        :class="`endpoint-legend__item--${item.kind}`"
-      >
+      <span v-for="item in sceneLegendItems" :key="item.key" class="endpoint-legend__item" :class="`endpoint-legend__item--${item.kind}`">
         <span
           class="endpoint-legend__swatch"
           :class="`endpoint-legend__swatch--${item.kind}`"

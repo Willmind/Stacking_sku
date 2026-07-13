@@ -1,17 +1,23 @@
 <script setup lang="ts">
 import { Boxes, Calculator, LoaderCircle } from "@lucide/vue";
-import { computed, nextTick, ref } from "vue";
-import BatchImportDialog from "./components/controls/BatchImportDialog.vue";
+import { computed, defineAsyncComponent, nextTick, ref } from "vue";
 import ContainerForm from "./components/controls/ContainerForm.vue";
 import PackingModeSwitch from "./components/controls/PackingModeSwitch.vue";
 import ProgressControl from "./components/controls/ProgressControl.vue";
 import SingleSkuForm from "./components/controls/SingleSkuForm.vue";
 import SkuEditor from "./components/controls/SkuEditor.vue";
-import Cargo3DView from "./components/visualizations/Cargo3DView.vue";
+import Cargo3DPlaceholder from "./components/visualizations/Cargo3DPlaceholder.vue";
 import Plan2DView from "./components/visualizations/Plan2DView.vue";
 import ResultSummary from "./components/results/ResultSummary.vue";
 import SkuBreakdown from "./components/results/SkuBreakdown.vue";
 import { usePackingStore } from "./stores/packingStore";
+
+const BatchImportDialog = defineAsyncComponent(() => import("./components/controls/BatchImportDialog.vue"));
+const Cargo3DView = defineAsyncComponent({
+  loader: () => import("./components/visualizations/Cargo3DView.vue"),
+  loadingComponent: Cargo3DPlaceholder,
+  delay: 0,
+});
 
 const store = usePackingStore();
 type StatusTone = "idle" | "dirty" | "success" | "empty" | "error";
@@ -62,13 +68,7 @@ async function handleCalculate() {
         :aria-busy="isCalculating"
         @click="handleCalculate"
       >
-        <LoaderCircle
-          v-if="isCalculating"
-          class="calculate-button__spinner"
-          :size="17"
-          :stroke-width="2.45"
-          aria-hidden="true"
-        />
+        <LoaderCircle v-if="isCalculating" class="calculate-button__spinner" :size="17" :stroke-width="2.45" aria-hidden="true" />
         <Calculator v-else :size="17" :stroke-width="2.35" aria-hidden="true" />
         {{ isCalculating ? "计算中" : "计算装载" }}
       </button>
@@ -94,7 +94,8 @@ async function handleCalculate() {
       </header>
       <div class="views-grid">
         <Plan2DView />
-        <Cargo3DView />
+        <Cargo3DView v-if="store.result" />
+        <Cargo3DPlaceholder v-else />
       </div>
     </section>
   </main>
