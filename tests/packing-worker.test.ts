@@ -1,0 +1,90 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { calculatePacking } from "../src/core/packing";
+import { PackingWorkerCancelledError, PackingWorkerTimeoutError, runPackingWorker } from "../src/core/packingWorkerClient";
+import { executePackingWorkerPayload } from "../src/workers/packingWorkerRuntime";
+import type { PackingWorkerRequest, PackingWorkerResponse } from "../src/workers/packingWorkerProtocol";
+
+class FakeWorker {
+  onmessage: ((event: MessageEvent<PackingWorkerResponse>) => void) | null = null;
+  onerror: ((event: ErrorEvent) => void) | null = null;
+  request: PackingWorkerRequest | null = null;
+  terminated = false;
+
+  postMessage(request: PackingWorkerRequest) {
+    this.request = request;
+  }
+
+  terminate() {
+    this.terminated = true;
+  }
+
+  emit(response: PackingWorkerResponse) {
+    this.onmessage?.({ data: response } as MessageEvent<PackingWorkerResponse>);
+  }
+}
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe("packing worker", () => {
+  it("保持 Worker 与直接调用的单 SKU 结果完全一致", async () => {
+    const payload = {
+      kind: "single" as const,
+      container: { id: "40HQ", name: "40HQ", length: 12_032, width: 2_352, height: 2_698 },
+      carton: { length: 488, width: 380, height: 291 },
+      options: { clearance: { front: 20, rear: 10, left: 5, right: 5, top: 10 } },
+    };
+
+    const direct = calculatePacking(payload.container, payload.carton, payload.options);
+    const workerResult = await executePackingWorkerPayload(payload);
+
+    expect(workerResult).toEqual(direct);
+  });
+
+  it("转发批量进度并只接收当前请求结果", async () => {
+    const worker = new FakeWorker();
+    const onProgress = vi.fn();
+    const promise = runPackingWorker({ kind: "batch", rows: [] }, { workerFactory: () => worker, onProgress, timeoutMs: 1_000 });
+    const requestId = worker.request?.requestId;
+    expect(requestId).toBeTypeOf("number");
+
+    worker.emit({
+      type: "progress",
+      requestId: requestId as number,
+      progress: { processed: 1, total: 2, progress: 0.5 },
+    });
+    worker.emit({ type: "success", requestId: (requestId as number) + 1, result: [] });
+    worker.emit({ type: "success", requestId: requestId as number, result: [] });
+
+    await expect(promise).resolves.toEqual([]);
+    expect(onProgress).toHaveBeenCalledWith({ processed: 1, total: 2, progress: 0.5 });
+    expect(worker.terminated).toBe(true);
+  });
+
+  it("取消时终止 Worker 且不返回部分结果", async () => {
+    const worker = new FakeWorker();
+    const controller = new AbortController();
+    const promise = runPackingWorker(
+      { kind: "batch", rows: [] },
+      { workerFactory: () => worker, signal: controller.signal, timeoutMs: 1_000 },
+    );
+
+    controller.abort();
+
+    await expect(promise).rejects.toBeInstanceOf(PackingWorkerCancelledError);
+    expect(worker.terminated).toBe(true);
+  });
+
+  it("超时后终止 Worker", async () => {
+    vi.useFakeTimers();
+    const worker = new FakeWorker();
+    const promise = runPackingWorker({ kind: "batch", rows: [] }, { workerFactory: () => worker, timeoutMs: 25 });
+    const rejection = expect(promise).rejects.toBeInstanceOf(PackingWorkerTimeoutError);
+
+    await vi.advanceTimersByTimeAsync(25);
+
+    await rejection;
+    expect(worker.terminated).toBe(true);
+  });
+});

@@ -5,6 +5,7 @@ import { OrbitControls } from "@tresjs/cientos";
 import * as THREE from "three";
 import { generateBoxPositions, type BoxPosition, type PackingResult } from "../../core/packing";
 import { getCargoCoordinateAxes, getSelectedCargoPosition } from "../../renderers/cargo3d";
+import { getCargoRenderPolicy } from "../../renderers/cargoRenderPolicy";
 import { toSceneBox, toSceneContainer, type SceneLabelModel } from "../../renderers/cargoSceneModel";
 
 const props = withDefaults(
@@ -33,6 +34,7 @@ const props = withDefaults(
 const DoubleSide = THREE.DoubleSide;
 const floorRotation: [number, number, number] = [-Math.PI / 2, 0, 0];
 const overlayGroup = shallowRef(new THREE.Group());
+const cargoInstancesGroup = shallowRef(new THREE.Group());
 const sceneRootRef = ref<HTMLElement | null>(null);
 const tresContext = shallowRef<TresContext | null>(null);
 let projectionAnimationFrame = 0;
@@ -69,6 +71,8 @@ const sceneBoxes = computed(() => {
   if (!result?.pattern) return [];
   return visiblePositions.value.map((box) => toSceneBox(box, result.container));
 });
+
+const cargoRenderPolicy = computed(() => getCargoRenderPolicy(sceneBoxes.value.length));
 
 const sceneContainer = computed(() => {
   const result = props.result;
@@ -215,8 +219,18 @@ function disposeObject(object: THREE.Object3D) {
 
 function clearOverlayGroup() {
   while (overlayGroup.value.children.length) {
-    const child = overlayGroup.value.children.pop();
+    const child = overlayGroup.value.children.at(-1);
     if (!child) continue;
+    overlayGroup.value.remove(child);
+    disposeObject(child);
+  }
+}
+
+function clearCargoInstancesGroup() {
+  while (cargoInstancesGroup.value.children.length) {
+    const child = cargoInstancesGroup.value.children.at(-1);
+    if (!child) continue;
+    cargoInstancesGroup.value.remove(child);
     disposeObject(child);
   }
 }
@@ -274,6 +288,73 @@ const contextCargoFaceOpacity = computed(() => (isCoordinateFocusMode.value ? 0.
 const contextCargoEdgeOpacity = computed(() => (isCoordinateFocusMode.value ? 0.18 : 0.08));
 const contextCargoEdgeColor = computed(() => (isCoordinateFocusMode.value ? "#dce8ee" : "#b8fff0"));
 const contextCargoDepthWrite = computed(() => !isCoordinateFocusMode.value);
+
+const instanceMatrix = new THREE.Matrix4();
+const instancePosition = new THREE.Vector3();
+const instanceScale = new THREE.Vector3();
+const instanceRotation = new THREE.Quaternion();
+
+function setInstanceTransform(mesh: THREE.InstancedMesh, index: number, position: number[], scale: number[]) {
+  instancePosition.set(position[0], position[1], position[2]);
+  instanceScale.set(scale[0], scale[1], scale[2]);
+  instanceMatrix.compose(instancePosition, instanceRotation, instanceScale);
+  mesh.setMatrixAt(index, instanceMatrix);
+}
+
+function rebuildCargoInstancesGroup() {
+  clearCargoInstancesGroup();
+  const boxes = sceneBoxes.value;
+  if (!boxes.length) return;
+
+  if (shouldRenderContextCargoFaces.value) {
+    const boxesByColor = new Map<string, (typeof boxes)[number][]>();
+    for (const box of boxes) {
+      const colorBoxes = boxesByColor.get(box.color) ?? [];
+      colorBoxes.push(box);
+      boxesByColor.set(box.color, colorBoxes);
+    }
+
+    for (const [color, colorBoxes] of boxesByColor) {
+      const mesh = new THREE.InstancedMesh(
+        new THREE.BoxGeometry(),
+        new THREE.MeshBasicMaterial({
+          color,
+          side: DoubleSide,
+          transparent: isCoordinateFocusMode.value,
+          opacity: contextCargoFaceOpacity.value,
+          depthWrite: contextCargoDepthWrite.value,
+        }),
+        colorBoxes.length,
+      );
+      colorBoxes.forEach((box, index) => setInstanceTransform(mesh, index, box.position, box.scale));
+      mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.frustumCulled = false;
+      mesh.name = "cargo-box-instances";
+      cargoInstancesGroup.value.add(mesh);
+    }
+  }
+
+  if (cargoRenderPolicy.value.showEdges) {
+    const edgeMesh = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(),
+      new THREE.MeshBasicMaterial({
+        color: contextCargoEdgeColor.value,
+        wireframe: true,
+        transparent: true,
+        opacity: contextCargoEdgeOpacity.value,
+        depthWrite: false,
+      }),
+      boxes.length,
+    );
+    boxes.forEach((box, index) => setInstanceTransform(edgeMesh, index, box.position, box.scale));
+    edgeMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+    edgeMesh.instanceMatrix.needsUpdate = true;
+    edgeMesh.frustumCulled = false;
+    edgeMesh.name = "cargo-box-edge-instances";
+    cargoInstancesGroup.value.add(edgeMesh);
+  }
+}
 
 function rebuildOverlayGroup() {
   clearOverlayGroup();
@@ -347,10 +428,26 @@ function onTresReady(context: TresContext) {
 
 watch([() => props.showCoordinateAxes, () => props.result], () => rebuildOverlayGroup(), { immediate: true });
 
+watch(
+  [
+    sceneBoxes,
+    shouldRenderContextCargoFaces,
+    isCoordinateFocusMode,
+    contextCargoFaceOpacity,
+    contextCargoEdgeOpacity,
+    contextCargoEdgeColor,
+    contextCargoDepthWrite,
+    cargoRenderPolicy,
+  ],
+  rebuildCargoInstancesGroup,
+  { immediate: true },
+);
+
 watch(projectionLabelAnchors, updateProjectionLabels, { immediate: true });
 
 onBeforeUnmount(() => {
   stopProjectionUpdate();
+  clearCargoInstancesGroup();
   clearOverlayGroup();
 });
 </script>
@@ -444,18 +541,7 @@ onBeforeUnmount(() => {
         </template>
       </template>
 
-      <template v-if="shouldRenderContextCargoFaces">
-        <TresMesh v-for="box in sceneBoxes" :key="`${box.key}-face`" name="cargo-box" :position="box.position" :scale="box.scale">
-          <TresBoxGeometry />
-          <TresMeshBasicMaterial
-            :color="box.color"
-            :side="DoubleSide"
-            :transparent="isCoordinateFocusMode"
-            :opacity="contextCargoFaceOpacity"
-            :depth-write="contextCargoDepthWrite"
-          />
-        </TresMesh>
-      </template>
+      <primitive :object="cargoInstancesGroup" />
 
       <TresMesh v-if="coordinateOrigin" name="coordinate-origin-marker" :position="coordinateOrigin">
         <TresSphereGeometry :args="[0.07, 24, 24]" />
@@ -506,17 +592,6 @@ onBeforeUnmount(() => {
         />
       </TresMesh>
 
-      <TresMesh v-for="box in sceneBoxes" :key="`${box.key}-edge`" name="box-edge" :position="box.position" :scale="box.scale">
-        <TresBoxGeometry />
-        <TresMeshBasicMaterial
-          :color="contextCargoEdgeColor"
-          :wireframe="true"
-          :transparent="true"
-          :opacity="contextCargoEdgeOpacity"
-          :depth-write="false"
-        />
-      </TresMesh>
-
       <primitive :object="overlayGroup" />
     </TresCanvas>
 
@@ -543,6 +618,8 @@ onBeforeUnmount(() => {
         <span>{{ item.label }}</span>
       </span>
     </div>
+
+    <p v-if="cargoRenderPolicy.notice" class="render-policy-notice" role="status">{{ cargoRenderPolicy.notice }}</p>
   </div>
 </template>
 
@@ -570,6 +647,24 @@ onBeforeUnmount(() => {
   position: absolute;
   inset: 0;
   z-index: 3;
+  pointer-events: none;
+}
+
+.render-policy-notice {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  z-index: 4;
+  max-width: min(360px, calc(100% - 28px));
+  margin: 0;
+  padding: 6px 9px;
+  border: 1px solid rgba(104, 166, 255, 0.34);
+  border-radius: 6px;
+  background: rgba(5, 14, 22, 0.8);
+  color: #cbdcf2;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.4;
   pointer-events: none;
 }
 

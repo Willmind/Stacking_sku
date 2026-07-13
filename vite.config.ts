@@ -5,6 +5,9 @@ import vue from "@vitejs/plugin-vue";
 export default defineConfig({
   base: "./",
   plugins: [vue({ ...templateCompilerOptions })],
+  optimizeDeps: {
+    include: ["fflate", "read-excel-file/browser"],
+  },
   build: {
     rolldownOptions: {
       output: {

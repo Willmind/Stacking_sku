@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Boxes, Calculator, LoaderCircle } from "@lucide/vue";
-import { computed, defineAsyncComponent, nextTick, ref } from "vue";
+import { Boxes, Calculator, X } from "@lucide/vue";
+import { computed, defineAsyncComponent } from "vue";
 import ContainerForm from "./components/controls/ContainerForm.vue";
 import PackingModeSwitch from "./components/controls/PackingModeSwitch.vue";
 import ProgressControl from "./components/controls/ProgressControl.vue";
@@ -25,24 +25,20 @@ type StatusTone = "idle" | "dirty" | "success" | "empty" | "error";
 const statusToneByLabel: Record<string, StatusTone> = {
   待计算: "idle",
   待重新计算: "dirty",
+  已取消计算: "dirty",
   已完成计算: "success",
   无法装载: "empty",
   计算失败: "error",
 };
 
 const statusChipClass = computed(() => `status-chip--${statusToneByLabel[store.status] ?? "idle"}`);
-const isCalculating = ref(false);
 
 async function handleCalculate() {
-  if (isCalculating.value) return;
-  isCalculating.value = true;
-  await nextTick();
-  await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
-  try {
-    store.calculate();
-  } finally {
-    isCalculating.value = false;
+  if (store.isCalculating) {
+    store.cancelCalculation();
+    return;
   }
+  await store.calculate();
 }
 </script>
 
@@ -62,15 +58,14 @@ async function handleCalculate() {
       <ResultSummary section="overview" />
       <button
         class="calculate-button"
-        :class="{ 'calculate-button--loading': isCalculating }"
+        :class="{ 'calculate-button--loading': store.isCalculating }"
         type="button"
-        :disabled="isCalculating"
-        :aria-busy="isCalculating"
+        :aria-busy="store.isCalculating"
         @click="handleCalculate"
       >
-        <LoaderCircle v-if="isCalculating" class="calculate-button__spinner" :size="17" :stroke-width="2.45" aria-hidden="true" />
+        <X v-if="store.isCalculating" :size="17" :stroke-width="2.45" aria-hidden="true" />
         <Calculator v-else :size="17" :stroke-width="2.35" aria-hidden="true" />
-        {{ isCalculating ? "计算中" : "计算装载" }}
+        {{ store.isCalculating ? "取消计算" : "计算装载" }}
       </button>
       <p v-if="store.error" class="error">{{ store.error }}</p>
 
@@ -189,26 +184,12 @@ p {
   box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.24);
 }
 
-.calculate-button:disabled {
-  cursor: wait;
-}
-
 .calculate-button--loading {
   border-color: rgba(92, 237, 193, 0.72);
   background: linear-gradient(180deg, #55dfb7, #31c59b);
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.16),
     0 16px 34px rgba(47, 189, 148, 0.2);
-}
-
-.calculate-button__spinner {
-  animation: calculate-spin 0.86s linear infinite;
-}
-
-@keyframes calculate-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .error {

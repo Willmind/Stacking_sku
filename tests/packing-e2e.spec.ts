@@ -326,6 +326,7 @@ test("shows and downloads the carton coordinate table", async ({ page }) => {
 test("opens expanded dialogs for 2D and 3D visualizations", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "计算装载" }).click();
+  await expect(page.locator("#status-chip")).toHaveText("已完成计算");
 
   await page.locator(".plan-view-card--switchable").getByRole("button", { name: "放大俯视图" }).click();
   const planDialog = page.getByRole("dialog", { name: "放大查看 俯视图" });
