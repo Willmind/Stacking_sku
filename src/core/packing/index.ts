@@ -3,6 +3,7 @@ import { CONTAINERS, DEFAULT_CORNER_BLOCK, LOADING_STRATEGIES, type ContainerTyp
 import {
   boxesOverlap3d,
   collidesCornerBlock,
+  collidesCornerObstruction,
   floorRectFromPosition,
   intersects,
   overlapsAnyFloorRect,
@@ -16,6 +17,7 @@ import type {
   CartonSpec,
   ContainerSpec,
   CornerBlockSpec,
+  EffectiveCornerBlockSpec,
   LoadingStrategy,
   NormalizedContainerClearance,
   PackingLayer,
@@ -57,7 +59,16 @@ export type {
 
 type ContainerInput = ContainerType | ContainerSpec;
 type NormalizedContainer = Required<ContainerSpec>;
-type AcceptedByStack = Map<number | undefined, BoxPosition[]>;
+interface AcceptedVerticalBand {
+  start: number;
+  end: number;
+  positions: BoxPosition[];
+}
+interface AcceptedPositionIndex {
+  bandsByKey: Map<string, AcceptedVerticalBand>;
+  bands: AcceptedVerticalBand[];
+  bandsAreDisjoint: boolean;
+}
 interface InternalPackingPattern {
   family: string;
   name?: string;
@@ -70,7 +81,8 @@ interface EvaluatedCandidatePattern extends CandidatePattern {
   floorPositions?: BoxPosition[];
   [key: string]: unknown;
 }
-type InternalPackingResult = Omit<PackingResult, "effectiveContainer" | "clearance" | "pattern"> & {
+type InternalPackingResult = Omit<PackingResult, "cornerBlock" | "effectiveContainer" | "clearance" | "pattern"> & {
+  cornerBlock: EffectiveCornerBlockSpec;
   effectiveContainer?: NormalizedContainer;
   clearance?: NormalizedContainerClearance;
   pattern: InternalPackingPattern | null;
@@ -84,7 +96,7 @@ interface PackingSpace {
   effectiveContainer: NormalizedContainer;
   clearance: NormalizedContainerClearance;
   cornerBlock: CornerBlockSpec;
-  effectiveCornerBlock: CornerBlockSpec;
+  effectiveCornerBlock: EffectiveCornerBlockSpec;
 }
 
 interface CandidateTotal {
@@ -122,7 +134,8 @@ function createPackingSpace(containerInput: ContainerInput, options: PackingOpti
   };
   const effectiveCornerBlock = {
     length: Math.max(0, cornerBlock.length - clearance.front),
-    width: Math.max(0, cornerBlock.width - Math.min(clearance.left, clearance.right)),
+    leftWidth: Math.max(0, cornerBlock.width - clearance.left),
+    rightWidth: Math.max(0, cornerBlock.width - clearance.right),
     height: Math.max(0, cornerBlock.height - clearance.top),
   };
 
@@ -254,9 +267,13 @@ function assignSameDestinationSkus(positions: BoxPosition[], skus: SkuInput[]): 
   return assignSequenceIndexes([...fullFaceAssignments, ...assignedRemainders]);
 }
 
-function createCornerAvoidanceNudges(box: BoxPosition, container: NormalizedContainer, cornerBlock: CornerBlockSpec): BoxPosition[] {
+function createCornerAvoidanceNudges(
+  box: BoxPosition,
+  container: NormalizedContainer,
+  cornerBlock: EffectiveCornerBlockSpec,
+): BoxPosition[] {
   const candidates = [box];
-  const yStarts = [0, cornerBlock.width, container.width - cornerBlock.width - box.dy, container.width - box.dy];
+  const yStarts = [0, cornerBlock.leftWidth, container.width - cornerBlock.rightWidth - box.dy, container.width - box.dy];
 
   for (const y of yStarts) {
     candidates.push({
@@ -277,14 +294,14 @@ function createCornerAvoidanceNudges(box: BoxPosition, container: NormalizedCont
 
 function findCornerSafePosition(
   position: BoxPosition,
-  acceptedInStackBand: BoxPosition[],
+  acceptedInHeightBand: BoxPosition[],
   container: NormalizedContainer,
-  cornerBlock: CornerBlockSpec,
+  cornerBlock: EffectiveCornerBlockSpec,
 ): BoxPosition | null {
-  const acceptedRects = acceptedInStackBand.map(floorRectFromPosition);
+  const acceptedRects = acceptedInHeightBand.map(floorRectFromPosition);
 
   for (const candidate of createCornerAvoidanceNudges(position, container, cornerBlock)) {
-    if (collidesCornerBlock(candidate, container, cornerBlock)) continue;
+    if (collidesCornerObstruction(candidate, container, cornerBlock)) continue;
     if (overlapsAnyFloorRect(candidate, acceptedRects)) continue;
     return candidate;
   }
@@ -298,15 +315,15 @@ function matchesPositionFootprint(a: BoxPosition, b: BoxPosition): boolean {
 
 function findCornerDisplacedPosition(
   position: BoxPosition,
-  acceptedInStackBand: BoxPosition[],
+  acceptedInHeightBand: BoxPosition[],
   container: NormalizedContainer,
-  cornerBlock: CornerBlockSpec,
+  cornerBlock: EffectiveCornerBlockSpec,
 ): BoxPosition | null {
   let candidate = position;
   let adjusted = false;
 
-  while (positionFitsFloor(candidate, container) && !collidesCornerBlock(candidate, container, cornerBlock)) {
-    const overlapping = acceptedInStackBand.filter((accepted) =>
+  while (positionFitsFloor(candidate, container) && !collidesCornerObstruction(candidate, container, cornerBlock)) {
+    const overlapping = acceptedInHeightBand.filter((accepted) =>
       rectanglesOverlap(floorRectFromPosition(candidate), floorRectFromPosition(accepted)),
     );
 
@@ -337,36 +354,51 @@ function findCornerDisplacedPosition(
 
 function resolveAcceptedStackPosition(
   position: BoxPosition,
-  acceptedInStackBand: BoxPosition[],
+  acceptedInHeightBand: BoxPosition[],
   container: NormalizedContainer,
-  cornerBlock: CornerBlockSpec,
+  cornerBlock: EffectiveCornerBlockSpec,
 ): BoxPosition | null {
-  const acceptedRects = acceptedInStackBand.map(floorRectFromPosition);
+  const acceptedRects = acceptedInHeightBand.map(floorRectFromPosition);
 
-  if (collidesCornerBlock(position, container, cornerBlock)) {
-    return findCornerSafePosition(position, acceptedInStackBand, container, cornerBlock);
+  if (collidesCornerObstruction(position, container, cornerBlock)) {
+    return findCornerSafePosition(position, acceptedInHeightBand, container, cornerBlock);
   }
-  if (acceptedInStackBand.some((accepted) => matchesPositionFootprint(position, accepted))) {
-    return findCornerDisplacedPosition(position, acceptedInStackBand, container, cornerBlock);
+  if (acceptedInHeightBand.some((accepted) => matchesPositionFootprint(position, accepted))) {
+    return findCornerDisplacedPosition(position, acceptedInHeightBand, container, cornerBlock);
   }
   if (overlapsAnyFloorRect(position, acceptedRects)) {
-    return findCornerDisplacedPosition(position, acceptedInStackBand, container, cornerBlock);
+    return findCornerDisplacedPosition(position, acceptedInHeightBand, container, cornerBlock);
   }
   return position;
+}
+
+function getAcceptedPositionsInHeightBand(position: BoxPosition, acceptedPositions: AcceptedPositionIndex): BoxPosition[] {
+  const start = position.z;
+  const end = position.z + position.dz;
+  if (acceptedPositions.bandsAreDisjoint) {
+    return acceptedPositions.bandsByKey.get(`${start}:${end}`)?.positions || [];
+  }
+
+  const overlappingPositions: BoxPosition[] = [];
+  for (const band of acceptedPositions.bands) {
+    if (band.start >= end) break;
+    if (band.end <= start) continue;
+    overlappingPositions.push(...band.positions);
+  }
+  return overlappingPositions;
 }
 
 function acceptStackPosition(
   position: BoxPosition,
   container: NormalizedContainer,
-  cornerBlock: CornerBlockSpec,
-  acceptedByStack: AcceptedByStack,
+  cornerBlock: EffectiveCornerBlockSpec,
+  acceptedPositions: AcceptedPositionIndex,
 ): BoxPosition | null {
-  const acceptedInStackBand = acceptedByStack.get(position.stackIndex) || [];
-  const acceptedPosition = resolveAcceptedStackPosition(position, acceptedInStackBand, container, cornerBlock);
+  const acceptedInHeightBand = getAcceptedPositionsInHeightBand(position, acceptedPositions);
+  const acceptedPosition = resolveAcceptedStackPosition(position, acceptedInHeightBand, container, cornerBlock);
 
   if (acceptedPosition) {
-    acceptedInStackBand.push(acceptedPosition);
-    acceptedByStack.set(position.stackIndex, acceptedInStackBand);
+    addPositionsToAcceptedPositionIndex(acceptedPositions, [acceptedPosition]);
   }
 
   return acceptedPosition;
@@ -377,8 +409,8 @@ function createStackedFacePositions(
   faceIndex: number,
   layerCount: number,
   container: NormalizedContainer,
-  cornerBlock: CornerBlockSpec,
-  acceptedByStack: AcceptedByStack,
+  cornerBlock: EffectiveCornerBlockSpec,
+  acceptedPositions: AcceptedPositionIndex,
 ): BoxPosition[] {
   const positions: BoxPosition[] = [];
 
@@ -392,7 +424,7 @@ function createStackedFacePositions(
       },
       container,
       cornerBlock,
-      acceptedByStack,
+      acceptedPositions,
     );
 
     if (acceptedPosition) positions.push(acceptedPosition);
@@ -434,7 +466,7 @@ function groupFloorPositionsByLoadingRow(orderedFloor: LoadingRowItem[]): Loadin
 
 function createOrderedPositionsFromFloor(
   container: NormalizedContainer,
-  cornerBlock: CornerBlockSpec,
+  cornerBlock: EffectiveCornerBlockSpec,
   floorPositions: BoxPosition[],
 ): BoxPosition[] {
   const maxStackCount = floorPositions.reduce((maxCount, position) => Math.max(maxCount, Math.floor(container.height / position.dz)), 0);
@@ -444,7 +476,7 @@ function createOrderedPositionsFromFloor(
   }));
   const loadingRows = groupFloorPositionsByLoadingRow(orderedFloor);
   const positions: BoxPosition[] = [];
-  const acceptedByStack: AcceptedByStack = new Map();
+  const acceptedPositions = createAcceptedPositionIndex([], new Set(floorPositions.map((position) => position.dz)).size === 1);
 
   for (const row of loadingRows) {
     for (let stackIndex = 0; stackIndex < maxStackCount; stackIndex += 1) {
@@ -459,7 +491,7 @@ function createOrderedPositionsFromFloor(
           },
           container,
           cornerBlock,
-          acceptedByStack,
+          acceptedPositions,
         );
 
         if (acceptedPosition) positions.push(acceptedPosition);
@@ -474,7 +506,7 @@ function evaluateCandidate(
   container: NormalizedContainer,
   carton: CartonSpec,
   pattern: CandidatePattern,
-  cornerBlock: CornerBlockSpec,
+  cornerBlock: EffectiveCornerBlockSpec,
 ): EvaluatedCandidateResult {
   const basePositions = [...createLayerPositions(pattern), ...(pattern.extraLayerPositions || [])].sort((a, b) => a.x - b.x || a.y - b.y);
   const evaluatedPattern: EvaluatedCandidatePattern = {
@@ -511,7 +543,7 @@ function layerCollidesWithTopBand(
   stackIndex: number,
   cartonHeight: number,
   container: NormalizedContainer,
-  cornerBlock: CornerBlockSpec,
+  cornerBlock: EffectiveCornerBlockSpec,
 ): boolean {
   return intersects(stackIndex * cartonHeight, cartonHeight, container.height - cornerBlock.height, cornerBlock.height);
 }
@@ -520,7 +552,7 @@ function countAcceptedPositionsForStack(
   orderedBasePositions: BoxPosition[],
   stackIndex: number,
   container: NormalizedContainer,
-  cornerBlock: CornerBlockSpec,
+  cornerBlock: EffectiveCornerBlockSpec,
 ): number {
   const acceptedInStackBand: BoxPosition[] = [];
 
@@ -533,7 +565,7 @@ function countAcceptedPositionsForStack(
     const acceptedRects = acceptedInStackBand.map(floorRectFromPosition);
     let acceptedPosition: BoxPosition | null;
 
-    if (collidesCornerBlock(position, container, cornerBlock)) {
+    if (collidesCornerObstruction(position, container, cornerBlock)) {
       acceptedPosition = findCornerSafePosition(position, acceptedInStackBand, container, cornerBlock);
     } else if (acceptedInStackBand.some((accepted) => matchesPositionFootprint(position, accepted))) {
       acceptedPosition = findCornerDisplacedPosition(position, acceptedInStackBand, container, cornerBlock);
@@ -555,7 +587,7 @@ function evaluateCandidateTotal(
   container: NormalizedContainer,
   _carton: CartonSpec,
   pattern: CandidatePattern,
-  cornerBlock: CornerBlockSpec,
+  cornerBlock: EffectiveCornerBlockSpec,
 ): CandidateTotal {
   const basePositions = [...createLayerPositions(pattern), ...(pattern.extraLayerPositions || [])].sort((a, b) => a.x - b.x || a.y - b.y);
   const uniqueHeights = new Set(basePositions.map((position) => position.dz));
@@ -731,7 +763,7 @@ function canPlaceHeterogeneousGroup(
   group: BoxPosition[],
   deltaX: number,
   container: NormalizedContainer,
-  cornerBlock: CornerBlockSpec,
+  cornerBlock: EffectiveCornerBlockSpec,
   occupiedPositions: BoxPosition[],
   occupiedRects: FloorRect[],
 ): boolean {
@@ -756,7 +788,7 @@ function canPlaceHeterogeneousGroup(
   for (const position of shiftedGroup) {
     if (!positionFitsFloor(position, container)) return false;
     if (position.z + position.dz > container.height) return false;
-    if (collidesCornerBlock(position, container, cornerBlock)) return false;
+    if (collidesCornerObstruction(position, container, cornerBlock)) return false;
     if (occupiedPositions.some((occupied) => boxesOverlap3d(position, occupied))) return false;
   }
 
@@ -780,7 +812,7 @@ function compactHeterogeneousPositionsLeft(
   container: NormalizedContainer,
   positions: BoxPosition[],
   occupiedPositions: BoxPosition[],
-  cornerBlock: CornerBlockSpec,
+  cornerBlock: EffectiveCornerBlockSpec,
 ): BoxPosition[] {
   const compactedPositionByOriginal = new Map<BoxPosition, BoxPosition>();
   const acceptedPositions = occupiedPositions.slice();
@@ -842,10 +874,11 @@ function summarizeSkuAllocation(skus: SkuInput[], positions: BoxPosition[]): Sku
   });
 }
 
-function createZeroCornerBlock(): CornerBlockSpec {
+function createZeroCornerBlock(): EffectiveCornerBlockSpec {
   return {
     length: 0,
-    width: 0,
+    leftWidth: 0,
+    rightWidth: 0,
     height: 0,
   };
 }
@@ -866,7 +899,7 @@ function hasSameSkuOrientationRules(skus: SkuInput[], options: PackingOptions = 
   return skus.every((sku) => getEffectiveAllowedOrientations(sku, options).join("|") === first);
 }
 
-function createZoneCornerBlock(cornerBlock: CornerBlockSpec, offsetX: number): CornerBlockSpec {
+function createZoneCornerBlock(cornerBlock: EffectiveCornerBlockSpec, offsetX: number): EffectiveCornerBlockSpec {
   return {
     ...cornerBlock,
     length: Math.max(0, cornerBlock.length - offsetX),
@@ -918,7 +951,11 @@ function reindexHeterogeneousPositions(positions: BoxPosition[]): {
   };
 }
 
-function createHeterogeneousSourceFootprint(zoneResult: PackingResult, position: BoxPosition, offsetX: number): FloorRect {
+function createHeterogeneousSourceFootprint(
+  zoneResult: Pick<PackingResult, "layerPositions">,
+  position: BoxPosition,
+  offsetX: number,
+): FloorRect {
   const source = zoneResult.layerPositions[position.faceIndex!] || position;
   return {
     x: source.x + offsetX,
@@ -928,43 +965,54 @@ function createHeterogeneousSourceFootprint(zoneResult: PackingResult, position:
   };
 }
 
-function createAcceptedByStackFromPositions(positions: BoxPosition[]): AcceptedByStack {
-  const acceptedByStack: AcceptedByStack = new Map();
-
-  for (const position of positions) {
-    const stackIndex = Number.isFinite(position.stackIndex) ? (position.stackIndex as number) : 0;
-    if (!acceptedByStack.has(stackIndex)) acceptedByStack.set(stackIndex, []);
-    acceptedByStack.get(stackIndex)!.push(position);
-  }
-
-  return acceptedByStack;
+function createAcceptedPositionIndex(positions: BoxPosition[] = [], bandsAreDisjoint = false): AcceptedPositionIndex {
+  const index: AcceptedPositionIndex = {
+    bandsByKey: new Map(),
+    bands: [],
+    bandsAreDisjoint,
+  };
+  addPositionsToAcceptedPositionIndex(index, positions);
+  return index;
 }
 
-function cloneAcceptedByStack(acceptedByStack: AcceptedByStack): AcceptedByStack {
-  const cloned: AcceptedByStack = new Map();
-  for (const [stackIndex, positions] of acceptedByStack.entries()) {
-    cloned.set(stackIndex, positions.slice());
-  }
-  return cloned;
+function cloneAcceptedPositionIndex(index: AcceptedPositionIndex): AcceptedPositionIndex {
+  const bands = index.bands.map((band) => ({
+    ...band,
+    positions: band.positions.slice(),
+  }));
+  return {
+    bandsByKey: new Map(bands.map((band) => [`${band.start}:${band.end}`, band])),
+    bands,
+    bandsAreDisjoint: index.bandsAreDisjoint,
+  };
 }
 
-function addPositionsToAcceptedByStack(acceptedByStack: AcceptedByStack, positions: BoxPosition[]): void {
+function addPositionsToAcceptedPositionIndex(index: AcceptedPositionIndex, positions: BoxPosition[]): void {
   for (const position of positions) {
-    const stackIndex = Number.isFinite(position.stackIndex) ? (position.stackIndex as number) : 0;
-    if (!acceptedByStack.has(stackIndex)) acceptedByStack.set(stackIndex, []);
-    acceptedByStack.get(stackIndex)!.push(position);
+    const start = position.z;
+    const end = position.z + position.dz;
+    const key = `${start}:${end}`;
+    let band = index.bandsByKey.get(key);
+    if (!band) {
+      band = { start, end, positions: [] };
+      index.bandsByKey.set(key, band);
+      const insertionIndex = index.bands.findIndex((item) => item.start > start || (item.start === start && item.end > end));
+      if (insertionIndex < 0) index.bands.push(band);
+      else index.bands.splice(insertionIndex, 0, band);
+    }
+    band.positions.push(position);
   }
 }
 
 function isHeterogeneousPosition3dSafe(
   position: BoxPosition,
   container: NormalizedContainer,
-  cornerBlock: CornerBlockSpec,
+  cornerBlock: EffectiveCornerBlockSpec,
   occupiedPositions: BoxPosition[],
 ): boolean {
   if (!positionFitsFloor(position, container)) return false;
   if (position.z < 0 || position.z + position.dz > container.height) return false;
-  if (collidesCornerBlock(position, container, cornerBlock)) return false;
+  if (collidesCornerObstruction(position, container, cornerBlock)) return false;
   return !occupiedPositions.some((occupied) => boxesOverlap3d(position, occupied));
 }
 
@@ -972,7 +1020,7 @@ function selectSafeHeterogeneousStackPositions(
   stackPositions: BoxPosition[],
   limit: number,
   container: NormalizedContainer,
-  cornerBlock: CornerBlockSpec,
+  cornerBlock: EffectiveCornerBlockSpec,
   occupiedPositions: BoxPosition[],
 ): BoxPosition[] {
   const selected: BoxPosition[] = [];
@@ -1056,11 +1104,11 @@ function createHeterogeneousBackfillPositions(
   target: number,
   occupiedPositions: BoxPosition[],
   maxLength: number,
-  cornerBlock: CornerBlockSpec,
+  cornerBlock: EffectiveCornerBlockSpec,
 ): BoxPosition[] {
   if (target <= 0 || occupiedPositions.length === 0 || maxLength <= 0) return [];
 
-  const acceptedByStack = createAcceptedByStackFromPositions(occupiedPositions);
+  const acceptedPositionIndex = createAcceptedPositionIndex(occupiedPositions);
   const acceptedPositions = occupiedPositions.slice();
   const acceptedFloorRects = uniqueFloorRectsFromPositions(occupiedPositions);
   const candidates = createBackfillFootprintCandidates(container, sku, occupiedPositions, maxLength);
@@ -1070,7 +1118,7 @@ function createHeterogeneousBackfillPositions(
     if (selectedPositions.length >= target) return;
     if (overlapsAnyFloorRect(candidate, acceptedFloorRects)) return;
 
-    const candidateAcceptedByStack = cloneAcceptedByStack(acceptedByStack);
+    const candidateAcceptedPositionIndex = cloneAcceptedPositionIndex(acceptedPositionIndex);
     const layerCount = Math.floor(container.height / candidate.dz);
     const stackPositions = createStackedFacePositions(
       candidate,
@@ -1078,7 +1126,7 @@ function createHeterogeneousBackfillPositions(
       layerCount,
       container,
       cornerBlock,
-      candidateAcceptedByStack,
+      candidateAcceptedPositionIndex,
     );
     if (stackPositions.length === 0) return;
 
@@ -1100,7 +1148,7 @@ function createHeterogeneousBackfillPositions(
     }));
     selectedPositions.push(...acceptedStackPositions);
     acceptedPositions.push(...acceptedStackPositions);
-    addPositionsToAcceptedByStack(acceptedByStack, acceptedStackPositions);
+    addPositionsToAcceptedPositionIndex(acceptedPositionIndex, acceptedStackPositions);
     acceptedFloorRects.push(footprintRectFromPosition(acceptedStackPositions[0]));
   });
 
@@ -1115,7 +1163,7 @@ function calculateSameDimensionMultiSkuPacking(
 ): PackingResult {
   const firstSku = skus[0];
   const firstSkuOptions = getSkuPackingOptions(firstSku, options);
-  const baseResult = calculatePacking(
+  const baseResult = calculatePackingOnce(
     containerInput,
     { length: firstSku.length, width: firstSku.width, height: firstSku.height },
     firstSkuOptions,
@@ -1193,13 +1241,11 @@ function calculateHeterogeneousMultiSkuPacking(
         length: remainingLength,
       };
       const zoneCornerBlock = cursorX >= cornerBlock.length ? createZeroCornerBlock() : createZoneCornerBlock(cornerBlock, cursorX);
-      const zoneResult = calculatePacking(
+      const zoneResult = calculatePackingInEffectiveSpaceOnce(
         zoneContainer,
         { length: sku.length, width: sku.width, height: sku.height },
-        {
-          ...skuPackingOptions,
-          cornerBlock: zoneCornerBlock,
-        },
+        zoneCornerBlock,
+        skuPackingOptions.allowedOrientations,
       );
       const selectedPositions = zoneResult.orderedPositions.slice(0, remainingTarget);
       const offsetPositions = selectedPositions.map((position) => ({
@@ -1275,12 +1321,14 @@ function calculateHeterogeneousMultiSkuPacking(
   );
 }
 
-function calculatePacking(containerInput: ContainerInput, cartonInput: CartonSpec, options: PackingOptions = {}): PackingResult {
-  const packingSpace = createPackingSpace(containerInput, options);
-  const container = packingSpace.effectiveContainer;
+function calculatePackingInEffectiveSpaceOnce(
+  container: NormalizedContainer,
+  cartonInput: CartonSpec,
+  cornerBlock: EffectiveCornerBlockSpec,
+  allowedOrientationIds?: CartonOrientationId[],
+): InternalPackingResult {
   const carton = normalizeCarton(cartonInput);
-  const cornerBlock = packingSpace.effectiveCornerBlock;
-  const allowedOrientations = normalizeAllowedOrientations(options.allowedOrientations);
+  const allowedOrientations = normalizeAllowedOrientations(allowedOrientationIds);
 
   const candidates = enumerateCandidates(container, carton, allowedOrientations);
   let best: EvaluatedCandidateResult | null = null;
@@ -1293,31 +1341,38 @@ function calculatePacking(containerInput: ContainerInput, cartonInput: CartonSpe
   }
 
   if (!best) {
-    return applyPackingSpaceToResult(
-      {
-        container,
-        effectiveContainer: container,
-        clearance: packingSpace.clearance,
-        carton,
-        cornerBlock,
-        pattern: null,
-        layerPositions: [],
-        orderedPositions: [],
-        perLayerBoxCount: 0,
-        layers: [],
-        totalBoxes: 0,
-        blockedByCornerTotal: 0,
-        usedHeight: 0,
-        utilizationRatio: 0,
-      },
-      packingSpace,
-    );
+    return {
+      container,
+      carton,
+      cornerBlock,
+      pattern: null,
+      layerPositions: [],
+      orderedPositions: [],
+      perLayerBoxCount: 0,
+      layers: [],
+      totalBoxes: 0,
+      blockedByCornerTotal: 0,
+      usedHeight: 0,
+      utilizationRatio: 0,
+    };
   }
 
-  return applyPackingSpaceToResult(best, packingSpace);
+  return best;
 }
 
-function calculatePackingTotalBoxes(containerInput: ContainerInput, cartonInput: CartonSpec, options: PackingOptions = {}): number {
+function calculatePackingOnce(containerInput: ContainerInput, cartonInput: CartonSpec, options: PackingOptions = {}): PackingResult {
+  const packingSpace = createPackingSpace(containerInput, options);
+  const result = calculatePackingInEffectiveSpaceOnce(
+    packingSpace.effectiveContainer,
+    cartonInput,
+    packingSpace.effectiveCornerBlock,
+    options.allowedOrientations,
+  );
+
+  return applyPackingSpaceToResult(result, packingSpace);
+}
+
+function calculatePackingTotalBoxesOnce(containerInput: ContainerInput, cartonInput: CartonSpec, options: PackingOptions = {}): number {
   const packingSpace = createPackingSpace(containerInput, options);
   const container = packingSpace.effectiveContainer;
   const carton = normalizeCarton(cartonInput);
@@ -1337,7 +1392,11 @@ function calculatePackingTotalBoxes(containerInput: ContainerInput, cartonInput:
   return best ? best.totalBoxes : 0;
 }
 
-function calculatePackingSummary(containerInput: ContainerInput, cartonInput: CartonSpec, options: PackingOptions = {}): PackingSummary {
+function calculatePackingSummaryOnce(
+  containerInput: ContainerInput,
+  cartonInput: CartonSpec,
+  options: PackingOptions = {},
+): PackingSummary {
   const packingSpace = createPackingSpace(containerInput, options);
   const container = packingSpace.effectiveContainer;
   const carton = normalizeCarton(cartonInput);
@@ -1367,7 +1426,7 @@ function calculatePackingSummary(containerInput: ContainerInput, cartonInput: Ca
   };
 }
 
-function calculateMultiSkuPacking(containerInput: ContainerInput, skuInputs: SkuInput[], options: PackingOptions = {}): PackingResult {
+function calculateMultiSkuPackingOnce(containerInput: ContainerInput, skuInputs: SkuInput[], options: PackingOptions = {}): PackingResult {
   const skus = normalizeSkus(skuInputs);
   const strategy = options.strategy || LOADING_STRATEGIES.MULTI_DESTINATION;
   if (!Object.values(LOADING_STRATEGIES).includes(strategy)) {
@@ -1377,6 +1436,126 @@ function calculateMultiSkuPacking(containerInput: ContainerInput, skuInputs: Sku
   return hasSameSkuDimensions(skus) && hasSameSkuOrientationRules(skus, options)
     ? calculateSameDimensionMultiSkuPacking(containerInput, skus, options, strategy)
     : calculateHeterogeneousMultiSkuPacking(containerInput, skus, options, strategy);
+}
+
+function hasAsymmetricActiveCorner(options: PackingOptions): boolean {
+  const clearance = normalizeContainerClearance(options.clearance);
+  const cornerBlock = {
+    ...DEFAULT_CORNER_BLOCK,
+    ...(options.cornerBlock || {}),
+  };
+  if (cornerBlock.length <= clearance.front || cornerBlock.height <= clearance.top) return false;
+
+  const leftWidth = Math.max(0, cornerBlock.width - clearance.left);
+  const rightWidth = Math.max(0, cornerBlock.width - clearance.right);
+  return leftWidth !== rightWidth;
+}
+
+function swapSideClearance(options: PackingOptions): PackingOptions {
+  const clearance = options.clearance || {};
+  return {
+    ...options,
+    clearance: {
+      ...clearance,
+      left: clearance.right ?? 0,
+      right: clearance.left ?? 0,
+    },
+  };
+}
+
+function mirrorPositionAcrossWidth(position: BoxPosition, width: number): BoxPosition {
+  const mirroredPosition = {
+    ...position,
+    y: width - position.y - position.dy,
+  };
+
+  if (position.sourceFootprint) {
+    mirroredPosition.sourceFootprint = {
+      ...position.sourceFootprint,
+      y: width - position.sourceFootprint.y - position.sourceFootprint.dy,
+    };
+  }
+
+  return mirroredPosition;
+}
+
+function mirrorPackingResult(result: PackingResult, originalSpaceResult: PackingResult): PackingResult {
+  const containerWidth = originalSpaceResult.container.width;
+  const mirroredLayerPositions = result.layerPositions.map((position) => mirrorPositionAcrossWidth(position, containerWidth));
+  const mirroredOrderedPositions = result.orderedPositions.map((position) => mirrorPositionAcrossWidth(position, containerWidth));
+  const mirroredExtraLayerPositions = Array.isArray(result.pattern?.extraLayerPositions)
+    ? (result.pattern.extraLayerPositions as BoxPosition[]).map((position) =>
+        mirrorPositionAcrossWidth(position, originalSpaceResult.effectiveContainer.width),
+      )
+    : undefined;
+
+  return {
+    ...result,
+    container: originalSpaceResult.container,
+    effectiveContainer: originalSpaceResult.effectiveContainer,
+    clearance: originalSpaceResult.clearance,
+    cornerBlock: originalSpaceResult.cornerBlock,
+    layerPositions: mirroredLayerPositions,
+    orderedPositions: mirroredOrderedPositions,
+    pattern: result.pattern
+      ? {
+          ...result.pattern,
+          ...(mirroredExtraLayerPositions ? { extraLayerPositions: mirroredExtraLayerPositions } : {}),
+          floorPositions: mirroredLayerPositions,
+          mirroredY: true,
+        }
+      : null,
+  };
+}
+
+function hasBetterPackingMetrics(
+  next: Pick<PackingResult, "totalBoxes" | "blockedByCornerTotal" | "perLayerBoxCount">,
+  current: Pick<PackingResult, "totalBoxes" | "blockedByCornerTotal" | "perLayerBoxCount">,
+): boolean {
+  if (next.totalBoxes !== current.totalBoxes) return next.totalBoxes > current.totalBoxes;
+  if (next.blockedByCornerTotal !== current.blockedByCornerTotal) {
+    return next.blockedByCornerTotal < current.blockedByCornerTotal;
+  }
+  return next.perLayerBoxCount > current.perLayerBoxCount;
+}
+
+function calculatePacking(containerInput: ContainerInput, cartonInput: CartonSpec, options: PackingOptions = {}): PackingResult {
+  const directResult = calculatePackingOnce(containerInput, cartonInput, options);
+  if (!hasAsymmetricActiveCorner(options)) return directResult;
+
+  const mirroredResult = calculatePackingOnce(containerInput, cartonInput, swapSideClearance(options));
+  return hasBetterPackingMetrics(mirroredResult, directResult) ? mirrorPackingResult(mirroredResult, directResult) : directResult;
+}
+
+function calculatePackingTotalBoxes(containerInput: ContainerInput, cartonInput: CartonSpec, options: PackingOptions = {}): number {
+  const directTotal = calculatePackingTotalBoxesOnce(containerInput, cartonInput, options);
+  if (!hasAsymmetricActiveCorner(options)) return directTotal;
+
+  const mirroredTotal = calculatePackingTotalBoxesOnce(containerInput, cartonInput, swapSideClearance(options));
+  return Math.max(directTotal, mirroredTotal);
+}
+
+function calculatePackingSummary(containerInput: ContainerInput, cartonInput: CartonSpec, options: PackingOptions = {}): PackingSummary {
+  const directSummary = calculatePackingSummaryOnce(containerInput, cartonInput, options);
+  if (!hasAsymmetricActiveCorner(options)) return directSummary;
+
+  const mirroredSummary = calculatePackingSummaryOnce(containerInput, cartonInput, swapSideClearance(options));
+  return hasBetterPackingMetrics(mirroredSummary, directSummary)
+    ? {
+        ...mirroredSummary,
+        container: directSummary.container,
+        effectiveContainer: directSummary.effectiveContainer,
+        clearance: directSummary.clearance,
+      }
+    : directSummary;
+}
+
+function calculateMultiSkuPacking(containerInput: ContainerInput, skuInputs: SkuInput[], options: PackingOptions = {}): PackingResult {
+  const directResult = calculateMultiSkuPackingOnce(containerInput, skuInputs, options);
+  if (!hasAsymmetricActiveCorner(options)) return directResult;
+
+  const mirroredResult = calculateMultiSkuPackingOnce(containerInput, skuInputs, swapSideClearance(options));
+  return hasBetterPackingMetrics(mirroredResult, directResult) ? mirrorPackingResult(mirroredResult, directResult) : directResult;
 }
 
 function generateBoxPositions(result: PackingResult, visibleCount = result.totalBoxes): BoxPosition[] {

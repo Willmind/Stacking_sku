@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { calculatePacking } from "../src/core/packing";
+import { calculateMultiSkuPacking, calculatePacking } from "../src/core/packing";
 import { PackingWorkerCancelledError, PackingWorkerTimeoutError, runPackingWorker } from "../src/core/packingWorkerClient";
 import { executePackingWorkerPayload } from "../src/workers/packingWorkerRuntime";
 import type { PackingWorkerRequest, PackingWorkerResponse } from "../src/workers/packingWorkerProtocol";
@@ -37,6 +37,26 @@ describe("packing worker", () => {
     };
 
     const direct = calculatePacking(payload.container, payload.carton, payload.options);
+    const workerResult = await executePackingWorkerPayload(payload);
+
+    expect(workerResult).toEqual(direct);
+  });
+
+  it("保持 Worker 与直接调用的异尺寸多 SKU 非对称公差结果完全一致", async () => {
+    const payload = {
+      kind: "multi" as const,
+      container: { id: "WORKER-MULTI", name: "Worker multi", length: 900, width: 430, height: 360 },
+      skus: [
+        { label: "A", length: 215, width: 134, height: 146, target: 50, color: "#d8923a" },
+        { label: "B", length: 139, width: 91, height: 68, target: 54, color: "#42d6a4" },
+      ],
+      options: {
+        cornerBlock: { length: 110, width: 110, height: 80 },
+        clearance: { left: 139, right: 50 },
+      },
+    };
+
+    const direct = calculateMultiSkuPacking(payload.container, payload.skus, payload.options);
     const workerResult = await executePackingWorkerPayload(payload);
 
     expect(workerResult).toEqual(direct);

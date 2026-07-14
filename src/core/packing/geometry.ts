@@ -1,4 +1,4 @@
-import type { BoxPosition, ContainerSpec, CornerBlockSpec } from "./types";
+import type { BoxPosition, ContainerSpec, CornerBlockSpec, EffectiveCornerBlockSpec } from "./types";
 
 export interface FloorRect {
   x: number;
@@ -51,14 +51,27 @@ export function collidesCornerBlock(
   container: Pick<ContainerSpec, "length" | "width" | "height">,
   cornerBlock: CornerBlockSpec,
 ): boolean {
+  return collidesCornerObstruction(box, container, {
+    length: cornerBlock.length,
+    leftWidth: cornerBlock.width,
+    rightWidth: cornerBlock.width,
+    height: cornerBlock.height,
+  });
+}
+
+export function collidesCornerObstruction(
+  box: SpatialBox,
+  container: Pick<ContainerSpec, "length" | "width" | "height">,
+  cornerBlock: EffectiveCornerBlockSpec,
+): boolean {
   const entersTopBand = intersects(box.z, box.dz, container.height - cornerBlock.height, cornerBlock.height);
   if (!entersTopBand) return false;
 
   const entersInnerLength = intersects(box.x, box.dx, 0, cornerBlock.length);
   if (!entersInnerLength) return false;
 
-  const leftCorner = intersects(box.y, box.dy, 0, cornerBlock.width);
-  const rightCorner = intersects(box.y, box.dy, container.width - cornerBlock.width, cornerBlock.width);
+  const leftCorner = intersects(box.y, box.dy, 0, cornerBlock.leftWidth);
+  const rightCorner = intersects(box.y, box.dy, container.width - cornerBlock.rightWidth, cornerBlock.rightWidth);
 
   return leftCorner || rightCorner;
 }
