@@ -38,6 +38,14 @@ export interface CornerBlockSpec {
   height: number;
 }
 
+/** 物理角件裁剪到有效装载空间后，在左右两侧形成的独立障碍范围。 */
+export interface EffectiveCornerBlockSpec {
+  length: number;
+  leftWidth: number;
+  rightWidth: number;
+  height: number;
+}
+
 export interface SkuInput extends CartonSpec {
   label: string;
   target: number;
