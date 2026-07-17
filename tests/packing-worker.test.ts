@@ -8,7 +8,7 @@ import {
   runPackingWorker,
 } from "../src/core/packingWorkerClient";
 import { executePackingWorkerPayload } from "../src/workers/packingWorkerRuntime";
-import type { PackingWorkerRequest, PackingWorkerResponse } from "../src/workers/packingWorkerProtocol";
+import type { PackingWorkerPayload, PackingWorkerRequest, PackingWorkerResponse } from "../src/workers/packingWorkerProtocol";
 
 class FakeWorker {
   onmessage: ((event: MessageEvent<PackingWorkerResponse>) => void) | null = null;
@@ -140,6 +140,38 @@ describe("packing worker", () => {
     worker.emit({ type: "success", requestId: requestId as number, result: [] });
     await expect(promise).resolves.toEqual([]);
     expect(worker.terminated).toBe(true);
+  });
+
+  it("单 SKU 和多 SKU 计算默认不再因超过 15 秒而自动停止", async () => {
+    vi.useFakeTimers();
+    const payloads: PackingWorkerPayload[] = [
+      {
+        kind: "single",
+        container: { id: "TEST", name: "Test", length: 1_000, width: 1_000, height: 1_000 },
+        carton: { length: 100, width: 100, height: 100 },
+      },
+      {
+        kind: "multi",
+        container: { id: "TEST", name: "Test", length: 1_000, width: 1_000, height: 1_000 },
+        skus: [
+          { label: "A", length: 100, width: 100, height: 100, target: 1, color: "#d8923a" },
+          { label: "B", length: 100, width: 100, height: 100, target: 1, color: "#42d6a4" },
+        ],
+      },
+    ];
+
+    for (const payload of payloads) {
+      const worker = new FakeWorker();
+      const promise = runPackingWorker(payload, { workerFactory: () => worker });
+      const requestId = worker.request?.requestId;
+
+      await vi.advanceTimersByTimeAsync(120_000);
+
+      expect(worker.terminated).toBe(false);
+      worker.emit({ type: "success", requestId: requestId as number, result: [] });
+      await expect(promise).resolves.toEqual([]);
+      expect(worker.terminated).toBe(true);
+    }
   });
 
   it("超时后终止 Worker", async () => {
