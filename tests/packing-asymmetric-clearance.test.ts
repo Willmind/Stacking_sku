@@ -68,7 +68,7 @@ function countPositionsInsideCornerLengthBand(positions: BoxPosition[]) {
 }
 
 describe("packing asymmetric side clearance", () => {
-  it("左右公差互换后保持相同装载量，并分别使用左右角件的有效宽度", () => {
+  it("左右间隙互换后保持相同装载量，并分别使用左右角件的有效宽度", () => {
     const leftHeavy = calculateClearanceCase(80, 20);
     const rightHeavy = calculateClearanceCase(20, 80);
 
@@ -81,7 +81,7 @@ describe("packing asymmetric side clearance", () => {
     expect(countPositionsInsideCornerLengthBand(rightHeavy.positions)).toBe(1);
   });
 
-  it("单侧公差大于角件宽度时将该侧有效角件宽度归零", () => {
+  it("单侧间隙大于角件宽度时将该侧有效角件宽度归零", () => {
     const leftCovered = calculateClearanceCase(120, 20);
     const rightCovered = calculateClearanceCase(20, 120);
 
@@ -94,7 +94,7 @@ describe("packing asymmetric side clearance", () => {
     expect(countPositionsInsideCornerLengthBand(rightCovered.positions)).toBe(1);
   });
 
-  it("单侧公差等于角件宽度时允许箱体与角件边界相切", () => {
+  it("单侧间隙等于角件宽度时允许箱体与角件边界相切", () => {
     const leftExact = calculateClearanceCase(CORNER_BLOCK.width, 20);
     const rightExact = calculateClearanceCase(20, CORNER_BLOCK.width);
 
@@ -113,7 +113,7 @@ describe("packing asymmetric side clearance", () => {
     ).toBe(false);
   });
 
-  it("异尺寸多 SKU 只扣减一次公差并只回移一次物理坐标", () => {
+  it("异尺寸多 SKU 只扣减一次间隙并只回移一次物理坐标", () => {
     const clearance = { front: 20, rear: 20, left: 20, right: 20, top: 40 };
     const container = { id: "MULTI-SKU", name: "Multi SKU clearance", length: 360, width: 240, height: 240 };
     const result = calculateMultiSkuPacking(

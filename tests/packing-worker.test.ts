@@ -48,7 +48,7 @@ describe("packing worker", () => {
     expect(workerResult).toEqual(direct);
   });
 
-  it("保持 Worker 与直接调用的异尺寸多 SKU 非对称公差结果完全一致", async () => {
+  it("保持 Worker 与直接调用的异尺寸多 SKU 非对称间隙结果完全一致", async () => {
     const payload = {
       kind: "multi" as const,
       container: { id: "WORKER-MULTI", name: "Worker multi", length: 900, width: 430, height: 360 },
@@ -88,7 +88,7 @@ describe("packing worker", () => {
     expect(worker.terminated).toBe(true);
   });
 
-  it("透传批量计算的朝向和车厢公差", async () => {
+  it("透传批量计算的朝向和车厢间隙", async () => {
     const rows = [{ "人工码垛数量（原始）": 1, "尺寸（长宽高 mm）": "2000*1000*2500", 柜型: "20GP" }];
     const options = {
       clearance: { front: 100 },

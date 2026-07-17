@@ -84,7 +84,7 @@ describe("packing safety regressions", () => {
     expect(result.totalBoxes).toBe(2);
   });
 
-  it("左右公差镜像时保持相同安全容量", () => {
+  it("左右间隙镜像时保持相同安全容量", () => {
     const container = { length: 342, width: 235, height: 212 };
     const carton = { length: 22, width: 116, height: 18 };
     const commonOptions: PackingOptions = {
@@ -105,7 +105,7 @@ describe("packing safety regressions", () => {
     expect(left.result.totalBoxes).toBe(right.result.totalBoxes);
   });
 
-  it("异尺寸多 SKU 在左右公差镜像时保持相同数量与 SKU 分配", () => {
+  it("异尺寸多 SKU 在左右间隙镜像时保持相同数量与 SKU 分配", () => {
     const container = { length: 900, width: 430, height: 360 };
     const skus = [
       { label: "A", length: 215, width: 134, height: 146, target: 50, color: "#d8923a" },

@@ -456,7 +456,7 @@ test("applies and persists container clearance inputs", async ({ page }) => {
   await page.reload();
   await selectDropdownOption(page, "柜型", "20GP");
 
-  await expect(page.getByText("车厢公差")).toBeVisible();
+  await expect(page.getByText("车厢间隙")).toBeVisible();
   await expect(page.getByText("按站在柜口正视柜内为基准")).toBeVisible();
   await expect(page.locator("#clearance-front")).toHaveValue("0");
   await page.locator("#clearance-front").fill("100");
@@ -472,17 +472,17 @@ test("applies and persists container clearance inputs", async ({ page }) => {
 
   await expect(page.locator("#total-boxes")).toHaveText("4");
   await expect(page.locator("#effective-size")).toContainText("5,798 × 2,352 × 2,393 mm");
-  await expect(page.locator("#strategy-notes")).toContainText("车厢公差");
+  await expect(page.locator("#strategy-notes")).toContainText("车厢间隙");
 
   await page.reload();
   await expect(page.locator("#clearance-front")).toHaveValue("100");
-  await expect(page.getByRole("button", { name: "重置公差" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "重置间隙" })).toBeEnabled();
 
-  await page.getByRole("button", { name: "重置公差" }).click();
+  await page.getByRole("button", { name: "重置间隙" }).click();
   for (const field of ["front", "rear", "left", "right", "top"]) {
     await expect(page.locator(`#clearance-${field}`)).toHaveValue("0");
   }
-  await expect(page.getByRole("button", { name: "重置公差" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "重置间隙" })).toBeDisabled();
 
   await page.reload();
   for (const field of ["front", "rear", "left", "right", "top"]) {
@@ -692,7 +692,7 @@ test("imports an Excel batch and shows calculated packing results in a dialog", 
   await page.getByRole("button", { name: "批量导入 Excel" }).click();
   const settingsDialog = page.getByRole("dialog", { name: "批量导入设置" });
   await expect(settingsDialog).toBeVisible();
-  await expect(settingsDialog).toContainText("不与主页面的朝向和车厢公差联动");
+  await expect(settingsDialog).toContainText("不与主页面的朝向和车厢间隙联动");
   await expect(page.locator("#batch-orientation-length-width-height")).toBeChecked();
   await expect(page.locator("#batch-orientation-width-length-height")).toBeChecked();
   await expect(page.locator("#batch-orientation-length-height-width")).not.toBeChecked();
@@ -720,7 +720,7 @@ test("imports an Excel batch and shows calculated packing results in a dialog", 
   await expect(dialog).toContainText("余量（宽）");
   await expect(dialog).toContainText("余量（高）");
   await expect(dialog).toContainText("允许朝向：长×宽×高、宽×长×高");
-  await expect(dialog).toContainText("车厢公差：前 0mm · 后 0mm · 左 0mm · 右 0mm · 顶部 0mm");
+  await expect(dialog).toContainText("车厢间隙：前 0mm · 后 0mm · 左 0mm · 右 0mm · 顶部 0mm");
   await expect(dialog.getByLabel("按导入状态筛选")).toBeVisible();
   await expect(dialog.getByLabel("按失败原因筛选")).toBeDisabled();
   await expect(dialog.getByLabel("按差值筛选")).toBeVisible();
@@ -894,7 +894,7 @@ test("uses batch-only orientation and clearance settings", async ({ page }) => {
   const resultsDialog = page.getByRole("dialog", { name: "批量导入结果" });
   await expect(resultsDialog).toBeVisible();
   await expect(resultsDialog).toContainText("允许朝向：高×宽×长");
-  await expect(resultsDialog).toContainText("车厢公差：前 100mm · 后 0mm · 左 0mm · 右 0mm · 顶部 0mm");
+  await expect(resultsDialog).toContainText("车厢间隙：前 100mm · 后 0mm · 左 0mm · 右 0mm · 顶部 0mm");
   await expect(resultsDialog.locator("tbody tr")).toHaveCount(1);
   await expect(resultsDialog.locator("tbody tr").first()).toContainText("成功");
 });

@@ -175,7 +175,7 @@ function formatOrientationSummary(allowedOrientations: CartonOrientationId[]) {
 }
 
 function formatClearanceSummary(clearance: BatchClearance) {
-  return `车厢公差：前 ${clearance.front}mm · 后 ${clearance.rear}mm · 左 ${clearance.left}mm · 右 ${clearance.right}mm · 顶部 ${clearance.top}mm`;
+  return `车厢间隙：前 ${clearance.front}mm · 后 ${clearance.rear}mm · 左 ${clearance.left}mm · 右 ${clearance.right}mm · 顶部 ${clearance.top}mm`;
 }
 
 function openBatchSettings() {
@@ -479,7 +479,7 @@ onBeforeUnmount(() => {
   <BaseDialog
     v-model:open="isSettingsOpen"
     title="批量导入设置"
-    description="设置仅作用于本次批量导入，不与主页面的朝向和车厢公差联动。"
+    description="设置仅作用于本次批量导入，不与主页面的朝向和车厢间隙联动。"
     close-label="关闭批量导入设置"
   >
     <template #icon>
@@ -526,7 +526,7 @@ onBeforeUnmount(() => {
         <section class="batch-setting-card" aria-labelledby="batch-clearance-title">
           <div class="batch-setting-heading batch-clearance-heading">
             <div>
-              <h3 id="batch-clearance-title">车厢公差</h3>
+              <h3 id="batch-clearance-title">车厢间隙</h3>
               <p>按站在柜口正视柜内为基准，单位为 mm。</p>
             </div>
             <button class="batch-clearance-reset" type="button" :disabled="!hasActiveBatchClearance" @click="resetBatchClearance">

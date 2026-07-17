@@ -650,7 +650,7 @@ describe("packing core", () => {
       const notes = Packing.describePackingStrategy(result);
       assert.deepEqual(
         notes.map((note) => note.label),
-        ["朝向规则", "车厢公差", "角件避让", "空位回填", "SKU 策略"],
+        ["朝向规则", "车厢间隙", "角件避让", "空位回填", "SKU 策略"],
       );
       assert.match(notes.find((note) => note.id === "backfill").detail, /复用/);
       assert.match(notes.find((note) => note.id === "sku").detail, /异尺寸按 SKU 顺序分区/);
@@ -741,12 +741,12 @@ describe("packing core", () => {
 
     assert.throws(
       () => Packing.calculatePacking(customContainer(500, 330, 250), carton(100, 100, 100), { clearance: { front: -1 } }),
-      /前公差必须为非负数/,
+      /前间隙必须为非负数/,
     );
 
     assert.throws(
       () => Packing.calculatePacking(customContainer(500, 330, 250), carton(100, 100, 100), { clearance: { front: 300, rear: 200 } }),
-      /公差扣减后的有效柜体长度必须为正数/,
+      /间隙扣减后的有效柜体长度必须为正数/,
     );
   }, 45000);
 

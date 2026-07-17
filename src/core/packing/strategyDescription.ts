@@ -145,7 +145,7 @@ function getClearanceNote(result: PackingResult): PackingStrategyNote {
   if (!hasClearance) {
     return {
       id: "clearance",
-      label: "车厢公差",
+      label: "车厢间隙",
       detail: "未启用额外间隙扣减",
       tone: "neutral",
     };
@@ -153,7 +153,7 @@ function getClearanceNote(result: PackingResult): PackingStrategyNote {
 
   return {
     id: "clearance",
-    label: "车厢公差",
+    label: "车厢间隙",
     detail: `有效空间 ${formatNumber(result.effectiveContainer.length)} × ${formatNumber(result.effectiveContainer.width)} × ${formatNumber(result.effectiveContainer.height)} mm`,
     tone: "warning",
   };
