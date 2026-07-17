@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { calculateMultiSkuPacking, calculatePacking } from "../src/core/packing";
-import { PackingWorkerCancelledError, PackingWorkerTimeoutError, runPackingWorker } from "../src/core/packingWorkerClient";
+import {
+  PackingWorkerCancelledError,
+  PackingWorkerTimeoutError,
+  calculateBatchPackingInWorker,
+  runPackingWorker,
+} from "../src/core/packingWorkerClient";
 import { executePackingWorkerPayload } from "../src/workers/packingWorkerRuntime";
 import type { PackingWorkerRequest, PackingWorkerResponse } from "../src/workers/packingWorkerProtocol";
 
@@ -93,6 +98,20 @@ describe("packing worker", () => {
     controller.abort();
 
     await expect(promise).rejects.toBeInstanceOf(PackingWorkerCancelledError);
+    expect(worker.terminated).toBe(true);
+  });
+
+  it("批量计算默认不再因超过 60 秒而自动停止", async () => {
+    vi.useFakeTimers();
+    const worker = new FakeWorker();
+    const promise = calculateBatchPackingInWorker([], {}, { workerFactory: () => worker });
+    const requestId = worker.request?.requestId;
+
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    expect(worker.terminated).toBe(false);
+    worker.emit({ type: "success", requestId: requestId as number, result: [] });
+    await expect(promise).resolves.toEqual([]);
     expect(worker.terminated).toBe(true);
   });
 

@@ -8,7 +8,6 @@ import type {
 } from "../workers/packingWorkerProtocol";
 
 export const DEFAULT_PACKING_TIMEOUT_MS = 15_000;
-export const DEFAULT_BATCH_PACKING_TIMEOUT_MS = 60_000;
 
 export class PackingWorkerCancelledError extends Error {
   constructor() {
@@ -35,7 +34,7 @@ type WorkerFactory = () => WorkerLike;
 
 export interface PackingWorkerRunOptions {
   signal?: AbortSignal;
-  timeoutMs?: number;
+  timeoutMs?: number | null;
   onProgress?: (progress: BatchPackingProgress) => void;
   workerFactory?: WorkerFactory;
 }
@@ -61,13 +60,15 @@ export function runPackingWorker(payload: PackingWorkerPayload, options: Packing
 
     const requestId = ++nextRequestId;
     const worker = (options.workerFactory ?? createPackingWorker)();
-    const timeoutMs = Math.max(1, options.timeoutMs ?? DEFAULT_PACKING_TIMEOUT_MS);
+    const timeoutMs = options.timeoutMs === null ? null : Math.max(1, options.timeoutMs ?? DEFAULT_PACKING_TIMEOUT_MS);
     let settled = false;
 
     const cleanup = () => {
       worker.terminate();
       options.signal?.removeEventListener("abort", handleAbort);
-      window.clearTimeout(timeoutId);
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
     };
 
     const finish = (callback: () => void) => {
@@ -78,9 +79,12 @@ export function runPackingWorker(payload: PackingWorkerPayload, options: Packing
     };
 
     const handleAbort = () => finish(() => reject(new PackingWorkerCancelledError()));
-    const timeoutId = window.setTimeout(() => {
-      finish(() => reject(new PackingWorkerTimeoutError(timeoutMs)));
-    }, timeoutMs);
+    const timeoutId =
+      timeoutMs === null
+        ? null
+        : window.setTimeout(() => {
+            finish(() => reject(new PackingWorkerTimeoutError(timeoutMs)));
+          }, timeoutMs);
 
     options.signal?.addEventListener("abort", handleAbort, { once: true });
 
@@ -135,6 +139,6 @@ export async function calculateBatchPackingInWorker(
 ) {
   return (await runPackingWorker(
     { kind: "batch", rows, options: packingOptions, batchSize: 20 },
-    { ...runOptions, timeoutMs: runOptions.timeoutMs ?? DEFAULT_BATCH_PACKING_TIMEOUT_MS },
+    { ...runOptions, timeoutMs: runOptions.timeoutMs ?? null },
   )) as BatchPackingItem[];
 }
