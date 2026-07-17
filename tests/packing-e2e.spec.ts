@@ -214,6 +214,37 @@ async function readSceneCanvasScreenshotFrame(page: Page) {
   return readCanvasScreenshotFrame(page, page.locator("#scene-canvas"));
 }
 
+test("shows a global loading dialog for single and multi SKU calculations", async ({ page }) => {
+  await page.goto("/");
+
+  const calculateButton = page.locator(".calculate-button");
+  await calculateButton.click();
+  const dialog = page.getByRole("dialog", { name: "正在计算装载方案" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toHaveAttribute("aria-modal", "true");
+  await expect(dialog).toContainText("正在计算单 SKU 的最大装载量与排布");
+  await expect(dialog.getByRole("status")).toContainText("正在生成最优排布");
+  await expect(page.locator("main.app-shell")).toHaveAttribute("aria-busy", "true");
+  const cancelButton = dialog.getByRole("button", { name: "取消计算", exact: true });
+  await expect(cancelButton).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(cancelButton).toBeFocused();
+  await cancelButton.click();
+  await expect(dialog).toBeHidden();
+  await expect(page.locator("#status-chip")).toHaveText("已取消计算");
+  await expect(page.locator("main.app-shell")).toHaveAttribute("aria-busy", "false");
+  await expect(calculateButton).toBeFocused();
+
+  await page.getByLabel("多 SKU").check();
+  await calculateButton.click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("正在计算多 SKU 的装载顺序与排布");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(page.locator("#status-chip")).toHaveText("已取消计算");
+  await expect(calculateButton).toBeFocused();
+});
+
 test("calculates the 488 x 380 x 291 benchmark and renders both views", async ({ page }) => {
   await calculateSingleSku(page, "488", "380", "291");
 

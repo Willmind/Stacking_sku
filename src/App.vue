@@ -10,6 +10,7 @@ import Cargo3DPlaceholder from "./components/visualizations/Cargo3DPlaceholder.v
 import Plan2DView from "./components/visualizations/Plan2DView.vue";
 import ResultSummary from "./components/results/ResultSummary.vue";
 import SkuBreakdown from "./components/results/SkuBreakdown.vue";
+import BlockingTaskOverlay from "./components/ui/BlockingTaskOverlay.vue";
 import { usePackingStore } from "./stores/packingStore";
 
 const BatchImportDialog = defineAsyncComponent(() => import("./components/controls/BatchImportDialog.vue"));
@@ -32,6 +33,9 @@ const statusToneByLabel: Record<string, StatusTone> = {
 };
 
 const statusChipClass = computed(() => `status-chip--${statusToneByLabel[store.status] ?? "idle"}`);
+const calculationDescription = computed(() =>
+  store.mode === "single" ? "正在计算单 SKU 的最大装载量与排布。" : "正在计算多 SKU 的装载顺序与排布。",
+);
 
 async function handleCalculate() {
   if (store.isCalculating) {
@@ -43,7 +47,7 @@ async function handleCalculate() {
 </script>
 
 <template>
-  <main class="app-shell">
+  <main class="app-shell" :aria-busy="store.isCalculating">
     <aside class="control-panel">
       <div class="brand-lockup">
         <span class="brand-mark" aria-hidden="true">
@@ -67,7 +71,7 @@ async function handleCalculate() {
         <Calculator v-else :size="17" :stroke-width="2.35" aria-hidden="true" />
         {{ store.isCalculating ? "取消计算" : "计算装载" }}
       </button>
-      <p v-if="store.error" class="error">{{ store.error }}</p>
+      <p v-if="store.error" class="error" role="alert">{{ store.error }}</p>
 
       <ContainerForm />
       <PackingModeSwitch />
@@ -94,6 +98,16 @@ async function handleCalculate() {
       </div>
     </section>
   </main>
+
+  <BlockingTaskOverlay
+    :open="store.isCalculating"
+    title="正在计算装载方案"
+    :description="calculationDescription"
+    status-label="正在生成最优排布"
+    status-detail="算法正在尝试可用朝向与装载组合，请稍候。"
+    cancel-label="取消计算"
+    @cancel="store.cancelCalculation"
+  />
 </template>
 
 <style scoped>
