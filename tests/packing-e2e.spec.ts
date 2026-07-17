@@ -697,7 +697,10 @@ test("imports an Excel batch and shows calculated packing results in a dialog", 
   await expect(page.locator("#batch-orientation-width-length-height")).toBeChecked();
   await expect(page.locator("#batch-orientation-length-height-width")).not.toBeChecked();
   await expect(page.locator("#batch-clearance-front")).toHaveValue("0");
-  await page.setInputFiles("#batch-excel-input", "tests/fixtures/batch-import-sample.xlsx");
+  const fileChooserPromise = page.waitForEvent("filechooser");
+  await settingsDialog.getByRole("button", { name: "选择 Excel 文件" }).click();
+  const fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles("tests/fixtures/batch-import-sample.xlsx");
   await expect(settingsDialog).toContainText("batch-import-sample.xlsx");
   await settingsDialog.getByRole("button", { name: "开始导入并计算" }).click();
   await expect(page.getByRole("status")).toContainText("正在解析 Excel");
@@ -871,11 +874,14 @@ test("keeps the batch import dialog height stable for empty and large results", 
 test("uses batch-only orientation and clearance settings", async ({ page }) => {
   test.setTimeout(60_000);
   await page.goto("/");
+  await page.evaluate(() => localStorage.removeItem("STACKING_SKU_BATCH_IMPORT_SETTINGS_V1"));
+  await page.reload();
   await page.locator("#clearance-front").fill("500");
   await page.locator("#clearance-front").blur();
 
   await page.getByRole("button", { name: "批量导入 Excel" }).click();
   const settingsDialog = page.getByRole("dialog", { name: "批量导入设置" });
+  await expect(settingsDialog).toContainText("会保留上一次完成计算的设置");
   await expect(page.locator("#batch-clearance-front")).toHaveValue("0");
   await page.locator("#batch-clearance-front").fill("100");
   await page.locator("#batch-clearance-front").blur();
@@ -897,6 +903,96 @@ test("uses batch-only orientation and clearance settings", async ({ page }) => {
   await expect(resultsDialog).toContainText("车厢间隙：前 100mm · 后 0mm · 左 0mm · 右 0mm · 顶部 0mm");
   await expect(resultsDialog.locator("tbody tr")).toHaveCount(1);
   await expect(resultsDialog.locator("tbody tr").first()).toContainText("成功");
+
+  await resultsDialog.getByRole("button", { name: "关闭", exact: true }).click();
+  await expect(resultsDialog).toBeHidden();
+  await page.reload();
+  await page.getByRole("button", { name: "批量导入 Excel" }).click();
+  await expect(page.locator("#batch-clearance-front")).toHaveValue("100");
+  await expect(page.locator("#batch-orientation-height-width-length")).toBeChecked();
+  await expect(page.locator("#batch-orientation-length-width-height")).not.toBeChecked();
+  await expect(page.locator("#batch-orientation-width-length-height")).not.toBeChecked();
+
+  await page.locator("#batch-clearance-front").fill("250");
+  await page.locator("#batch-clearance-front").blur();
+  await page.locator("label:has(#batch-orientation-length-width-height)").click();
+  await settingsDialog.getByRole("button", { name: "取消" }).click();
+  await expect(settingsDialog).toBeHidden();
+
+  await page.getByRole("button", { name: "批量导入 Excel" }).click();
+  await expect(page.locator("#batch-clearance-front")).toHaveValue("100");
+  await expect(page.locator("#batch-orientation-height-width-length")).toBeChecked();
+  await expect(page.locator("#batch-orientation-length-width-height")).not.toBeChecked();
+
+  await page.locator("#batch-clearance-front").fill("250");
+  await page.locator("#batch-clearance-front").blur();
+  await page.locator("label:has(#batch-orientation-length-width-height)").click();
+  await page.setInputFiles("#batch-excel-input", {
+    name: "invalid-batch.xlsx",
+    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    buffer: Buffer.from("not-an-excel-workbook"),
+  });
+  await settingsDialog.getByRole("button", { name: "开始导入并计算" }).click();
+  await expect(resultsDialog).toBeVisible();
+  await resultsDialog.getByRole("button", { name: "关闭", exact: true }).click();
+  await expect(resultsDialog).toBeHidden();
+
+  await page.reload();
+  await page.getByRole("button", { name: "批量导入 Excel" }).click();
+  await expect(page.locator("#batch-clearance-front")).toHaveValue("100");
+  await expect(page.locator("#batch-orientation-height-width-length")).toBeChecked();
+  await expect(page.locator("#batch-orientation-length-width-height")).not.toBeChecked();
+});
+
+test("falls back to default batch settings when saved settings are invalid", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => localStorage.setItem("STACKING_SKU_BATCH_IMPORT_SETTINGS_V1", "{invalid-json"));
+  await page.reload();
+
+  await page.getByRole("button", { name: "批量导入 Excel" }).click();
+  await expect(page.locator("#batch-clearance-front")).toHaveValue("0");
+  await expect(page.locator("#batch-orientation-length-width-height")).toBeChecked();
+  await expect(page.locator("#batch-orientation-width-length-height")).toBeChecked();
+  await expect(page.locator("#batch-orientation-height-width-length")).not.toBeChecked();
+
+  await page.evaluate(() =>
+    localStorage.setItem(
+      "STACKING_SKU_BATCH_IMPORT_SETTINGS_V1",
+      JSON.stringify({ allowedOrientations: ["unsupported-orientation"], clearance: { front: 125 } }),
+    ),
+  );
+  await page.reload();
+  await page.getByRole("button", { name: "批量导入 Excel" }).click();
+  await expect(page.locator("#batch-clearance-front")).toHaveValue("0");
+  await expect(page.locator("#batch-orientation-length-width-height")).toBeChecked();
+  await expect(page.locator("#batch-orientation-width-length-height")).toBeChecked();
+});
+
+test("does not remember settings when import is cancelled after calculation", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => localStorage.removeItem("STACKING_SKU_BATCH_IMPORT_SETTINGS_V1"));
+  await page.reload();
+
+  await page.getByRole("button", { name: "批量导入 Excel" }).click();
+  const settingsDialog = page.getByRole("dialog", { name: "批量导入设置" });
+  await page.locator("#batch-clearance-front").fill("100");
+  await page.locator("#batch-clearance-front").blur();
+  await page.setInputFiles("#batch-excel-input", {
+    name: "cancelled-batch.xlsx",
+    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    buffer: createBatchImportWorkbook([[1, "2000*1000*2500", "20GP"]]),
+  });
+  await settingsDialog.getByRole("button", { name: "开始导入并计算" }).click();
+
+  const loadingStatus = page.getByRole("status");
+  await expect(loadingStatus).toContainText("正在生成结果");
+  await page.getByRole("button", { name: "取消导入" }).click();
+  await expect(loadingStatus).toBeHidden();
+  await expect(page.getByRole("dialog", { name: "批量导入结果" })).toBeHidden();
+
+  await page.reload();
+  await page.getByRole("button", { name: "批量导入 Excel" }).click();
+  await expect(page.locator("#batch-clearance-front")).toHaveValue("0");
 });
 
 test("keeps batch settings usable in a short mobile viewport", async ({ page }) => {

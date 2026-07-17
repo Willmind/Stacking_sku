@@ -7,6 +7,7 @@ import { BatchImportCancelledError, type BatchImportStatus, type BatchPackingIte
 import {
   CARTON_ORIENTATION_OPTIONS,
   DEFAULT_ALLOWED_ORIENTATION_IDS,
+  normalizeAllowedOrientations,
   type CartonOrientationId,
   type ContainerClearanceSpec,
 } from "../../core/packing";
@@ -38,7 +39,13 @@ interface SortColumn {
 
 type BatchClearance = Required<ContainerClearanceSpec>;
 
+interface BatchImportSettings {
+  allowedOrientations: CartonOrientationId[];
+  clearance: BatchClearance;
+}
+
 const DEFAULT_BATCH_CLEARANCE: BatchClearance = { front: 0, rear: 0, left: 0, right: 0, top: 0 };
+const BATCH_IMPORT_SETTINGS_STORAGE_KEY = "STACKING_SKU_BATCH_IMPORT_SETTINGS_V1";
 const clearanceFields = [
   { key: "front", label: "前 mm" },
   { key: "rear", label: "后 mm" },
@@ -47,15 +54,69 @@ const clearanceFields = [
   { key: "top", label: "顶部 mm" },
 ] as const;
 
+function createDefaultBatchImportSettings(): BatchImportSettings {
+  return {
+    allowedOrientations: [...DEFAULT_ALLOWED_ORIENTATION_IDS],
+    clearance: { ...DEFAULT_BATCH_CLEARANCE },
+  };
+}
+
+function normalizeStoredClearance(input: unknown): BatchClearance {
+  const source = input && typeof input === "object" && !Array.isArray(input) ? (input as Record<string, unknown>) : {};
+  const normalizeValue = (value: unknown) => {
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.max(0, Math.round(number)) : 0;
+  };
+
+  return {
+    front: normalizeValue(source.front),
+    rear: normalizeValue(source.rear),
+    left: normalizeValue(source.left),
+    right: normalizeValue(source.right),
+    top: normalizeValue(source.top),
+  };
+}
+
+function loadStoredBatchImportSettings(): BatchImportSettings {
+  const fallback = createDefaultBatchImportSettings();
+  if (typeof window === "undefined") return fallback;
+
+  try {
+    const rawValue = window.localStorage.getItem(BATCH_IMPORT_SETTINGS_STORAGE_KEY);
+    if (!rawValue) return fallback;
+    const parsed = JSON.parse(rawValue) as Record<string, unknown>;
+    return {
+      allowedOrientations: normalizeAllowedOrientations(parsed.allowedOrientations as readonly unknown[]),
+      clearance: normalizeStoredClearance(parsed.clearance),
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function persistBatchImportSettings(settings: BatchImportSettings) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(BATCH_IMPORT_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  } catch {
+    // localStorage may be unavailable in restricted browser contexts.
+  }
+}
+
+const initialBatchImportSettings = loadStoredBatchImportSettings();
+
 const inputRef = ref<HTMLInputElement | null>(null);
 const isSettingsOpen = ref(false);
 const isResultsOpen = ref(false);
 const isImporting = ref(false);
 const selectedFile = ref<File | null>(null);
-const batchAllowedOrientations = ref<CartonOrientationId[]>([...DEFAULT_ALLOWED_ORIENTATION_IDS]);
-const batchClearance = ref<BatchClearance>({ ...DEFAULT_BATCH_CLEARANCE });
-const appliedAllowedOrientations = ref<CartonOrientationId[]>([...DEFAULT_ALLOWED_ORIENTATION_IDS]);
-const appliedClearance = ref<BatchClearance>({ ...DEFAULT_BATCH_CLEARANCE });
+const lastSuccessfulAllowedOrientations = ref<CartonOrientationId[]>([...initialBatchImportSettings.allowedOrientations]);
+const lastSuccessfulClearance = ref<BatchClearance>({ ...initialBatchImportSettings.clearance });
+const batchAllowedOrientations = ref<CartonOrientationId[]>([...initialBatchImportSettings.allowedOrientations]);
+const batchClearance = ref<BatchClearance>({ ...initialBatchImportSettings.clearance });
+const appliedAllowedOrientations = ref<CartonOrientationId[]>([...initialBatchImportSettings.allowedOrientations]);
+const appliedClearance = ref<BatchClearance>({ ...initialBatchImportSettings.clearance });
 const fileName = ref("");
 const results = ref<BatchPackingItem[]>([]);
 const importError = ref("");
@@ -181,10 +242,20 @@ function formatClearanceSummary(clearance: BatchClearance) {
 function openBatchSettings() {
   if (isImporting.value) return;
   selectedFile.value = null;
-  batchAllowedOrientations.value = [...appliedAllowedOrientations.value];
-  batchClearance.value = { ...appliedClearance.value };
+  batchAllowedOrientations.value = [...lastSuccessfulAllowedOrientations.value];
+  batchClearance.value = { ...lastSuccessfulClearance.value };
   if (inputRef.value) inputRef.value.value = "";
   isSettingsOpen.value = true;
+}
+
+function rememberSuccessfulBatchImportSettings(allowedOrientations: CartonOrientationId[], clearance: BatchClearance) {
+  const settings: BatchImportSettings = {
+    allowedOrientations: [...allowedOrientations],
+    clearance: { ...clearance },
+  };
+  lastSuccessfulAllowedOrientations.value = [...settings.allowedOrientations];
+  lastSuccessfulClearance.value = { ...settings.clearance };
+  persistBatchImportSettings(settings);
 }
 
 function openFilePicker() {
@@ -395,6 +466,7 @@ async function startBatchImport() {
   }, LONG_IMPORT_NOTICE_MS);
   const loadingStartedAt = performance.now();
   let shouldOpenDialog = true;
+  let shouldRememberSettings = false;
   await waitForLoadingPaint();
 
   try {
@@ -425,6 +497,7 @@ async function startBatchImport() {
         },
       },
     );
+    shouldRememberSettings = results.value.some((item) => item.status === "成功" || item.status === "无法装载");
     importProgress.value = 100;
     importStage.value = "正在生成结果";
     resetFilters();
@@ -432,6 +505,7 @@ async function startBatchImport() {
       importError.value = "没有读取到可计算的数据";
     }
   } catch (caught) {
+    shouldRememberSettings = false;
     results.value = [];
     if (caught instanceof BatchImportCancelledError || caught instanceof PackingWorkerCancelledError || controller.signal.aborted) {
       importError.value = "已取消导入";
@@ -444,6 +518,15 @@ async function startBatchImport() {
     const loadingElapsed = performance.now() - loadingStartedAt;
     if (loadingElapsed < MIN_IMPORT_LOADING_MS) {
       await wait(MIN_IMPORT_LOADING_MS - loadingElapsed);
+    }
+    if (controller.signal.aborted) {
+      results.value = [];
+      importError.value = "已取消导入";
+      shouldOpenDialog = false;
+      shouldRememberSettings = false;
+    }
+    if (shouldRememberSettings) {
+      rememberSuccessfulBatchImportSettings(allowedOrientations, clearance);
     }
     isImporting.value = false;
     isLongImporting.value = false;
@@ -479,7 +562,7 @@ onBeforeUnmount(() => {
   <BaseDialog
     v-model:open="isSettingsOpen"
     title="批量导入设置"
-    description="设置仅作用于本次批量导入，不与主页面的朝向和车厢间隙联动。"
+    description="设置仅作用于批量导入；会保留上一次完成计算的设置，不与主页面的朝向和车厢间隙联动。"
     close-label="关闭批量导入设置"
   >
     <template #icon>
