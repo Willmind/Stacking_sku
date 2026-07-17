@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { calculateBatchPacking } from "../src/core/batchImport";
 import { calculateMultiSkuPacking, calculatePacking } from "../src/core/packing";
 import {
   PackingWorkerCancelledError,
@@ -85,6 +86,32 @@ describe("packing worker", () => {
     await expect(promise).resolves.toEqual([]);
     expect(onProgress).toHaveBeenCalledWith({ processed: 1, total: 2, progress: 0.5 });
     expect(worker.terminated).toBe(true);
+  });
+
+  it("透传批量计算的朝向和车厢公差", async () => {
+    const rows = [{ "人工码垛数量（原始）": 1, "尺寸（长宽高 mm）": "2000*1000*2500", 柜型: "20GP" }];
+    const options = {
+      clearance: { front: 100 },
+      allowedOrientations: ["height-width-length" as const],
+    };
+    const direct = calculateBatchPacking(rows, options);
+    const workerResult = await executePackingWorkerPayload({ kind: "batch", rows, options });
+
+    expect(workerResult).toEqual(direct);
+  });
+
+  it("把批量弹框配置写入 Worker 请求", async () => {
+    const worker = new FakeWorker();
+    const options = {
+      clearance: { left: 15, right: 15 },
+      allowedOrientations: ["length-width-height" as const],
+    };
+    const promise = calculateBatchPackingInWorker([], options, { workerFactory: () => worker });
+    const requestId = worker.request?.requestId;
+
+    expect(worker.request?.payload).toMatchObject({ kind: "batch", options });
+    worker.emit({ type: "success", requestId: requestId as number, result: [] });
+    await expect(promise).resolves.toEqual([]);
   });
 
   it("取消时终止 Worker 且不返回部分结果", async () => {

@@ -76,6 +76,31 @@ describe("batch import", () => {
     assert.equal(withClearance[0].difference, -4);
   });
 
+  it("applies the selected orientations to batch calculations", () => {
+    const rows = [{ "人工码垛数量（原始）": 1, "尺寸（长宽高 mm）": "2000*1000*2500", 柜型: "20GP" }];
+    const defaultOrientations = calculateBatchPacking(rows);
+    const sidePlacement = calculateBatchPacking(rows, {
+      allowedOrientations: ["height-width-length"],
+    });
+
+    assert.equal(defaultOrientations[0].totalBoxes, 0);
+    assert.ok((sidePlacement[0].totalBoxes || 0) > 0);
+    assert.equal(sidePlacement[0].status, "成功");
+  });
+
+  it("reports invalid packing constraints as calculation failures", () => {
+    const results = calculateBatchPacking([{ "人工码垛数量（原始）": 8, "尺寸（长宽高 mm）": "2900*1150*1150", 柜型: "20GP" }], {
+      clearance: { front: 6000 },
+    });
+
+    assert.equal(results[0].status, "计算失败");
+    assert.equal(results[0].containerType, "20GP");
+    assert.equal(results[0].manualCount, 8);
+    assert.equal(results[0].length, 2900);
+    assert.equal(results[0].totalBoxes, null);
+    assert.match(results[0].error || "", /有效柜体长度/);
+  });
+
   it("skips blank rows and reports row-level parse errors", () => {
     const results = calculateBatchPacking([
       { "人工码垛数量（原始）": "", "尺寸（长宽高 mm）": "", 柜型: "" },

@@ -19,6 +19,7 @@ export async function executePackingWorkerPayload(
 
   return calculateBatchPackingAsync(payload.rows, {
     clearance: payload.options?.clearance,
+    allowedOrientations: payload.options?.allowedOrientations,
     batchSize: payload.batchSize,
     onProgress,
   });

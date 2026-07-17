@@ -134,7 +134,7 @@ export async function calculateMultiSkuPackingInWorker(
 
 export async function calculateBatchPackingInWorker(
   rows: BatchPackingRow[],
-  packingOptions: Pick<PackingOptions, "clearance"> = {},
+  packingOptions: Pick<PackingOptions, "clearance" | "allowedOrientations"> = {},
   runOptions: PackingWorkerRunOptions = {},
 ) {
   return (await runPackingWorker(

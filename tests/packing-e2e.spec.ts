@@ -689,7 +689,17 @@ test("imports an Excel batch and shows calculated packing results in a dialog", 
   test.setTimeout(60_000);
   await page.goto("/");
 
+  await page.getByRole("button", { name: "批量导入 Excel" }).click();
+  const settingsDialog = page.getByRole("dialog", { name: "批量导入设置" });
+  await expect(settingsDialog).toBeVisible();
+  await expect(settingsDialog).toContainText("不与主页面的朝向和车厢公差联动");
+  await expect(page.locator("#batch-orientation-length-width-height")).toBeChecked();
+  await expect(page.locator("#batch-orientation-width-length-height")).toBeChecked();
+  await expect(page.locator("#batch-orientation-length-height-width")).not.toBeChecked();
+  await expect(page.locator("#batch-clearance-front")).toHaveValue("0");
   await page.setInputFiles("#batch-excel-input", "tests/fixtures/batch-import-sample.xlsx");
+  await expect(settingsDialog).toContainText("batch-import-sample.xlsx");
+  await settingsDialog.getByRole("button", { name: "开始导入并计算" }).click();
   await expect(page.getByRole("status")).toContainText("正在解析 Excel");
   await expect(page.getByRole("progressbar", { name: "Excel 导入进度" })).toBeVisible();
 
@@ -709,6 +719,8 @@ test("imports an Excel batch and shows calculated packing results in a dialog", 
   await expect(dialog).toContainText("余量（长）");
   await expect(dialog).toContainText("余量（宽）");
   await expect(dialog).toContainText("余量（高）");
+  await expect(dialog).toContainText("允许朝向：长×宽×高、宽×长×高");
+  await expect(dialog).toContainText("车厢公差：前 0mm · 后 0mm · 左 0mm · 右 0mm · 顶部 0mm");
   await expect(dialog.getByLabel("按导入状态筛选")).toBeVisible();
   await expect(dialog.getByLabel("按失败原因筛选")).toBeDisabled();
   await expect(dialog.getByLabel("按差值筛选")).toBeVisible();
@@ -824,11 +836,14 @@ test("keeps the batch import dialog height stable for empty and large results", 
   const largeWorkbook = createBatchImportWorkbook(
     Array.from({ length: 80 }, (_, index) => [3300 + index, index % 2 === 0 ? "315*258*250" : "385*260*255", "40HQ"]),
   );
+  await page.getByRole("button", { name: "批量导入 Excel" }).click();
+  let settingsDialog = page.getByRole("dialog", { name: "批量导入设置" });
   await page.setInputFiles("#batch-excel-input", {
     name: "large-batch.xlsx",
     mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     buffer: largeWorkbook,
   });
+  await settingsDialog.getByRole("button", { name: "开始导入并计算" }).click();
 
   const dialog = page.getByRole("dialog", { name: "批量导入结果" });
   await expect(dialog).toBeVisible();
@@ -838,16 +853,110 @@ test("keeps the batch import dialog height stable for empty and large results", 
   await expect(dialog).toBeHidden();
 
   const emptyWorkbook = createBatchImportWorkbook([]);
+  await page.getByRole("button", { name: "批量导入 Excel" }).click();
+  settingsDialog = page.getByRole("dialog", { name: "批量导入设置" });
   await page.setInputFiles("#batch-excel-input", {
     name: "empty-batch.xlsx",
     mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     buffer: emptyWorkbook,
   });
+  await settingsDialog.getByRole("button", { name: "开始导入并计算" }).click();
 
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText("没有读取到可计算的数据");
   const emptyDialogHeight = await dialog.evaluate((element) => Math.round(element.getBoundingClientRect().height));
   expect(Math.abs(emptyDialogHeight - largeDialogHeight)).toBeLessThanOrEqual(8);
+});
+
+test("uses batch-only orientation and clearance settings", async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.goto("/");
+  await page.locator("#clearance-front").fill("500");
+  await page.locator("#clearance-front").blur();
+
+  await page.getByRole("button", { name: "批量导入 Excel" }).click();
+  const settingsDialog = page.getByRole("dialog", { name: "批量导入设置" });
+  await expect(page.locator("#batch-clearance-front")).toHaveValue("0");
+  await page.locator("#batch-clearance-front").fill("100");
+  await page.locator("#batch-clearance-front").blur();
+  await page.locator("label:has(#batch-orientation-height-width-length)").click();
+  await page.locator("label:has(#batch-orientation-length-width-height)").click();
+  await page.locator("label:has(#batch-orientation-width-length-height)").click();
+
+  const workbook = createBatchImportWorkbook([[1, "2000*1000*2500", "20GP"]]);
+  await page.setInputFiles("#batch-excel-input", {
+    name: "batch-settings.xlsx",
+    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    buffer: workbook,
+  });
+  await settingsDialog.getByRole("button", { name: "开始导入并计算" }).click();
+
+  const resultsDialog = page.getByRole("dialog", { name: "批量导入结果" });
+  await expect(resultsDialog).toBeVisible();
+  await expect(resultsDialog).toContainText("允许朝向：高×宽×长");
+  await expect(resultsDialog).toContainText("车厢公差：前 100mm · 后 0mm · 左 0mm · 右 0mm · 顶部 0mm");
+  await expect(resultsDialog.locator("tbody tr")).toHaveCount(1);
+  await expect(resultsDialog.locator("tbody tr").first()).toContainText("成功");
+});
+
+test("keeps batch settings usable in a short mobile viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 600 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "批量导入 Excel" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "批量导入设置" });
+  const settings = dialog.locator(".batch-settings-layout");
+  const initialLayout = await dialog.evaluate((element) => {
+    const settingsElement = element.querySelector<HTMLElement>(".batch-settings-layout");
+    const footer = element.querySelector<HTMLElement>(".base-dialog-footer");
+    if (!settingsElement || !footer) throw new Error("Batch settings layout anchors are missing");
+    const dialogRect = element.getBoundingClientRect();
+    const footerRect = footer.getBoundingClientRect();
+    return {
+      dialogTop: dialogRect.top,
+      dialogBottom: dialogRect.bottom,
+      footerTop: footerRect.top,
+      footerBottom: footerRect.bottom,
+      settingsClientHeight: settingsElement.clientHeight,
+      settingsScrollHeight: settingsElement.scrollHeight,
+    };
+  });
+
+  expect(initialLayout.dialogTop).toBeGreaterThanOrEqual(0);
+  expect(initialLayout.dialogBottom).toBeLessThanOrEqual(600);
+  expect(initialLayout.footerTop).toBeGreaterThan(initialLayout.dialogTop);
+  expect(initialLayout.footerBottom).toBeLessThanOrEqual(initialLayout.dialogBottom);
+  expect(initialLayout.settingsScrollHeight).toBeGreaterThan(initialLayout.settingsClientHeight);
+
+  await settings.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
+  const summaryIsInView = await dialog.evaluate((element) => {
+    const body = element.querySelector<HTMLElement>(".base-dialog-body");
+    const summary = element.querySelector<HTMLElement>(".batch-settings-summary");
+    if (!body || !summary) throw new Error("Batch settings summary anchors are missing");
+    const bodyRect = body.getBoundingClientRect();
+    const summaryRect = summary.getBoundingClientRect();
+    return summaryRect.top >= bodyRect.top - 1 && summaryRect.bottom <= bodyRect.bottom + 1;
+  });
+
+  expect(summaryIsInView).toBe(true);
+  await expect(dialog.getByRole("button", { name: "开始导入并计算" })).toBeVisible();
+});
+
+test("closes batch settings once and discards unconfirmed changes", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "批量导入 Excel" }).click();
+
+  let dialog = page.getByRole("dialog", { name: "批量导入设置" });
+  await page.locator("#batch-clearance-front").fill("100");
+  await page.locator("#batch-clearance-front").blur();
+  await dialog.getByRole("button", { name: "关闭批量导入设置" }).click();
+  await page.waitForTimeout(360);
+  await expect(page.locator('[role="dialog"]')).toHaveCount(0);
+
+  await page.getByRole("button", { name: "批量导入 Excel" }).click();
+  dialog = page.getByRole("dialog", { name: "批量导入设置" });
+  await expect(page.locator("#batch-clearance-front")).toHaveValue("0");
+  await dialog.getByRole("button", { name: "取消" }).click();
 });
 
 test("downloads the batch import template workbook", async ({ page }) => {
