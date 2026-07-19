@@ -1,4 +1,12 @@
-import { CONTAINERS, calculatePackingSummary, type CartonSpec, type ContainerClearanceSpec, type ContainerSpec } from "./packing";
+import {
+  CONTAINERS,
+  calculatePackingSummary,
+  normalizeAllowedOrientations,
+  type CartonOrientationId,
+  type CartonSpec,
+  type ContainerClearanceSpec,
+  type ContainerSpec,
+} from "./packing";
 
 export const BATCH_SIZE_COLUMN = "尺寸（长宽高 mm）";
 export const BATCH_CONTAINER_COLUMN = "柜型";
@@ -18,6 +26,7 @@ export interface BatchPackingProgress {
 export interface CalculateBatchPackingAsyncOptions {
   batchSize?: number;
   clearance?: ContainerClearanceSpec;
+  allowedOrientations?: CartonOrientationId[];
   signal?: AbortSignal;
   onProgress?: (event: BatchPackingProgress) => void;
   yieldToMain?: () => Promise<void>;
@@ -25,6 +34,7 @@ export interface CalculateBatchPackingAsyncOptions {
 
 export interface CalculateBatchPackingOptions {
   clearance?: ContainerClearanceSpec;
+  allowedOrientations?: CartonOrientationId[];
 }
 
 export interface BatchPackingRow {
@@ -119,6 +129,7 @@ function formatSize({ length, width, height }: CartonSpec) {
 
 function createMaxLoadCacheKey(containerType: BatchContainerType, carton: CartonSpec, options: CalculateBatchPackingOptions) {
   const clearance = options.clearance || {};
+  const allowedOrientations = normalizeAllowedOrientations(options.allowedOrientations);
   return [
     containerType,
     carton.length,
@@ -129,6 +140,7 @@ function createMaxLoadCacheKey(containerType: BatchContainerType, carton: Carton
     clearance.left || 0,
     clearance.right || 0,
     clearance.top || 0,
+    allowedOrientations.join(","),
   ].join(":");
 }
 
@@ -147,6 +159,31 @@ function createFailedItem(rowNumber: number, row: BatchPackingRow, error: string
     remainingWidth: null,
     remainingHeight: null,
     status: "解析失败",
+    error,
+  };
+}
+
+function createCalculationFailedItem(
+  rowNumber: number,
+  carton: CartonSpec,
+  containerType: BatchContainerType,
+  manualCount: number,
+  error: string,
+): BatchPackingItem {
+  return {
+    rowNumber,
+    sizeText: formatSize(carton),
+    containerType,
+    manualCount,
+    difference: null,
+    length: carton.length,
+    width: carton.width,
+    height: carton.height,
+    totalBoxes: null,
+    remainingLength: null,
+    remainingWidth: null,
+    remainingHeight: null,
+    status: "计算失败",
     error,
   };
 }
@@ -209,15 +246,27 @@ function calculateBatchRow(
     return null;
   }
 
+  let carton: CartonSpec;
+  let containerType: BatchContainerType;
+  let manualCount: number;
+
   try {
-    const carton = parseDimension(sizeValue);
-    const containerType = parseContainerType(containerValue);
-    const manualCount = parseManualCount(manualValue);
+    carton = parseDimension(sizeValue);
+    containerType = parseContainerType(containerValue);
+    manualCount = parseManualCount(manualValue);
+  } catch (caught) {
+    return createFailedItem(rowNumber, row, caught instanceof Error ? caught.message : "解析失败");
+  }
+
+  try {
     const container = CONTAINERS[containerType] as Required<ContainerSpec>;
     const cacheKey = createMaxLoadCacheKey(containerType, carton, options);
     let metrics = metricsCache.get(cacheKey);
     if (!metrics) {
-      const result = calculatePackingSummary(container, carton, { clearance: options.clearance });
+      const result = calculatePackingSummary(container, carton, {
+        clearance: options.clearance,
+        allowedOrientations: options.allowedOrientations,
+      });
       metrics = {
         totalBoxes: result.totalBoxes,
         remainingLength: result.totalBoxes > 0 ? result.effectiveContainer.length - result.occupiedLength : null,
@@ -228,7 +277,13 @@ function calculateBatchRow(
     }
     return createSuccessItem(rowNumber, carton, containerType, manualCount, metrics);
   } catch (caught) {
-    return createFailedItem(rowNumber, row, caught instanceof Error ? caught.message : "解析失败");
+    return createCalculationFailedItem(
+      rowNumber,
+      carton,
+      containerType,
+      manualCount,
+      caught instanceof Error ? caught.message : "计算失败",
+    );
   }
 }
 

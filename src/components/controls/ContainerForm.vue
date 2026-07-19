@@ -31,14 +31,14 @@ const clearanceFields = [
       show-selected-description
       @update:model-value="store.setContainerType"
     />
-    <section class="clearance-panel" aria-label="车厢公差">
+    <section class="clearance-panel" aria-label="车厢间隙">
       <div class="clearance-heading">
         <div class="clearance-title-row">
-          <h3>车厢公差</h3>
+          <h3>车厢间隙</h3>
           <button
             class="clearance-reset-button"
             type="button"
-            aria-label="重置公差"
+            aria-label="重置间隙"
             :disabled="!store.hasActiveContainerClearance"
             @click="store.resetContainerClearance"
           >

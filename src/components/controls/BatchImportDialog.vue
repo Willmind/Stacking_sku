@@ -4,9 +4,17 @@ import { computed, nextTick, onBeforeUnmount, ref } from "vue";
 import templateFileUrl from "../../assets/batch-import-template.xlsx?url";
 import type { BatchResultWorkbookOptions } from "../../core/batchExport";
 import { BatchImportCancelledError, type BatchImportStatus, type BatchPackingItem, type BatchPackingRow } from "../../core/batchImport";
+import {
+  CARTON_ORIENTATION_OPTIONS,
+  DEFAULT_ALLOWED_ORIENTATION_IDS,
+  normalizeAllowedOrientations,
+  type CartonOrientationId,
+  type ContainerClearanceSpec,
+} from "../../core/packing";
 import { PackingWorkerCancelledError, calculateBatchPackingInWorker } from "../../core/packingWorkerClient";
-import { usePackingStore } from "../../stores/packingStore";
+import OrientationSelector from "./OrientationSelector.vue";
 import BaseDialog from "../ui/BaseDialog.vue";
+import BaseNumberField from "../ui/BaseNumberField.vue";
 import BaseSelect, { type SelectOption } from "../ui/BaseSelect.vue";
 
 type DifferenceFilter = "全部" | "负差值" | "零差值" | "正差值" | "非零差值";
@@ -29,10 +37,86 @@ interface SortColumn {
   kind: "number" | "text";
 }
 
-const store = usePackingStore();
+type BatchClearance = Required<ContainerClearanceSpec>;
+
+interface BatchImportSettings {
+  allowedOrientations: CartonOrientationId[];
+  clearance: BatchClearance;
+}
+
+const DEFAULT_BATCH_CLEARANCE: BatchClearance = { front: 0, rear: 0, left: 0, right: 0, top: 0 };
+const BATCH_IMPORT_SETTINGS_STORAGE_KEY = "STACKING_SKU_BATCH_IMPORT_SETTINGS_V1";
+const clearanceFields = [
+  { key: "front", label: "前 mm" },
+  { key: "rear", label: "后 mm" },
+  { key: "left", label: "左 mm" },
+  { key: "right", label: "右 mm" },
+  { key: "top", label: "顶部 mm" },
+] as const;
+
+function createDefaultBatchImportSettings(): BatchImportSettings {
+  return {
+    allowedOrientations: [...DEFAULT_ALLOWED_ORIENTATION_IDS],
+    clearance: { ...DEFAULT_BATCH_CLEARANCE },
+  };
+}
+
+function normalizeStoredClearance(input: unknown): BatchClearance {
+  const source = input && typeof input === "object" && !Array.isArray(input) ? (input as Record<string, unknown>) : {};
+  const normalizeValue = (value: unknown) => {
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.max(0, Math.round(number)) : 0;
+  };
+
+  return {
+    front: normalizeValue(source.front),
+    rear: normalizeValue(source.rear),
+    left: normalizeValue(source.left),
+    right: normalizeValue(source.right),
+    top: normalizeValue(source.top),
+  };
+}
+
+function loadStoredBatchImportSettings(): BatchImportSettings {
+  const fallback = createDefaultBatchImportSettings();
+  if (typeof window === "undefined") return fallback;
+
+  try {
+    const rawValue = window.localStorage.getItem(BATCH_IMPORT_SETTINGS_STORAGE_KEY);
+    if (!rawValue) return fallback;
+    const parsed = JSON.parse(rawValue) as Record<string, unknown>;
+    return {
+      allowedOrientations: normalizeAllowedOrientations(parsed.allowedOrientations as readonly unknown[]),
+      clearance: normalizeStoredClearance(parsed.clearance),
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function persistBatchImportSettings(settings: BatchImportSettings) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(BATCH_IMPORT_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  } catch {
+    // localStorage may be unavailable in restricted browser contexts.
+  }
+}
+
+const initialBatchImportSettings = loadStoredBatchImportSettings();
+
 const inputRef = ref<HTMLInputElement | null>(null);
-const isOpen = ref(false);
+const isSettingsOpen = ref(false);
+const isResultsOpen = ref(false);
 const isImporting = ref(false);
+const selectedFile = ref<File | null>(null);
+const lastSuccessfulAllowedOrientations = ref<CartonOrientationId[]>([...initialBatchImportSettings.allowedOrientations]);
+const lastSuccessfulClearance = ref<BatchClearance>({ ...initialBatchImportSettings.clearance });
+const batchAllowedOrientations = ref<CartonOrientationId[]>([...initialBatchImportSettings.allowedOrientations]);
+const batchClearance = ref<BatchClearance>({ ...initialBatchImportSettings.clearance });
+const appliedAllowedOrientations = ref<CartonOrientationId[]>([...initialBatchImportSettings.allowedOrientations]);
+const appliedClearance = ref<BatchClearance>({ ...initialBatchImportSettings.clearance });
 const fileName = ref("");
 const results = ref<BatchPackingItem[]>([]);
 const importError = ref("");
@@ -127,11 +211,12 @@ const progressStyle = computed(() => ({ width: `${progressPercent.value}%` }));
 const hasActiveFilter = computed(
   () => statusFilter.value !== "全部" || errorFilter.value !== "全部" || differenceFilter.value !== "全部" || reviewOnly.value,
 );
-const hasActiveClearance = computed(() => Object.values(store.containerClearance).some((value) => value > 0));
-const clearanceSummary = computed(() => {
-  const clearance = store.containerClearance;
-  return `公差：前 ${clearance.front}mm · 后 ${clearance.rear}mm · 左 ${clearance.left}mm · 右 ${clearance.right}mm · 顶部 ${clearance.top}mm`;
-});
+const hasActiveBatchClearance = computed(() => Object.values(batchClearance.value).some((value) => value > 0));
+const batchOrientationSummary = computed(() => formatOrientationSummary(batchAllowedOrientations.value));
+const appliedOrientationSummary = computed(() => formatOrientationSummary(appliedAllowedOrientations.value));
+const batchClearanceSummary = computed(() => formatClearanceSummary(batchClearance.value));
+const appliedClearanceSummary = computed(() => formatClearanceSummary(appliedClearance.value));
+const canStartImport = computed(() => Boolean(selectedFile.value) && batchAllowedOrientations.value.length > 0 && !isImporting.value);
 
 function clearLongImportTimer() {
   if (longImportTimer === null) return;
@@ -143,9 +228,57 @@ function formatNumber(value: number | null) {
   return value === null ? "-" : value.toLocaleString("zh-CN");
 }
 
+function formatOrientationSummary(allowedOrientations: CartonOrientationId[]) {
+  const labels = allowedOrientations.map(
+    (orientationId) => CARTON_ORIENTATION_OPTIONS.find((orientation) => orientation.id === orientationId)?.label || orientationId,
+  );
+  return `允许朝向：${labels.join("、")}`;
+}
+
+function formatClearanceSummary(clearance: BatchClearance) {
+  return `车厢间隙：前 ${clearance.front}mm · 后 ${clearance.rear}mm · 左 ${clearance.left}mm · 右 ${clearance.right}mm · 顶部 ${clearance.top}mm`;
+}
+
+function openBatchSettings() {
+  if (isImporting.value) return;
+  selectedFile.value = null;
+  batchAllowedOrientations.value = [...lastSuccessfulAllowedOrientations.value];
+  batchClearance.value = { ...lastSuccessfulClearance.value };
+  if (inputRef.value) inputRef.value.value = "";
+  isSettingsOpen.value = true;
+}
+
+function rememberSuccessfulBatchImportSettings(allowedOrientations: CartonOrientationId[], clearance: BatchClearance) {
+  const settings: BatchImportSettings = {
+    allowedOrientations: [...allowedOrientations],
+    clearance: { ...clearance },
+  };
+  lastSuccessfulAllowedOrientations.value = [...settings.allowedOrientations];
+  lastSuccessfulClearance.value = { ...settings.clearance };
+  persistBatchImportSettings(settings);
+}
+
 function openFilePicker() {
   if (isImporting.value) return;
+  if (inputRef.value) inputRef.value.value = "";
   inputRef.value?.click();
+}
+
+function handleFileSelection(event: Event) {
+  const input = event.target as HTMLInputElement;
+  selectedFile.value = input.files?.[0] ?? null;
+}
+
+function updateBatchClearance(key: keyof BatchClearance, value: number) {
+  const normalizedValue = Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+  batchClearance.value = {
+    ...batchClearance.value,
+    [key]: normalizedValue,
+  };
+}
+
+function resetBatchClearance() {
+  batchClearance.value = { ...DEFAULT_BATCH_CLEARANCE };
 }
 
 function resetFilters() {
@@ -306,10 +439,15 @@ async function waitForLoadingPaint() {
   await wait(80);
 }
 
-async function handleFileChange(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
+async function startBatchImport() {
+  const file = selectedFile.value;
   if (!file) return;
+
+  const allowedOrientations = [...batchAllowedOrientations.value];
+  const clearance = { ...batchClearance.value };
+  appliedAllowedOrientations.value = allowedOrientations;
+  appliedClearance.value = clearance;
+  isSettingsOpen.value = false;
 
   const controller = new AbortController();
   abortController = controller;
@@ -328,6 +466,7 @@ async function handleFileChange(event: Event) {
   }, LONG_IMPORT_NOTICE_MS);
   const loadingStartedAt = performance.now();
   let shouldOpenDialog = true;
+  let shouldRememberSettings = false;
   await waitForLoadingPaint();
 
   try {
@@ -347,7 +486,7 @@ async function handleFileChange(event: Event) {
     importStage.value = rows.length ? `正在计算 0 / ${rows.length} 行` : "正在计算导入数据";
     results.value = await calculateBatchPackingInWorker(
       rows,
-      { clearance: { ...store.containerClearance } },
+      { clearance, allowedOrientations },
       {
         signal: controller.signal,
         onProgress: ({ processed, total, progress }) => {
@@ -358,6 +497,7 @@ async function handleFileChange(event: Event) {
         },
       },
     );
+    shouldRememberSettings = results.value.some((item) => item.status === "成功" || item.status === "无法装载");
     importProgress.value = 100;
     importStage.value = "正在生成结果";
     resetFilters();
@@ -365,6 +505,7 @@ async function handleFileChange(event: Event) {
       importError.value = "没有读取到可计算的数据";
     }
   } catch (caught) {
+    shouldRememberSettings = false;
     results.value = [];
     if (caught instanceof BatchImportCancelledError || caught instanceof PackingWorkerCancelledError || controller.signal.aborted) {
       importError.value = "已取消导入";
@@ -378,12 +519,22 @@ async function handleFileChange(event: Event) {
     if (loadingElapsed < MIN_IMPORT_LOADING_MS) {
       await wait(MIN_IMPORT_LOADING_MS - loadingElapsed);
     }
+    if (controller.signal.aborted) {
+      results.value = [];
+      importError.value = "已取消导入";
+      shouldOpenDialog = false;
+      shouldRememberSettings = false;
+    }
+    if (shouldRememberSettings) {
+      rememberSuccessfulBatchImportSettings(allowedOrientations, clearance);
+    }
     isImporting.value = false;
     isLongImporting.value = false;
     abortController = null;
-    input.value = "";
+    selectedFile.value = null;
+    if (inputRef.value) inputRef.value.value = "";
     if (shouldOpenDialog) {
-      isOpen.value = true;
+      isResultsOpen.value = true;
     }
   }
 }
@@ -396,7 +547,7 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="batch-import" aria-label="批量导入">
-    <button class="batch-import-button" type="button" :disabled="isImporting" :aria-busy="isImporting" @click="openFilePicker">
+    <button class="batch-import-button" type="button" :disabled="isImporting" :aria-busy="isImporting" @click="openBatchSettings">
       <span v-if="isImporting" class="batch-import-spinner" aria-hidden="true"></span>
       <Upload v-else :size="16" :stroke-width="2.35" aria-hidden="true" />
       {{ isImporting ? "解析中..." : "批量导入 Excel" }}
@@ -405,8 +556,93 @@ onBeforeUnmount(() => {
       <Download :size="16" :stroke-width="2.35" aria-hidden="true" />
       下载模版
     </a>
-    <input id="batch-excel-input" ref="inputRef" class="batch-file-input" type="file" accept=".xlsx" @change="handleFileChange" />
+    <input id="batch-excel-input" ref="inputRef" class="batch-file-input" type="file" accept=".xlsx" @change="handleFileSelection" />
   </section>
+
+  <BaseDialog
+    v-model:open="isSettingsOpen"
+    title="批量导入设置"
+    description="设置仅作用于批量导入；会保留上一次完成计算的设置，不与主页面的朝向和车厢间隙联动。"
+    close-label="关闭批量导入设置"
+  >
+    <template #icon>
+      <span class="dialog-icon" aria-hidden="true">
+        <FileSpreadsheet :size="18" :stroke-width="2.3" />
+      </span>
+    </template>
+
+    <div class="batch-settings-layout">
+      <section class="batch-setting-card batch-file-setting" aria-labelledby="batch-file-setting-title">
+        <div class="batch-setting-heading">
+          <h3 id="batch-file-setting-title">Excel 文件</h3>
+          <p>使用现有模板导入尺寸、柜型和人工码垛数量。</p>
+        </div>
+        <div class="batch-file-actions">
+          <button class="batch-file-picker" type="button" @click="openFilePicker">
+            <Upload :size="16" :stroke-width="2.35" aria-hidden="true" />
+            {{ selectedFile ? "重新选择文件" : "选择 Excel 文件" }}
+          </button>
+          <a class="batch-template-link" :href="templateFileUrl" download="模版文件.xlsx">
+            <Download :size="15" :stroke-width="2.35" aria-hidden="true" />
+            下载模版
+          </a>
+          <span class="batch-selected-file" :class="{ 'batch-selected-file--empty': !selectedFile }">
+            {{ selectedFile?.name || "尚未选择文件" }}
+          </span>
+        </div>
+      </section>
+
+      <div class="batch-setting-columns">
+        <section class="batch-setting-card" aria-label="批量导入允许朝向">
+          <div class="batch-setting-heading">
+            <h3>允许朝向</h3>
+            <p>至少选择一种。默认保持纸箱高度朝上，并允许底面水平旋转。</p>
+          </div>
+          <OrientationSelector
+            id-prefix="batch-orientation"
+            v-model="batchAllowedOrientations"
+            label="本次批量计算允许的纸箱朝向"
+            compact
+          />
+        </section>
+
+        <section class="batch-setting-card" aria-labelledby="batch-clearance-title">
+          <div class="batch-setting-heading batch-clearance-heading">
+            <div>
+              <h3 id="batch-clearance-title">车厢间隙</h3>
+              <p>按站在柜口正视柜内为基准，单位为 mm。</p>
+            </div>
+            <button class="batch-clearance-reset" type="button" :disabled="!hasActiveBatchClearance" @click="resetBatchClearance">
+              重置为 0
+            </button>
+          </div>
+          <div class="batch-clearance-grid">
+            <BaseNumberField
+              v-for="field in clearanceFields"
+              :id="`batch-clearance-${field.key}`"
+              :key="field.key"
+              class="batch-clearance-field"
+              :label="field.label"
+              :model-value="batchClearance[field.key]"
+              :min="0"
+              @update:model-value="updateBatchClearance(field.key, $event)"
+            />
+          </div>
+        </section>
+      </div>
+
+      <section class="batch-settings-summary" aria-label="本次批量计算条件">
+        <strong>本次计算条件</strong>
+        <span>{{ batchOrientationSummary }}</span>
+        <span>{{ batchClearanceSummary }}</span>
+      </section>
+    </div>
+
+    <template #footer>
+      <button class="dialog-action" type="button" @click="isSettingsOpen = false">取消</button>
+      <button class="dialog-action primary" type="button" :disabled="!canStartImport" @click="startBatchImport">开始导入并计算</button>
+    </template>
+  </BaseDialog>
 
   <Teleport to="body">
     <Transition name="batch-import-loading">
@@ -440,7 +676,7 @@ onBeforeUnmount(() => {
     </Transition>
   </Teleport>
 
-  <BaseDialog v-model:open="isOpen" title="批量导入结果" :description="summaryText" body-variant="flush" stable-height>
+  <BaseDialog v-model:open="isResultsOpen" title="批量导入结果" :description="summaryText" body-variant="flush" stable-height>
     <template #icon>
       <span class="dialog-icon" aria-hidden="true">
         <FileSpreadsheet :size="18" :stroke-width="2.3" />
@@ -451,7 +687,8 @@ onBeforeUnmount(() => {
       <div class="batch-result-head">
         <div v-if="fileName" class="file-line">
           <span>文件：{{ fileName }}</span>
-          <span v-if="results.length && hasActiveClearance" class="file-line-meta">{{ clearanceSummary }}</span>
+          <span class="file-line-meta">{{ appliedOrientationSummary }}</span>
+          <span class="file-line-meta">{{ appliedClearanceSummary }}</span>
         </div>
 
         <div v-if="results.length" class="batch-result-toolbar">
@@ -544,7 +781,7 @@ onBeforeUnmount(() => {
         <Download :size="15" :stroke-width="2.35" aria-hidden="true" />
         下载结果
       </button>
-      <button class="dialog-action" type="button" @click="isOpen = false">关闭</button>
+      <button class="dialog-action" type="button" @click="isResultsOpen = false">关闭</button>
     </template>
   </BaseDialog>
 </template>
@@ -608,6 +845,191 @@ onBeforeUnmount(() => {
 
 .batch-file-input {
   display: none;
+}
+
+.batch-settings-layout {
+  display: grid;
+  min-height: 0;
+  gap: 14px;
+  overflow: auto;
+  padding: 2px;
+}
+
+.batch-setting-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.batch-setting-card {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 13px;
+  border: 1px solid rgba(174, 184, 201, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.028);
+  padding: 14px;
+}
+
+.batch-file-setting {
+  grid-template-columns: minmax(200px, 0.7fr) minmax(0, 1.3fr);
+  align-items: center;
+}
+
+.batch-setting-heading {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.batch-setting-heading h3,
+.batch-setting-heading p {
+  margin: 0;
+}
+
+.batch-setting-heading h3 {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.batch-setting-heading p {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 760;
+  line-height: 1.45;
+}
+
+.batch-file-actions {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto auto minmax(120px, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.batch-file-picker,
+.batch-template-link,
+.batch-clearance-reset {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid rgba(174, 184, 201, 0.22);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 900;
+  padding: 0 11px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.batch-file-picker:hover,
+.batch-template-link:hover,
+.batch-clearance-reset:hover:not(:disabled) {
+  border-color: rgba(66, 214, 164, 0.46);
+  background: rgba(66, 214, 164, 0.09);
+  color: var(--accent);
+}
+
+.batch-template-link {
+  border-color: rgba(66, 214, 164, 0.24);
+  color: var(--accent);
+}
+
+.batch-selected-file {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.batch-selected-file--empty {
+  color: var(--muted);
+}
+
+.batch-clearance-heading {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+}
+
+.batch-clearance-reset {
+  min-height: 28px;
+  padding-inline: 9px;
+}
+
+.batch-clearance-reset:disabled {
+  cursor: not-allowed;
+  opacity: 0.44;
+}
+
+.batch-clearance-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.batch-clearance-field {
+  min-width: 0;
+}
+
+.batch-clearance-field :deep(.base-number-control) {
+  min-height: 36px;
+}
+
+.batch-clearance-field :deep(.base-number-input) {
+  min-height: 34px;
+  text-align: center;
+}
+
+.batch-settings-summary {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  border: 1px solid rgba(66, 214, 164, 0.26);
+  border-radius: 8px;
+  background: rgba(66, 214, 164, 0.075);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.5;
+  padding: 11px 13px;
+}
+
+.batch-settings-summary strong {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+@media (max-width: 760px) {
+  .batch-setting-columns,
+  .batch-file-setting {
+    grid-template-columns: 1fr;
+  }
+
+  .batch-file-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .batch-selected-file {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 520px) {
+  .batch-file-actions,
+  .batch-clearance-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .batch-import-spinner {
@@ -885,6 +1307,16 @@ onBeforeUnmount(() => {
   background: rgba(255, 255, 255, 0.075);
 }
 
+.dialog-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+.dialog-action:disabled:hover {
+  border-color: rgba(174, 184, 201, 0.22);
+  background: rgba(255, 255, 255, 0.045);
+}
+
 .result-table-shell {
   height: 100%;
   min-height: 0;
@@ -1017,5 +1449,13 @@ tr.failed td {
 .dialog-action.primary:hover {
   border-color: rgba(92, 237, 193, 0.78);
   background: linear-gradient(180deg, #68e8c2, #35cba0);
+}
+
+.dialog-action.primary:disabled,
+.dialog-action.primary:disabled:hover {
+  border-color: rgba(174, 184, 201, 0.18);
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--muted);
+  box-shadow: none;
 }
 </style>

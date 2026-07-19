@@ -48,14 +48,13 @@ function clearCloseTimer() {
   closeTimer = null;
 }
 
-function beginClose(emitAfterAnimation: boolean) {
+function beginClose() {
   if (isClosing.value) return;
   clearCloseTimer();
   isClosing.value = true;
   closeTimer = window.setTimeout(() => {
     closeTimer = null;
     isClosing.value = false;
-    if (emitAfterAnimation) emit("update:open", false);
   }, DIALOG_ANIMATION_MS);
 }
 
@@ -66,7 +65,7 @@ function updateOpen(value: boolean) {
     emit("update:open", true);
     return;
   }
-  beginClose(true);
+  emit("update:open", false);
 }
 
 watch(
@@ -77,7 +76,7 @@ watch(
       isClosing.value = false;
       return;
     }
-    if (previousOpen) beginClose(false);
+    if (previousOpen) beginClose();
   },
 );
 

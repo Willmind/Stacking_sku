@@ -17,7 +17,7 @@ export type PackingWorkerPayload =
   | {
       kind: "batch";
       rows: BatchPackingRow[];
-      options?: Pick<PackingOptions, "clearance">;
+      options?: Pick<PackingOptions, "clearance" | "allowedOrientations">;
       batchSize?: number;
     };
 

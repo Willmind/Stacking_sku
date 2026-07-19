@@ -23,7 +23,16 @@ const DEFAULT_CARTON: CartonSpec = { length: 488, width: 380, height: 291 };
 const DEFAULT_CONTAINER_CLEARANCE = { front: 0, rear: 0, left: 0, right: 0, top: 0 };
 const DEFAULT_ALLOWED_ORIENTATIONS = [...DEFAULT_ALLOWED_ORIENTATION_IDS];
 const STACKING_SKU_CLEARANCE = "STACKING_SKU_CLEARANCE";
+const MIN_CALCULATION_LOADING_MS = 600;
 type ContainerClearanceKey = keyof typeof DEFAULT_CONTAINER_CLEARANCE;
+
+async function waitForMinimumCalculationLoading(startedAt: number) {
+  const remaining = MIN_CALCULATION_LOADING_MS - (performance.now() - startedAt);
+  if (remaining <= 0) return;
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, remaining);
+  });
+}
 
 function isContainerType(type: string): type is ContainerType {
   return Object.prototype.hasOwnProperty.call(CONTAINERS, type);
@@ -223,6 +232,7 @@ export const usePackingStore = defineStore("packing", () => {
     activeCalculation = controller;
     isCalculating.value = true;
     error.value = "";
+    const calculationStartedAt = performance.now();
 
     try {
       const next: PackingResult =
@@ -251,6 +261,7 @@ export const usePackingStore = defineStore("packing", () => {
               },
               { signal: controller.signal },
             );
+      await waitForMinimumCalculationLoading(calculationStartedAt);
       if (version !== calculationVersion) return;
       result.value = next;
       visibleCount.value = next.totalBoxes;
@@ -261,6 +272,8 @@ export const usePackingStore = defineStore("packing", () => {
         status.value = "已取消计算";
         return;
       }
+      await waitForMinimumCalculationLoading(calculationStartedAt);
+      if (version !== calculationVersion) return;
       result.value = null;
       visibleCount.value = 0;
       status.value = "计算失败";

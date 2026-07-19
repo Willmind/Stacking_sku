@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { calculateBatchPacking } from "../src/core/batchImport";
 import { calculateMultiSkuPacking, calculatePacking } from "../src/core/packing";
 import {
   PackingWorkerCancelledError,
@@ -7,7 +8,7 @@ import {
   runPackingWorker,
 } from "../src/core/packingWorkerClient";
 import { executePackingWorkerPayload } from "../src/workers/packingWorkerRuntime";
-import type { PackingWorkerRequest, PackingWorkerResponse } from "../src/workers/packingWorkerProtocol";
+import type { PackingWorkerPayload, PackingWorkerRequest, PackingWorkerResponse } from "../src/workers/packingWorkerProtocol";
 
 class FakeWorker {
   onmessage: ((event: MessageEvent<PackingWorkerResponse>) => void) | null = null;
@@ -47,7 +48,7 @@ describe("packing worker", () => {
     expect(workerResult).toEqual(direct);
   });
 
-  it("保持 Worker 与直接调用的异尺寸多 SKU 非对称公差结果完全一致", async () => {
+  it("保持 Worker 与直接调用的异尺寸多 SKU 非对称间隙结果完全一致", async () => {
     const payload = {
       kind: "multi" as const,
       container: { id: "WORKER-MULTI", name: "Worker multi", length: 900, width: 430, height: 360 },
@@ -87,6 +88,32 @@ describe("packing worker", () => {
     expect(worker.terminated).toBe(true);
   });
 
+  it("透传批量计算的朝向和车厢间隙", async () => {
+    const rows = [{ "人工码垛数量（原始）": 1, "尺寸（长宽高 mm）": "2000*1000*2500", 柜型: "20GP" }];
+    const options = {
+      clearance: { front: 100 },
+      allowedOrientations: ["height-width-length" as const],
+    };
+    const direct = calculateBatchPacking(rows, options);
+    const workerResult = await executePackingWorkerPayload({ kind: "batch", rows, options });
+
+    expect(workerResult).toEqual(direct);
+  });
+
+  it("把批量弹框配置写入 Worker 请求", async () => {
+    const worker = new FakeWorker();
+    const options = {
+      clearance: { left: 15, right: 15 },
+      allowedOrientations: ["length-width-height" as const],
+    };
+    const promise = calculateBatchPackingInWorker([], options, { workerFactory: () => worker });
+    const requestId = worker.request?.requestId;
+
+    expect(worker.request?.payload).toMatchObject({ kind: "batch", options });
+    worker.emit({ type: "success", requestId: requestId as number, result: [] });
+    await expect(promise).resolves.toEqual([]);
+  });
+
   it("取消时终止 Worker 且不返回部分结果", async () => {
     const worker = new FakeWorker();
     const controller = new AbortController();
@@ -113,6 +140,38 @@ describe("packing worker", () => {
     worker.emit({ type: "success", requestId: requestId as number, result: [] });
     await expect(promise).resolves.toEqual([]);
     expect(worker.terminated).toBe(true);
+  });
+
+  it("单 SKU 和多 SKU 计算默认不再因超过 15 秒而自动停止", async () => {
+    vi.useFakeTimers();
+    const payloads: PackingWorkerPayload[] = [
+      {
+        kind: "single",
+        container: { id: "TEST", name: "Test", length: 1_000, width: 1_000, height: 1_000 },
+        carton: { length: 100, width: 100, height: 100 },
+      },
+      {
+        kind: "multi",
+        container: { id: "TEST", name: "Test", length: 1_000, width: 1_000, height: 1_000 },
+        skus: [
+          { label: "A", length: 100, width: 100, height: 100, target: 1, color: "#d8923a" },
+          { label: "B", length: 100, width: 100, height: 100, target: 1, color: "#42d6a4" },
+        ],
+      },
+    ];
+
+    for (const payload of payloads) {
+      const worker = new FakeWorker();
+      const promise = runPackingWorker(payload, { workerFactory: () => worker });
+      const requestId = worker.request?.requestId;
+
+      await vi.advanceTimersByTimeAsync(120_000);
+
+      expect(worker.terminated).toBe(false);
+      worker.emit({ type: "success", requestId: requestId as number, result: [] });
+      await expect(promise).resolves.toEqual([]);
+      expect(worker.terminated).toBe(true);
+    }
   });
 
   it("超时后终止 Worker", async () => {

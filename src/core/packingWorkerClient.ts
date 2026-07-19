@@ -7,8 +7,6 @@ import type {
   PackingWorkerResult,
 } from "../workers/packingWorkerProtocol";
 
-export const DEFAULT_PACKING_TIMEOUT_MS = 15_000;
-
 export class PackingWorkerCancelledError extends Error {
   constructor() {
     super("已取消计算");
@@ -60,7 +58,7 @@ export function runPackingWorker(payload: PackingWorkerPayload, options: Packing
 
     const requestId = ++nextRequestId;
     const worker = (options.workerFactory ?? createPackingWorker)();
-    const timeoutMs = options.timeoutMs === null ? null : Math.max(1, options.timeoutMs ?? DEFAULT_PACKING_TIMEOUT_MS);
+    const timeoutMs = options.timeoutMs == null ? null : Math.max(1, options.timeoutMs);
     let settled = false;
 
     const cleanup = () => {
@@ -134,7 +132,7 @@ export async function calculateMultiSkuPackingInWorker(
 
 export async function calculateBatchPackingInWorker(
   rows: BatchPackingRow[],
-  packingOptions: Pick<PackingOptions, "clearance"> = {},
+  packingOptions: Pick<PackingOptions, "clearance" | "allowedOrientations"> = {},
   runOptions: PackingWorkerRunOptions = {},
 ) {
   return (await runPackingWorker(
