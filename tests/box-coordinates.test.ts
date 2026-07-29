@@ -37,10 +37,10 @@ describe("box coordinate rows", () => {
           row.rowSequence,
         ]),
       [
-        [1, 200, 100, 100, 0, -100, 0, 0, 0, 180, 1, 1, 1],
-        [2, 200, 100, 100, 0, 0, 0, 0, 0, 180, 1, 1, 2],
-        [3, 200, 100, 100, 0, -100, 100, 0, 0, 180, 2, 1, 3],
-        [4, 200, 100, 100, 0, 0, 100, 0, 0, 180, 2, 1, 4],
+        [1, 200, 100, 100, 0, -100, 0, 180, 0, 0, 1, 1, 1],
+        [2, 200, 100, 100, 0, 0, 0, 180, 0, 0, 1, 1, 2],
+        [3, 200, 100, 100, 0, -100, 100, 180, 0, 0, 2, 1, 3],
+        [4, 200, 100, 100, 0, 0, 100, 180, 0, 0, 2, 1, 4],
       ],
     );
     assert.deepEqual([rows[4].totalId, rows[4].row, rows[4].rowSequence], [5, 2, 1]);
@@ -53,9 +53,9 @@ describe("box coordinate rows", () => {
       x: -200,
       y: 0,
       z: 100,
-      a: 0,
+      a: 180,
       b: 0,
-      c: 180,
+      c: 0,
       layer: 2,
       row: 2,
       rowSequence: 4,
@@ -63,7 +63,7 @@ describe("box coordinate rows", () => {
     });
   });
 
-  it("exports swapped carton orientation as XYZ Euler angles in degrees", () => {
+  it("exports swapped carton orientation as Z-Y-X Euler angles in degrees", () => {
     const result = calculatePacking(
       customContainer(400, 200, 100),
       { length: 200, width: 100, height: 100 },
@@ -85,9 +85,9 @@ describe("box coordinate rows", () => {
       x: 0,
       y: 0,
       z: 0,
-      a: 0,
+      a: 90,
       b: 0,
-      c: 90,
+      c: 0,
       layer: 1,
       row: 1,
       rowSequence: 1,
@@ -96,6 +96,15 @@ describe("box coordinate rows", () => {
   });
 
   it("keeps the original carton dimensions for every supported orientation", () => {
+    const expectedEulerByOrientation = new Map([
+      ["length-width-height", [180, 0, 0]],
+      ["width-length-height", [90, 0, 0]],
+      ["length-height-width", [180, 0, 90]],
+      ["height-length-width", [90, 0, -90]],
+      ["width-height-length", [-90, -90, 0]],
+      ["height-width-length", [0, -90, 0]],
+    ]);
+
     for (const orientation of CARTON_ORIENTATION_OPTIONS) {
       const result = calculatePacking(
         customContainer(400, 400, 400),
@@ -108,7 +117,11 @@ describe("box coordinate rows", () => {
 
       const row = createBoxCoordinateRows(result)[0];
       assert.deepEqual([row.length, row.width, row.height], [200, 150, 100], `${orientation.id} should preserve the carton dimensions`);
-      assert.ok([row.a, row.b, row.c].every(Number.isFinite), `${orientation.id} should export finite Euler angles`);
+      assert.deepEqual(
+        [row.a, row.b, row.c],
+        expectedEulerByOrientation.get(orientation.id),
+        `${orientation.id} should use Z-Y-X Euler angles`,
+      );
     }
   });
 
@@ -124,6 +137,6 @@ describe("box coordinate rows", () => {
 
     assert.ok(csv.startsWith("\uFEFF总ID,SKU,长,宽,高,X,Y,Z,A,B,C,所属层,所属排,排内ID"));
     assert.doesNotMatch(csv, /中心点|柜门面|上表面/);
-    assert.match(csv, /1,,200,100,100,0,-100,0,0,0,180,1,1,1/);
+    assert.match(csv, /1,,200,100,100,0,-100,0,180,0,0,1,1,1/);
   });
 });

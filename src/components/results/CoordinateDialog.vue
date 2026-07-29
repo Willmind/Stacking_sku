@@ -173,8 +173,8 @@ watch(
     <div class="coordinate-layout">
       <p class="coordinate-system-note">
         坐标系：观察者站在柜门处望向角件端，原点为观察画面中角件端的左下角；X 沿柜长反方向（远离观察者），Y 沿柜宽反方向，Z
-        向上；位置使用纸箱远离柜门面的左下角；A、B、C 分别绕 X、Y、Z 轴，使用角度制，旋转顺序
-        XYZ。所属排从角件端向柜门编号，排内ID按同排中的总ID顺序编号。
+        向上；位置使用纸箱远离柜门面的左下角；A 绕 Z 轴（偏航），B 绕 Y 轴（俯仰），C 绕 X 轴（滚转），使用角度制，欧拉角顺序
+        Z-Y-X。所属排从角件端向柜门编号，排内ID按同排中的总ID顺序编号。
       </p>
 
       <div class="coordinate-content">

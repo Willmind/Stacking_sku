@@ -106,27 +106,27 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-function matrixToEulerXYZ(localX: Vector3, localY: Vector3, localZ: Vector3) {
+function matrixToEulerZYX(localX: Vector3, localY: Vector3, localZ: Vector3) {
   const m11 = localX[0];
   const m12 = localY[0];
-  const m13 = localZ[0];
+  const m21 = localX[1];
   const m22 = localY[1];
-  const m23 = localZ[1];
+  const m31 = localX[2];
   const m32 = localY[2];
   const m33 = localZ[2];
 
-  const y = Math.asin(clamp(m13, -1, 1));
-  if (Math.abs(m13) < 0.9999999) {
+  const b = Math.asin(-clamp(m31, -1, 1));
+  if (Math.abs(m31) < 0.9999999) {
     return {
-      a: roundDegrees(Math.atan2(-m23, m33)),
-      b: roundDegrees(y),
-      c: roundDegrees(Math.atan2(-m12, m11)),
+      a: roundDegrees(Math.atan2(m21, m11)),
+      b: roundDegrees(b),
+      c: roundDegrees(Math.atan2(m32, m33)),
     };
   }
 
   return {
-    a: roundDegrees(Math.atan2(m32, m22)),
-    b: roundDegrees(y),
+    a: roundDegrees(Math.atan2(-m12, m22)),
+    b: roundDegrees(b),
     c: 0,
   };
 }
@@ -148,7 +148,7 @@ function createEulerAngles(box: BoxPosition) {
     localY = negate(localY);
   }
 
-  return matrixToEulerXYZ(localX, localY, cross(localX, localY));
+  return matrixToEulerZYX(localX, localY, cross(localX, localY));
 }
 
 function createCartonDimensions(box: BoxPosition) {

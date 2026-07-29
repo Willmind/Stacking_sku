@@ -378,7 +378,7 @@ test("shows and downloads the carton coordinate table", async ({ page }) => {
   await expect(dialog).toContainText("排内ID");
   await expect(dialog).toContainText("所属层");
   await expect(dialog).toContainText("所属排");
-  await expect(dialog).toContainText("旋转顺序 XYZ");
+  await expect(dialog).toContainText("欧拉角顺序 Z-Y-X");
   await expect(dialog).toContainText("远离柜门面的左下角");
   await expect(dialog.locator(".coordinate-virtual-spacer")).toHaveCount(1);
   const renderedCoordinateRows = dialog.locator("tbody tr:not(.coordinate-virtual-spacer)");
