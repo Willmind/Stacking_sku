@@ -1,5 +1,8 @@
 # 纸箱坐标表第一阶段 Implementation Plan
 
+> [!WARNING]
+> 本文是 2026-06-25 的历史实施计划，其中“中心点坐标”和旧姿态定义已经被后续业务决策取代。当前实现不得以本文作为坐标事实来源；请阅读 [`../../business/coordinate-system.md`](../../business/coordinate-system.md) 和 [`../../decisions/0001-robot-coordinate-and-pose.md`](../../decisions/0001-robot-coordinate-and-pose.md)。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 新增“查看坐标”第一阶段能力，输出每个纸箱的编号、柜门面中心点坐标、上表面中心点坐标和基础属性，并支持 CSV 导出。
@@ -13,6 +16,7 @@
 ### Task 1: 核心坐标数据
 
 **Files:**
+
 - Create: `src/core/boxCoordinates.ts`
 - Test: `tests/box-coordinates.test.ts`
 
@@ -28,6 +32,7 @@ Expected: FAIL，因为 `src/core/boxCoordinates.ts` 不存在。
 - [ ] **Step 3: Write minimal implementation**
 
 实现：
+
 - `createBoxCoordinateRows(result)`：返回坐标行。
 - `createBoxCoordinateCsv(rows)`：返回带 UTF-8 BOM 的 CSV 字符串。
 - 坐标系：站在柜门外面向柜内，X 向右，Y 向柜门，Z 向上，单位 mm。
@@ -42,6 +47,7 @@ Expected: PASS。
 ### Task 2: 查看坐标弹窗
 
 **Files:**
+
 - Create: `src/components/results/CoordinateDialog.vue`
 - Modify: `src/App.vue`
 - Test: `tests/app-visuals.test.ts`
@@ -49,6 +55,7 @@ Expected: PASS。
 - [ ] **Step 1: Write the failing source guard**
 
 在 `tests/app-visuals.test.ts` 中断言：
+
 - `App.vue` 渲染 `<CoordinateDialog />`
 - `CoordinateDialog.vue` 包含 `查看坐标`、`导出 CSV`、`坐标系`、`createBoxCoordinateRows`
 
@@ -60,6 +67,7 @@ Expected: FAIL，因为组件还不存在且 App 未引用。
 - [ ] **Step 3: Write minimal implementation**
 
 实现坐标弹窗：
+
 - 结果存在且 `totalBoxes > 0` 时可点击“查看坐标”。
 - 弹窗展示坐标表，包含序号、装载顺序、SKU、柜门面 X/Y/Z、上表面 X/Y/Z、中心点 X/Y/Z、层、排、列、朝向。
 - 支持“导出 CSV”。
@@ -72,11 +80,13 @@ Expected: PASS。
 ### Task 3: 浏览器流程验证
 
 **Files:**
+
 - Modify: `tests/packing-e2e.spec.ts`
 
 - [ ] **Step 1: Write failing e2e test**
 
 新增或扩展计算结果测试：
+
 - 点击“计算装载”。
 - 点击“查看坐标”。
 - 断言弹窗可见，表格包含 `序号`、`X`、`Y`、`Z`。
@@ -94,10 +104,12 @@ Expected: FAIL，直到弹窗和下载实现完成。
 - [ ] **Step 4: Run targeted and full verification**
 
 Run:
+
 - `npm run test:unit`
 - `npm run build`
 - `npm run test:e2e -- tests/packing-e2e.spec.ts -g "coordinate"`
 
 Expected:
+
 - unit/build/targeted e2e PASS。
 - 如果完整 e2e 仍有既有无关失败，最终说明失败项和本次功能关系。
