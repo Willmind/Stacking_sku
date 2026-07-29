@@ -59,7 +59,7 @@ export interface SceneCoordinatePointModel {
 
 export const DOOR_ENDPOINT_COLOR = "#42d6a4";
 export const INNER_ENDPOINT_COLOR = "#ffb24a";
-export const TOP_FACE_POINT_COLOR = "#68a6ff";
+export const POSITION_POINT_COLOR = "#68a6ff";
 
 function roundSceneUnit(value: number) {
   return Math.round(value * 1000) / 1000;
@@ -90,23 +90,13 @@ export function toSceneCoordinatePoints(
 ): SceneCoordinatePointModel[] {
   return [
     {
-      key: "door-face-center",
-      label: "柜门面",
-      color: DOOR_ENDPOINT_COLOR,
+      key: "position-reference-corner",
+      label: "远离柜门面的左下角",
+      color: POSITION_POINT_COLOR,
       position: [
-        roundSceneUnit((box.x + box.dx - container.length / 2) * 0.001),
-        roundSceneUnit((box.z + box.dz / 2 - container.height / 2) * 0.001),
-        roundSceneUnit((box.y + box.dy / 2 - container.width / 2) * 0.001),
-      ],
-    },
-    {
-      key: "top-face-center",
-      label: "上表面",
-      color: TOP_FACE_POINT_COLOR,
-      position: [
-        roundSceneUnit((box.x + box.dx / 2 - container.length / 2) * 0.001),
-        roundSceneUnit((box.z + box.dz - container.height / 2) * 0.001),
-        roundSceneUnit((box.y + box.dy / 2 - container.width / 2) * 0.001),
+        roundSceneUnit((box.x - container.length / 2) * 0.001),
+        roundSceneUnit((box.z - container.height / 2) * 0.001),
+        roundSceneUnit((box.y + box.dy - container.width / 2) * 0.001),
       ],
     },
   ];

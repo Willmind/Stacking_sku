@@ -153,14 +153,14 @@ span {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: rgba(3, 8, 14, 0.72);
+  background: var(--scene-bg);
 }
 
 .cargo-scene-shell--unified {
   isolation: isolate;
   background:
-    radial-gradient(circle at 18% 12%, rgba(66, 214, 164, 0.12), transparent 34%),
-    radial-gradient(circle at 86% 82%, rgba(104, 166, 255, 0.1), transparent 30%), rgba(3, 8, 14, 0.72);
+    radial-gradient(circle at 18% 12%, var(--scene-accent-green), transparent 34%),
+    radial-gradient(circle at 86% 82%, var(--scene-accent-blue), transparent 30%), var(--scene-bg);
 }
 
 .cargo-scene-shell--unified::after {
@@ -170,15 +170,15 @@ span {
   pointer-events: none;
   content: "";
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.045),
-    inset 0 0 52px rgba(0, 0, 0, 0.16);
+    inset 0 0 0 1px var(--scene-inset-line),
+    inset 0 0 52px var(--scene-inset-shadow);
 }
 
 canvas {
   width: 100%;
   height: 100%;
   min-height: 0;
-  background: rgba(3, 8, 14, 0.72);
+  background: var(--scene-bg);
   cursor: grab;
   touch-action: none;
   user-select: none;

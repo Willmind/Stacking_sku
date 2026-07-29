@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, ref, shallowRef, watch, type CSSProperties }
 import { TresCanvas, type TresContext } from "@tresjs/core";
 import { OrbitControls } from "@tresjs/cientos";
 import * as THREE from "three";
+import { useTheme } from "../../composables/useTheme";
 import { generateBoxPositions, type BoxPosition, type PackingResult } from "../../core/packing";
 import { getCargoCoordinateAxes, getSelectedCargoPosition } from "../../renderers/cargo3d";
 import { getCargoRenderPolicy } from "../../renderers/cargoRenderPolicy";
@@ -33,6 +34,42 @@ const props = withDefaults(
 
 const DoubleSide = THREE.DoubleSide;
 const floorRotation: [number, number, number] = [-Math.PI / 2, 0, 0];
+const { resolvedTheme } = useTheme();
+const scenePalette = computed(() =>
+  resolvedTheme.value === "light"
+    ? {
+        clearColor: "#f1f5f4",
+        accent: "#08785b",
+        floor: "#d5dfdc",
+        floorOpacity: 0.9,
+        shellEdge: "#647a73",
+        shellEdgeOpacity: 0.62,
+        cornerEdge: "#6c3434",
+        origin: "#263a34",
+        selected: "#16898b",
+        selectedGlow: "#69bfc0",
+        selectedOutline: "#075f61",
+        selectedEdge: "#087b7c",
+        contextFocusEdge: "#71867f",
+        contextEdge: "#334f47",
+      }
+    : {
+        clearColor: "#071016",
+        accent: "#42d6a4",
+        floor: "#172a30",
+        floorOpacity: 0.78,
+        shellEdge: "#e7f8f5",
+        shellEdgeOpacity: 0.72,
+        cornerEdge: "#050505",
+        origin: "#f5f7fb",
+        selected: "#78ffff",
+        selectedGlow: "#a9ffff",
+        selectedOutline: "#f6ffff",
+        selectedEdge: "#2dffff",
+        contextFocusEdge: "#dce8ee",
+        contextEdge: "#b8fff0",
+      },
+);
 const overlayGroup = shallowRef(new THREE.Group());
 const cargoInstancesGroup = shallowRef(new THREE.Group());
 const sceneRootRef = ref<HTMLElement | null>(null);
@@ -156,7 +193,7 @@ const sceneLegendItems = computed<SceneLegendViewModel[]>(() => {
     items.push({
       key: "selected-box-legend",
       label: "当前选中",
-      color: "#6efcff",
+      color: scenePalette.value.selected,
       kind: "selected",
     });
   }
@@ -169,7 +206,7 @@ const selectedProjectionLabel = computed<ProjectionLabelAnchor | null>(() => {
   return {
     key: "selected-box-label",
     text: props.selectedLabel,
-    color: "#6efcff",
+    color: scenePalette.value.selected,
     position: [box.position[0] - 0.46, box.position[1] + box.scale[1] / 2 + 0.74, box.position[2]],
     variant: "selected",
   };
@@ -286,7 +323,9 @@ const shouldUseLightweightCoordinatePreview = computed(() => Boolean(props.light
 const shouldRenderContextCargoFaces = computed(() => !shouldUseLightweightCoordinatePreview.value);
 const contextCargoFaceOpacity = computed(() => (isCoordinateFocusMode.value ? 0.025 : 1));
 const contextCargoEdgeOpacity = computed(() => (isCoordinateFocusMode.value ? 0.18 : 0.08));
-const contextCargoEdgeColor = computed(() => (isCoordinateFocusMode.value ? "#dce8ee" : "#b8fff0"));
+const contextCargoEdgeColor = computed(() =>
+  isCoordinateFocusMode.value ? scenePalette.value.contextFocusEdge : scenePalette.value.contextEdge,
+);
 const contextCargoDepthWrite = computed(() => !isCoordinateFocusMode.value);
 
 const instanceMatrix = new THREE.Matrix4();
@@ -454,17 +493,23 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="sceneRootRef" class="cargo-scene-v2">
-    <TresCanvas :id="canvasId" class="cargo-scene-v2-canvas" clear-color="#071016" :window-size="false" @ready="onTresReady">
+    <TresCanvas
+      :id="canvasId"
+      class="cargo-scene-v2-canvas"
+      :clear-color="scenePalette.clearColor"
+      :window-size="false"
+      @ready="onTresReady"
+    >
       <TresPerspectiveCamera :position="[9.8, 5.7, 9.6]" :look-at="[0, -0.2, 0]" :fov="48" :zoom="cameraZoom" />
       <OrbitControls :enable-zoom="true" :zoom-speed="0.84" />
       <TresAmbientLight :intensity="0.72" />
       <TresDirectionalLight :position="[5, 8, 6]" :intensity="1.18" />
-      <TresDirectionalLight :position="[-4, 3, -5]" :intensity="0.4" color="#42d6a4" />
+      <TresDirectionalLight :position="[-4, 3, -5]" :intensity="0.4" :color="scenePalette.accent" />
 
       <template v-if="sceneContainer">
         <TresMesh name="container-floor" :position="sceneContainer.floorPosition" :rotation="floorRotation">
           <TresPlaneGeometry :args="sceneContainer.floorSize" />
-          <TresMeshBasicMaterial color="#172a30" :transparent="true" :opacity="0.78" :side="DoubleSide" />
+          <TresMeshBasicMaterial :color="scenePalette.floor" :transparent="true" :opacity="scenePalette.floorOpacity" :side="DoubleSide" />
         </TresMesh>
 
         <TresMesh
@@ -504,12 +549,23 @@ onBeforeUnmount(() => {
 
         <TresMesh name="container-shell" :scale="sceneContainer.scale">
           <TresBoxGeometry />
-          <TresMeshBasicMaterial color="#42d6a4" :transparent="true" :opacity="0.015" :side="DoubleSide" :depth-write="false" />
+          <TresMeshBasicMaterial
+            :color="scenePalette.accent"
+            :transparent="true"
+            :opacity="0.015"
+            :side="DoubleSide"
+            :depth-write="false"
+          />
         </TresMesh>
 
         <TresMesh name="container-shell-edge" :scale="sceneContainer.scale">
           <TresBoxGeometry />
-          <TresMeshBasicMaterial color="#e7f8f5" :wireframe="true" :transparent="true" :opacity="0.72" />
+          <TresMeshBasicMaterial
+            :color="scenePalette.shellEdge"
+            :wireframe="true"
+            :transparent="true"
+            :opacity="scenePalette.shellEdgeOpacity"
+          />
         </TresMesh>
 
         <TresMesh
@@ -520,7 +576,7 @@ onBeforeUnmount(() => {
         >
           <TresBoxGeometry />
           <TresMeshBasicMaterial
-            color="#42d6a4"
+            :color="scenePalette.accent"
             :wireframe="true"
             :transparent="true"
             :opacity="0.92"
@@ -536,7 +592,7 @@ onBeforeUnmount(() => {
           </TresMesh>
           <TresMesh name="corner-block-edge" :position="block.position" :scale="block.scale">
             <TresBoxGeometry />
-            <TresMeshBasicMaterial color="#050505" :wireframe="true" />
+            <TresMeshBasicMaterial :color="scenePalette.cornerEdge" :wireframe="true" />
           </TresMesh>
         </template>
       </template>
@@ -545,17 +601,29 @@ onBeforeUnmount(() => {
 
       <TresMesh v-if="coordinateOrigin" name="coordinate-origin-marker" :position="coordinateOrigin">
         <TresSphereGeometry :args="[0.07, 24, 24]" />
-        <TresMeshBasicMaterial color="#f5f7fb" :depth-test="false" :depth-write="false" />
+        <TresMeshBasicMaterial :color="scenePalette.origin" :depth-test="false" :depth-write="false" />
       </TresMesh>
 
       <TresMesh v-if="selectedHalo" name="selected-box-halo" :position="selectedHalo.position" :scale="selectedHalo.scale">
         <TresBoxGeometry />
-        <TresMeshBasicMaterial color="#78ffff" :transparent="true" :opacity="0.16" :depth-test="false" :depth-write="false" />
+        <TresMeshBasicMaterial
+          :color="scenePalette.selected"
+          :transparent="true"
+          :opacity="0.16"
+          :depth-test="false"
+          :depth-write="false"
+        />
       </TresMesh>
 
       <TresMesh v-if="selectedGlow" name="selected-box-glow" :position="selectedGlow.position" :scale="selectedGlow.scale">
         <TresBoxGeometry />
-        <TresMeshBasicMaterial color="#a9ffff" :transparent="true" :opacity="0.34" :depth-test="false" :depth-write="false" />
+        <TresMeshBasicMaterial
+          :color="scenePalette.selectedGlow"
+          :transparent="true"
+          :opacity="0.34"
+          :depth-test="false"
+          :depth-write="false"
+        />
       </TresMesh>
 
       <TresMesh
@@ -565,13 +633,13 @@ onBeforeUnmount(() => {
         :scale="selectedHighlight.scale"
       >
         <TresBoxGeometry />
-        <TresMeshBasicMaterial color="#78ffff" :transparent="true" :opacity="0.9" :depth-test="false" :depth-write="false" />
+        <TresMeshBasicMaterial :color="scenePalette.selected" :transparent="true" :opacity="0.9" :depth-test="false" :depth-write="false" />
       </TresMesh>
 
       <TresMesh v-if="selectedOutline" name="selected-box-outline" :position="selectedOutline.position" :scale="selectedOutline.scale">
         <TresBoxGeometry />
         <TresMeshBasicMaterial
-          color="#f6ffff"
+          :color="scenePalette.selectedOutline"
           :wireframe="true"
           :transparent="true"
           :opacity="1"
@@ -583,7 +651,7 @@ onBeforeUnmount(() => {
       <TresMesh v-if="selectedHighlight" name="selected-box-edge" :position="selectedHighlight.position" :scale="selectedHighlight.scale">
         <TresBoxGeometry />
         <TresMeshBasicMaterial
-          color="#2dffff"
+          :color="scenePalette.selectedEdge"
           :wireframe="true"
           :transparent="true"
           :opacity="1"
@@ -630,14 +698,14 @@ onBeforeUnmount(() => {
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  background: rgba(3, 8, 14, 0.72);
+  background: var(--scene-bg);
 }
 
 .cargo-scene-v2-canvas {
   width: 100%;
   height: 100%;
   min-height: 0;
-  background: rgba(3, 8, 14, 0.72);
+  background: var(--scene-bg);
   cursor: grab;
   touch-action: none;
   user-select: none;
@@ -660,8 +728,8 @@ onBeforeUnmount(() => {
   padding: 6px 9px;
   border: 1px solid rgba(104, 166, 255, 0.34);
   border-radius: 6px;
-  background: rgba(5, 14, 22, 0.8);
-  color: #cbdcf2;
+  background: var(--scene-notice-bg);
+  color: var(--scene-notice-text);
   font-size: 11px;
   font-weight: 650;
   line-height: 1.4;
@@ -680,14 +748,14 @@ onBeforeUnmount(() => {
   padding: 0 8px;
   border: 1px solid color-mix(in srgb, var(--projection-label-color) 86%, transparent);
   border-radius: 6px;
-  background: rgba(6, 11, 17, 0.76);
+  background: var(--scene-label-bg);
   color: var(--projection-label-color);
   font-size: 12px;
   font-weight: 800;
   line-height: 1;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.72);
+  text-shadow: var(--scene-label-text-shadow);
   white-space: nowrap;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.26);
+  box-shadow: var(--scene-label-shadow);
   will-change: transform;
 }
 
@@ -697,9 +765,9 @@ onBeforeUnmount(() => {
 
 .projection-label--selected {
   min-width: 32px;
-  border-color: rgba(110, 252, 255, 0.92);
-  background: rgba(2, 38, 46, 0.84);
-  color: #d9ffff;
+  border-color: color-mix(in srgb, var(--scene-selected-accent) 76%, transparent);
+  background: var(--scene-selected-label-bg);
+  color: var(--scene-selected-label-text);
 }
 
 .endpoint-legend {
@@ -716,8 +784,8 @@ onBeforeUnmount(() => {
   padding: 7px 9px;
   border: 1px solid rgba(148, 163, 184, 0.22);
   border-radius: 7px;
-  background: rgba(7, 13, 20, 0.78);
-  color: #d8e3ec;
+  background: var(--scene-legend-bg);
+  color: var(--scene-legend-text);
   font-size: 12px;
   font-weight: 700;
   line-height: 1;
@@ -734,7 +802,7 @@ onBeforeUnmount(() => {
 .endpoint-legend__swatch {
   width: 10px;
   height: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--scene-swatch-border);
   border-radius: 2px;
 }
 
@@ -743,15 +811,15 @@ onBeforeUnmount(() => {
   height: 4px;
   border: 0;
   border-radius: 999px;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28);
+  box-shadow: 0 0 0 1px var(--scene-swatch-ring);
 }
 
 .endpoint-legend__swatch--selected {
   width: 14px;
   height: 10px;
-  border-color: #6efcff;
+  border-color: var(--scene-selected-accent);
   border-radius: 3px;
-  background: rgba(110, 252, 255, 0.18) !important;
-  box-shadow: 0 0 0 1px rgba(110, 252, 255, 0.36);
+  background: color-mix(in srgb, var(--scene-selected-accent) 18%, transparent) !important;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--scene-selected-accent) 36%, transparent);
 }
 </style>

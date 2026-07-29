@@ -73,12 +73,12 @@ describe("cargo scene model", () => {
     );
   });
 
-  it("maps selected carton coordinate target points to Three/Tres scene coordinates", async () => {
+  it("maps the selected carton reference corner to Three/Tres scene coordinates", async () => {
     const module = await import("../src/renderers/cargoSceneModel");
     const points = module.toSceneCoordinatePoints(
       {
         x: 0,
-        y: 0,
+        y: 2000,
         z: 0,
         dx: 500,
         dy: 400,
@@ -92,16 +92,10 @@ describe("cargo scene model", () => {
 
     assert.deepEqual(points, [
       {
-        key: "door-face-center",
-        label: "柜门面",
-        color: "#42d6a4",
-        position: [-5.5, -1.15, -1],
-      },
-      {
-        key: "top-face-center",
-        label: "上表面",
+        key: "position-reference-corner",
+        label: "远离柜门面的左下角",
         color: "#68a6ff",
-        position: [-5.75, -1, -1],
+        position: [-6, -1.3, 1.2],
       },
     ]);
   });

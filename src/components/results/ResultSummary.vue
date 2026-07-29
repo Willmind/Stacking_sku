@@ -157,7 +157,7 @@ dt {
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(16, 24, 33, 0.72);
+  background: var(--surface-row);
 }
 
 .detail-list {
@@ -172,7 +172,7 @@ dt {
   padding: 12px;
   border: 1px solid rgba(104, 166, 255, 0.24);
   border-radius: 8px;
-  background: rgba(16, 24, 33, 0.68);
+  background: var(--surface-row-soft);
 }
 
 .strategy-notes h2 {

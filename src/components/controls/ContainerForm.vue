@@ -75,7 +75,7 @@ const clearanceFields = [
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.042), rgba(255, 255, 255, 0.022));
+  background: linear-gradient(180deg, var(--section-bg-start), var(--section-bg-end));
 }
 
 h2 {
@@ -131,7 +131,7 @@ h3 {
   flex: 0 0 auto;
   border: 1px solid rgba(174, 184, 201, 0.2);
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.035);
+  background: var(--surface-button);
   color: var(--muted);
   font-size: 11px;
   font-weight: 900;

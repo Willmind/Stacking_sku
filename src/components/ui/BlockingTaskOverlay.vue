@@ -63,7 +63,7 @@ function handleOpenChange(open: boolean) {
   position: fixed;
   inset: 0;
   z-index: 140;
-  background: rgba(2, 6, 12, 0.78);
+  background: var(--overlay-bg-strong);
   backdrop-filter: blur(14px);
   animation: blocking-task-overlay-in 180ms ease both;
 }
@@ -80,13 +80,11 @@ function handleOpenChange(open: boolean) {
   gap: 18px;
   overflow: auto;
   padding: 20px;
-  border: 1px solid rgba(174, 184, 201, 0.26);
+  border: 1px solid var(--task-card-border);
   border-radius: 9px;
   outline: none;
   background: var(--panel);
-  box-shadow:
-    0 28px 90px rgba(0, 0, 0, 0.56),
-    var(--panel-shadow);
+  box-shadow: var(--task-card-shadow), var(--panel-shadow);
   animation: blocking-task-content-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
@@ -126,11 +124,11 @@ function handleOpenChange(open: boolean) {
   width: 76px;
   height: 76px;
   place-items: center;
-  border: 1px solid rgba(66, 214, 164, 0.3);
+  border: 1px solid var(--task-spinner-border);
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(66, 214, 164, 0.16), transparent 68%), rgba(8, 18, 25, 0.72);
-  color: var(--accent);
-  box-shadow: 0 0 38px rgba(66, 214, 164, 0.14);
+  background: var(--task-spinner-bg);
+  color: var(--task-spinner-color);
+  box-shadow: var(--task-spinner-shadow);
 }
 
 .blocking-task-spinner svg {
@@ -160,7 +158,7 @@ function handleOpenChange(open: boolean) {
   display: flex;
   justify-content: flex-end;
   padding-top: 14px;
-  border-top: 1px solid rgba(174, 184, 201, 0.18);
+  border-top: 1px solid var(--task-divider);
 }
 
 .blocking-task-cancel {
@@ -173,7 +171,7 @@ function handleOpenChange(open: boolean) {
   border: 1px solid rgba(240, 120, 120, 0.4);
   border-radius: 7px;
   background: rgba(240, 120, 120, 0.1);
-  color: #ffabab;
+  color: var(--danger-action-text);
   font-weight: 900;
 }
 

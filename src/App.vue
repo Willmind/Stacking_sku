@@ -11,6 +11,7 @@ import Plan2DView from "./components/visualizations/Plan2DView.vue";
 import ResultSummary from "./components/results/ResultSummary.vue";
 import SkuBreakdown from "./components/results/SkuBreakdown.vue";
 import BlockingTaskOverlay from "./components/ui/BlockingTaskOverlay.vue";
+import ThemeModeControl from "./components/ui/ThemeModeControl.vue";
 import { usePackingStore } from "./stores/packingStore";
 
 const BatchImportDialog = defineAsyncComponent(() => import("./components/controls/BatchImportDialog.vue"));
@@ -57,6 +58,7 @@ async function handleCalculate() {
           <h1>智能装柜助手</h1>
           <p>纸箱装载量与排布可视化</p>
         </div>
+        <ThemeModeControl />
       </div>
 
       <ResultSummary section="overview" />
@@ -148,6 +150,11 @@ async function handleCalculate() {
   align-items: center;
 }
 
+.brand-lockup > div {
+  min-width: 0;
+  margin-right: auto;
+}
+
 .brand-mark {
   display: grid;
   width: 42px;
@@ -167,6 +174,7 @@ p {
 h1 {
   font-size: 26px;
   line-height: 1.1;
+  white-space: nowrap;
 }
 
 p {
@@ -179,31 +187,29 @@ p {
   align-items: center;
   justify-content: center;
   min-height: 48px;
-  border: 1px solid rgba(66, 214, 164, 0.54);
+  border: 1px solid var(--primary-button-border);
   border-radius: 8px;
-  background: linear-gradient(180deg, #52e0b5, var(--accent-strong));
-  color: #04110d;
+  background: var(--primary-button-bg);
+  color: var(--primary-button-text);
   font-weight: 900;
-  box-shadow: 0 16px 34px rgba(47, 189, 148, 0.2);
+  box-shadow: var(--primary-button-shadow);
 }
 
 .calculate-button:not(:disabled):hover {
-  border-color: rgba(92, 237, 193, 0.82);
-  background: linear-gradient(180deg, #68e8c2, #35cba0);
-  box-shadow: 0 18px 40px rgba(47, 189, 148, 0.26);
+  border-color: var(--primary-button-border-hover);
+  background: var(--primary-button-bg-hover);
+  box-shadow: var(--primary-button-shadow-hover);
 }
 
 .calculate-button:not(:disabled):active {
-  background: linear-gradient(180deg, #35cba0, #279e7d);
-  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.24);
+  background: var(--primary-button-bg-active);
+  box-shadow: var(--primary-button-shadow-active);
 }
 
 .calculate-button--loading {
-  border-color: rgba(92, 237, 193, 0.72);
-  background: linear-gradient(180deg, #55dfb7, #31c59b);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
-    0 16px 34px rgba(47, 189, 148, 0.2);
+  border-color: var(--primary-button-border);
+  background: var(--primary-button-bg);
+  box-shadow: var(--primary-button-shadow);
 }
 
 .error {
@@ -221,15 +227,17 @@ p {
 
 .top-strip {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: 252px minmax(0, 1fr);
   gap: 18px;
   align-items: center;
 }
 
 .status-line {
-  display: flex;
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
   gap: 14px;
   align-items: center;
+  width: 252px;
   min-width: 0;
 }
 
@@ -238,7 +246,8 @@ p {
   gap: 7px;
   align-items: center;
   justify-content: center;
-  min-width: 96px;
+  width: 104px;
+  min-width: 0;
   padding: 8px 12px;
   border: 1px solid var(--status-chip-border);
   border-radius: 6px;
@@ -248,6 +257,14 @@ p {
   font-weight: 900;
   text-align: center;
   box-shadow: inset 0 0 0 1px var(--status-chip-ring);
+}
+
+#progress-text {
+  min-width: 0;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
 }
 
 #status-chip::before {
@@ -270,7 +287,7 @@ p {
 .status-chip--dirty {
   --status-chip-bg: rgba(217, 166, 79, 0.14);
   --status-chip-border: rgba(217, 166, 79, 0.46);
-  --status-chip-color: #f0bc68;
+  --status-chip-color: var(--warning-text);
   --status-chip-ring: rgba(217, 166, 79, 0.1);
 }
 
@@ -284,14 +301,14 @@ p {
 .status-chip--empty {
   --status-chip-bg: rgba(104, 166, 255, 0.12);
   --status-chip-border: rgba(104, 166, 255, 0.43);
-  --status-chip-color: #8dbdff;
+  --status-chip-color: var(--blue-text);
   --status-chip-ring: rgba(104, 166, 255, 0.1);
 }
 
 .status-chip--error {
   --status-chip-bg: rgba(240, 120, 120, 0.13);
   --status-chip-border: rgba(240, 120, 120, 0.48);
-  --status-chip-color: #ff8d8d;
+  --status-chip-color: var(--danger-text);
   --status-chip-ring: rgba(240, 120, 120, 0.1);
 }
 
@@ -355,6 +372,37 @@ p {
     grid-template-rows: clamp(420px, 58dvh, 640px) clamp(300px, 38dvh, 420px);
     height: auto;
     overflow: visible;
+  }
+}
+
+@media (max-width: 560px) {
+  .top-strip {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .status-line {
+    width: 100%;
+    grid-template-columns: 104px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 460px) {
+  .brand-lockup {
+    gap: 9px;
+  }
+
+  .brand-mark {
+    width: 38px;
+    height: 38px;
+  }
+
+  h1 {
+    font-size: 22px;
+  }
+
+  .brand-lockup :deep(.theme-mode-trigger span) {
+    display: none;
   }
 }
 </style>

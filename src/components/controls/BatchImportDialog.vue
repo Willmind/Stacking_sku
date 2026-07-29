@@ -868,7 +868,7 @@ onBeforeUnmount(() => {
   gap: 13px;
   border: 1px solid rgba(174, 184, 201, 0.18);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.028);
+  background: var(--surface-card-soft);
   padding: 14px;
 }
 
@@ -919,7 +919,7 @@ onBeforeUnmount(() => {
   gap: 6px;
   border: 1px solid rgba(174, 184, 201, 0.22);
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--surface-button);
   color: var(--text);
   font-size: 12px;
   font-weight: 900;
@@ -1054,7 +1054,7 @@ onBeforeUnmount(() => {
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(2, 6, 12, 0.68);
+  background: var(--overlay-bg);
   backdrop-filter: blur(10px);
 }
 
@@ -1065,7 +1065,7 @@ onBeforeUnmount(() => {
   gap: 14px;
   border: 1px solid rgba(174, 184, 201, 0.24);
   border-radius: 8px;
-  background: linear-gradient(180deg, rgba(26, 36, 49, 0.98), rgba(18, 27, 38, 0.98));
+  background: linear-gradient(180deg, var(--surface-floating-strong), var(--surface-floating));
   box-shadow:
     0 24px 72px rgba(0, 0, 0, 0.46),
     var(--panel-shadow);
@@ -1332,7 +1332,7 @@ onBeforeUnmount(() => {
   place-items: center;
   border: 1px solid rgba(174, 184, 201, 0.18);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--surface-card-soft);
 }
 
 table {
@@ -1355,7 +1355,7 @@ th {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: #17212c;
+  background: var(--surface-table-head);
   color: var(--muted);
   font-weight: 900;
 }
@@ -1440,15 +1440,16 @@ tr.failed td {
 }
 
 .dialog-action.primary {
-  border-color: rgba(66, 214, 164, 0.48);
-  background: linear-gradient(180deg, #52e0b5, var(--accent-strong));
-  color: #04110d;
-  box-shadow: 0 12px 28px rgba(47, 189, 148, 0.18);
+  border-color: var(--primary-button-border);
+  background: var(--primary-button-bg);
+  color: var(--primary-button-text);
+  box-shadow: var(--primary-button-shadow);
 }
 
 .dialog-action.primary:hover {
-  border-color: rgba(92, 237, 193, 0.78);
-  background: linear-gradient(180deg, #68e8c2, #35cba0);
+  border-color: var(--primary-button-border-hover);
+  background: var(--primary-button-bg-hover);
+  box-shadow: var(--primary-button-shadow-hover);
 }
 
 .dialog-action.primary:disabled,

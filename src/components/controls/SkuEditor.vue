@@ -208,7 +208,7 @@ onBeforeUnmount(finishDrag);
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.042), rgba(255, 255, 255, 0.022));
+  background: linear-gradient(180deg, var(--section-bg-start), var(--section-bg-end));
 }
 
 h2 {
@@ -261,7 +261,7 @@ input[type="range"] {
   transform: scale(1.02);
   border: 1px solid rgba(92, 237, 193, 0.64);
   border-radius: 8px;
-  background: linear-gradient(180deg, rgba(26, 36, 49, 0.98), rgba(18, 27, 38, 0.98));
+  background: linear-gradient(180deg, var(--surface-floating-strong), var(--surface-floating));
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.38);
   padding: 12px;
 }

@@ -31,7 +31,7 @@ const store = usePackingStore();
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--surface-button);
 }
 
 .sku-swatch {

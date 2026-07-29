@@ -14,21 +14,20 @@ const COORDINATE_TABLE_OVERSCAN = 10;
 type CoordinateColumnKey = Extract<keyof BoxCoordinateRow, string>;
 
 const coordinateColumnSpecs: Array<{ key: CoordinateColumnKey; header: (typeof BOX_COORDINATE_HEADERS)[number] }> = [
-  { key: "sequence", header: "序号" },
-  { key: "loadingSequence", header: "装载顺序" },
+  { key: "totalId", header: "总ID" },
   { key: "sku", header: "SKU" },
-  { key: "centerX", header: "中心点X" },
-  { key: "centerY", header: "中心点Y" },
-  { key: "centerZ", header: "中心点Z" },
-  { key: "eulerX", header: "欧拉角X" },
-  { key: "eulerY", header: "欧拉角Y" },
-  { key: "eulerZ", header: "欧拉角Z" },
   { key: "length", header: "长" },
   { key: "width", header: "宽" },
   { key: "height", header: "高" },
-  { key: "layer", header: "层" },
-  { key: "row", header: "排" },
-  { key: "column", header: "列" },
+  { key: "x", header: "X" },
+  { key: "y", header: "Y" },
+  { key: "z", header: "Z" },
+  { key: "a", header: "A" },
+  { key: "b", header: "B" },
+  { key: "c", header: "C" },
+  { key: "layer", header: "所属层" },
+  { key: "row", header: "所属排" },
+  { key: "rowSequence", header: "排内ID" },
   { key: "orientation", header: "朝向" },
 ];
 
@@ -49,20 +48,20 @@ const coordinateSummary = computed(() =>
 );
 const selectedText = computed(() => {
   if (!selectedRow.value) return "当前选中：-";
-  return `当前选中：#${selectedRow.value.sequence} · 装载顺序 ${selectedRow.value.loadingSequence}`;
+  return `当前选中：总ID ${selectedRow.value.totalId} · 第 ${selectedRow.value.row} 排 · 排内ID ${selectedRow.value.rowSequence}`;
 });
 const selectedLabel = computed(() =>
-  selectedRow.value ? `#${selectedRow.value.sequence} · 顺序 ${selectedRow.value.loadingSequence}` : "",
+  selectedRow.value ? `总ID ${selectedRow.value.totalId} · 排内 ${selectedRow.value.rowSequence}` : "",
 );
-const selectedCenterText = computed(() => {
+const selectedPositionText = computed(() => {
   const row = selectedRow.value;
   if (!row) return "-";
-  return `(${formatNumber(row.centerX)}, ${formatNumber(row.centerY)}, ${formatNumber(row.centerZ)})`;
+  return `(${formatNumber(row.x)}, ${formatNumber(row.y)}, ${formatNumber(row.z)})`;
 });
 const selectedEulerText = computed(() => {
   const row = selectedRow.value;
   if (!row) return "-";
-  return `(${formatNumber(row.eulerX)}°, ${formatNumber(row.eulerY)}°, ${formatNumber(row.eulerZ)}°)`;
+  return `(${formatNumber(row.a)}°, ${formatNumber(row.b)}°, ${formatNumber(row.c)}°)`;
 });
 
 function formatNumber(value: number) {
@@ -78,7 +77,7 @@ const coordinateTable = useVueTable({
   data: rows,
   columns: coordinateColumns,
   getCoreRowModel: getCoreRowModel(),
-  getRowId: (row) => String(row.sequence),
+  getRowId: (row) => String(row.totalId),
 });
 const coordinateTableRows = computed(() => {
   const rowCount = rows.value.length;
@@ -112,7 +111,7 @@ const bottomSpacerHeight = computed(() => {
 
 function openDialog() {
   if (!hasRows.value) return;
-  const matchingRow = rows.value.find((row) => row.sequence === selectedRow.value?.sequence);
+  const matchingRow = rows.value.find((row) => row.totalId === selectedRow.value?.totalId);
   selectedRow.value = matchingRow ?? rows.value[0];
   isOpen.value = true;
   void nextTick(() => coordinateVirtualizer.value.measure());
@@ -143,7 +142,7 @@ watch(
       selectedRow.value = null;
       return;
     }
-    const matchingRow = nextRows.find((row) => row.sequence === selectedRow.value?.sequence);
+    const matchingRow = nextRows.find((row) => row.totalId === selectedRow.value?.totalId);
     selectedRow.value = matchingRow ?? nextRows[0];
   },
 );
@@ -173,7 +172,9 @@ watch(
 
     <div class="coordinate-layout">
       <p class="coordinate-system-note">
-        坐标系：原点为角件端右下角；X 沿柜宽向左，Y 向柜门，Z 向上；位置使用纸箱中心点；欧拉角使用角度制，旋转顺序 XYZ。
+        坐标系：观察者站在柜门处望向角件端，原点为观察画面中角件端的左下角；X 沿柜长反方向（远离观察者），Y 沿柜宽反方向，Z
+        向上；位置使用纸箱远离柜门面的左下角；A 绕 Z 轴（偏航），B 绕 Y 轴（俯仰），C 绕 X 轴（滚转），使用角度制，欧拉角顺序
+        Z-Y-X。所属排从角件端向柜门编号，排内ID按同排中的总ID顺序编号。
       </p>
 
       <div class="coordinate-content">
@@ -194,7 +195,7 @@ watch(
                 v-for="{ row, virtualRow } in coordinateVirtualRows"
                 :key="row.id"
                 :data-index="virtualRow.index"
-                :class="{ 'is-selected': selectedRow?.sequence === row.original.sequence }"
+                :class="{ 'is-selected': selectedRow?.totalId === row.original.totalId }"
                 tabindex="0"
                 @click="selectRow(row.original)"
                 @keydown.enter.prevent="selectRow(row.original)"
@@ -217,11 +218,11 @@ watch(
             <span>点击左侧任一行，高亮对应纸箱；XYZ 轴从原点伸出</span>
             <dl class="coordinate-preview-metrics" aria-label="当前选中坐标点">
               <div>
-                <dt>中心点</dt>
-                <dd>{{ selectedCenterText }}</dd>
+                <dt>参考点 XYZ</dt>
+                <dd>{{ selectedPositionText }}</dd>
               </div>
               <div>
-                <dt>欧拉角 XYZ</dt>
+                <dt>欧拉角 ABC</dt>
                 <dd>{{ selectedEulerText }}</dd>
               </div>
             </dl>
@@ -231,7 +232,7 @@ watch(
             class="coordinate-preview-canvas"
             :result="store.result"
             :visible-count="store.result?.totalBoxes ?? 0"
-            :selected-loading-sequence="selectedRow?.loadingSequence"
+            :selected-loading-sequence="selectedRow?.totalId"
             :selected-label="selectedLabel"
             :camera-zoom="1.6"
             show-coordinate-axes
@@ -265,7 +266,7 @@ watch(
   gap: 7px;
   border: 1px solid rgba(174, 184, 201, 0.22);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--surface-button);
   color: var(--text);
   font-weight: 900;
 }
@@ -279,7 +280,7 @@ watch(
 .coordinate-button:hover,
 .coordinate-action:hover {
   border-color: var(--control-border-hover);
-  background: rgba(255, 255, 255, 0.075);
+  background: var(--surface-button-hover);
   color: var(--accent);
 }
 
@@ -298,7 +299,7 @@ watch(
   border: 1px solid rgba(104, 166, 255, 0.32);
   border-radius: 8px;
   background: rgba(104, 166, 255, 0.12);
-  color: #8dbdff;
+  color: var(--blue-text);
 }
 
 .coordinate-layout {
@@ -359,7 +360,7 @@ th {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: #17212c;
+  background: var(--surface-table-head);
   color: var(--muted);
   font-weight: 900;
 }
@@ -410,7 +411,7 @@ tr:last-child td {
   overflow: hidden;
   border: 1px solid rgba(174, 184, 201, 0.18);
   border-radius: 8px;
-  background: rgba(3, 8, 14, 0.72);
+  background: var(--scene-panel-bg);
 }
 
 .coordinate-preview-head {
@@ -418,6 +419,7 @@ tr:last-child td {
   gap: 3px;
   padding: 10px 12px;
   border-bottom: 1px solid rgba(174, 184, 201, 0.14);
+  background: var(--scene-panel-header);
 }
 
 .coordinate-preview-head strong {
@@ -446,7 +448,7 @@ tr:last-child td {
   padding: 8px 10px;
   border: 1px solid rgba(174, 184, 201, 0.14);
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.035);
+  background: var(--surface-card);
 }
 
 .coordinate-preview-metrics dt {
@@ -467,7 +469,7 @@ tr:last-child td {
   width: 100%;
   height: 100%;
   min-height: 420px;
-  background: rgba(3, 8, 14, 0.72);
+  background: var(--scene-bg);
   cursor: grab;
   touch-action: none;
   user-select: none;
@@ -480,16 +482,17 @@ tr:last-child td {
 }
 
 .coordinate-action.primary {
-  border-color: rgba(66, 214, 164, 0.48);
-  background: linear-gradient(180deg, #52e0b5, var(--accent-strong));
-  color: #04110d;
-  box-shadow: 0 12px 28px rgba(47, 189, 148, 0.18);
+  border-color: var(--primary-button-border);
+  background: var(--primary-button-bg);
+  color: var(--primary-button-text);
+  box-shadow: var(--primary-button-shadow);
 }
 
 .coordinate-action.primary:hover {
-  border-color: rgba(92, 237, 193, 0.78);
-  background: linear-gradient(180deg, #68e8c2, #35cba0);
-  color: #04110d;
+  border-color: var(--primary-button-border-hover);
+  background: var(--primary-button-bg-hover);
+  color: var(--primary-button-text);
+  box-shadow: var(--primary-button-shadow-hover);
 }
 
 @media (max-width: 980px) {

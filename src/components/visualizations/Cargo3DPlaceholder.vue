@@ -52,7 +52,7 @@ span {
   color: var(--muted);
   font-size: 13px;
   background:
-    radial-gradient(circle at 18% 12%, rgba(66, 214, 164, 0.1), transparent 34%),
-    radial-gradient(circle at 86% 82%, rgba(104, 166, 255, 0.08), transparent 30%), rgba(3, 8, 14, 0.72);
+    radial-gradient(circle at 18% 12%, var(--scene-accent-green), transparent 34%),
+    radial-gradient(circle at 86% 82%, var(--scene-accent-blue), transparent 30%), var(--scene-bg);
 }
 </style>
