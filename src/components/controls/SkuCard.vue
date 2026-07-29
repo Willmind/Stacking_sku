@@ -119,7 +119,7 @@ function startDrag(event: PointerEvent) {
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.048), rgba(255, 255, 255, 0.022));
+  background: linear-gradient(180deg, var(--section-bg-start), var(--section-bg-end));
 }
 
 .sku-card--dragging {
@@ -216,8 +216,8 @@ function startDrag(event: PointerEvent) {
   padding: 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(18, 27, 38, 0.98);
-  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.34);
+  background: var(--surface-floating);
+  box-shadow: var(--popover-shadow);
 }
 
 .sku-fields {

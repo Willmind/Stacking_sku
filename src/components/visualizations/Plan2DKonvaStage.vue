@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import { useTheme } from "../../composables/useTheme";
 import type { PackingResult } from "../../core/packing";
 import {
   createPlan2DSceneModel,
@@ -29,6 +30,7 @@ const props = withDefaults(
 
 const stageHostRef = ref<HTMLElement | null>(null);
 const stageSize = ref({ width: 360, height: 280 });
+const { resolvedTheme } = useTheme();
 let resizeObserver: ResizeObserver | null = null;
 const GUIDE_LABEL_PADDING_X = 10;
 const GUIDE_LABEL_PADDING_Y = 8;
@@ -138,14 +140,36 @@ const axisGuideConfig = computed(() => {
   };
 });
 
+function themeColor(name: string, fallback: string) {
+  void resolvedTheme.value;
+  if (typeof document === "undefined") return fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
 function rectConfig(rect: Plan2DSceneRectModel) {
+  const isLightTheme = resolvedTheme.value === "light";
+  let fill = rect.fillStyle;
+  let stroke = rect.strokeStyle;
+
+  if (isLightTheme) {
+    if (rect.kind === "container-fill") fill = "rgba(255, 255, 255, 0.78)";
+    if (rect.kind === "carton" && !rect.visible) {
+      fill = "rgba(55, 78, 70, 0.045)";
+      stroke = "rgba(55, 78, 70, 0.12)";
+    } else if (rect.kind === "carton") {
+      stroke = "rgba(35, 45, 41, 0.62)";
+    }
+    if (rect.kind === "container-outline") stroke = "rgba(43, 70, 61, 0.5)";
+    if (rect.kind === "effective-space") stroke = themeColor("--accent", "#08785b");
+  }
+
   return {
     x: rect.x,
     y: rect.y,
     width: Math.max(0, rect.width),
     height: Math.max(0, rect.height),
-    fill: rect.fillStyle,
-    stroke: rect.strokeStyle,
+    fill,
+    stroke,
     strokeWidth: rect.lineWidth ?? 0,
     dash: rect.lineDash,
     listening: false,
@@ -157,7 +181,7 @@ function rectConfig(rect: Plan2DSceneRectModel) {
 function lineConfig(points: number[], options: { dash?: number[]; stroke?: string; strokeWidth?: number } = {}) {
   return {
     points,
-    stroke: options.stroke ?? "rgba(245, 247, 251, 0.64)",
+    stroke: options.stroke ?? themeColor("--visual-guide", "rgba(245, 247, 251, 0.64)"),
     strokeWidth: options.strokeWidth ?? 1,
     dash: options.dash ?? [5, 4],
     listening: false,
@@ -186,7 +210,7 @@ const emptyTextConfig = computed(() => ({
   width: sceneModel.value.width,
   text: sceneModel.value.emptyMessage ?? "",
   align: "center",
-  fill: "rgba(245, 247, 251, 0.78)",
+  fill: themeColor("--visual-empty-text", "rgba(245, 247, 251, 0.78)"),
   fontFamily: "Inter, sans-serif",
   fontSize: 16,
   fontStyle: "700",
@@ -199,7 +223,7 @@ const effectiveSpaceTextConfig = computed(() => {
     x: label?.x ?? 0,
     y: (label?.y ?? 0) - 13,
     text: label?.text ?? "",
-    fill: "rgba(66, 214, 164, 0.92)",
+    fill: themeColor("--accent", "rgba(66, 214, 164, 0.92)"),
     fontFamily: "Inter, sans-serif",
     fontSize: 11,
     fontStyle: "800",
@@ -278,9 +302,9 @@ onBeforeUnmount(() => {
   padding: 6px 10px;
   border: 1px solid rgba(142, 156, 172, 0.42);
   border-radius: 7px;
-  background: rgba(5, 14, 17, 0.88);
+  background: var(--visual-label-bg);
   box-shadow: 0 5px 12px rgba(0, 0, 0, 0.18);
-  color: rgba(245, 247, 251, 0.96);
+  color: var(--visual-label-text);
   font-family: Inter, sans-serif;
   font-size: 12px;
   font-weight: 900;
@@ -301,7 +325,7 @@ onBeforeUnmount(() => {
 }
 
 .plan-guide-label__line--count {
-  color: rgba(66, 214, 164, 0.98);
+  color: var(--accent);
 }
 
 .plan-canvas-shell {
@@ -310,10 +334,10 @@ onBeforeUnmount(() => {
   min-height: 0;
   overflow: hidden;
   background:
-    radial-gradient(circle at 18% 12%, rgba(66, 214, 164, 0.1), transparent 34%),
-    radial-gradient(circle at 86% 78%, rgba(104, 166, 255, 0.09), transparent 30%),
-    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px), rgba(3, 8, 14, 0.72);
+    radial-gradient(circle at 18% 12%, var(--visual-accent-green), transparent 34%),
+    radial-gradient(circle at 86% 78%, var(--visual-accent-blue), transparent 30%),
+    linear-gradient(var(--visual-grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--visual-grid-line) 1px, transparent 1px),
+    var(--visual-canvas);
   background-size:
     auto,
     auto,
@@ -332,15 +356,15 @@ onBeforeUnmount(() => {
 }
 
 .plan-canvas-shell::before {
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px var(--visual-inset-line);
 }
 
 .plan-canvas-shell::after {
   background:
     linear-gradient(90deg, rgba(66, 214, 164, 0.18), transparent 18%, transparent 82%, rgba(104, 166, 255, 0.12)),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 24%);
-  opacity: 0.42;
-  mix-blend-mode: screen;
+    linear-gradient(180deg, var(--visual-overlay-start), transparent 24%);
+  opacity: 0.24;
+  mix-blend-mode: var(--visual-overlay-blend);
 }
 
 .plan-canvas-shell--expanded {

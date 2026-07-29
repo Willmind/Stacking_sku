@@ -120,7 +120,7 @@ function updateValue(value: number) {
   justify-items: stretch;
   grid-template-rows: repeat(2, minmax(0, 1fr));
   border-left: 1px solid var(--control-border);
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--control-bg-strong);
 }
 
 .base-number-stepper {
@@ -146,7 +146,7 @@ function updateValue(value: number) {
 }
 
 .base-number-stepper:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--control-bg-hover);
   color: var(--text);
 }
 

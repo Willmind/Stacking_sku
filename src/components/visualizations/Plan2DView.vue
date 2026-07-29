@@ -298,7 +298,7 @@ span {
   overflow: hidden;
   border: 1px solid rgba(174, 184, 201, 0.18);
   border-radius: 8px;
-  background: linear-gradient(180deg, rgba(13, 24, 33, 0.9), rgba(4, 10, 16, 0.88)), rgba(3, 8, 14, 0.52);
+  background: linear-gradient(180deg, var(--visual-card-start), var(--visual-card-end));
 }
 
 .plan-view-card--switchable {
@@ -421,7 +421,7 @@ span {
   grid-column: 1 / -1;
   min-width: 0;
   max-width: 100%;
-  color: rgba(245, 247, 251, 0.78);
+  color: var(--visual-empty-text);
   font-size: 11px;
   line-height: 1.2;
 }

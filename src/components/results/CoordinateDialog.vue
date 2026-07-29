@@ -266,7 +266,7 @@ watch(
   gap: 7px;
   border: 1px solid rgba(174, 184, 201, 0.22);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--surface-button);
   color: var(--text);
   font-weight: 900;
 }
@@ -280,7 +280,7 @@ watch(
 .coordinate-button:hover,
 .coordinate-action:hover {
   border-color: var(--control-border-hover);
-  background: rgba(255, 255, 255, 0.075);
+  background: var(--surface-button-hover);
   color: var(--accent);
 }
 
@@ -299,7 +299,7 @@ watch(
   border: 1px solid rgba(104, 166, 255, 0.32);
   border-radius: 8px;
   background: rgba(104, 166, 255, 0.12);
-  color: #8dbdff;
+  color: var(--blue-text);
 }
 
 .coordinate-layout {
@@ -360,7 +360,7 @@ th {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: #17212c;
+  background: var(--surface-table-head);
   color: var(--muted);
   font-weight: 900;
 }
@@ -411,7 +411,7 @@ tr:last-child td {
   overflow: hidden;
   border: 1px solid rgba(174, 184, 201, 0.18);
   border-radius: 8px;
-  background: rgba(3, 8, 14, 0.72);
+  background: var(--scene-panel-bg);
 }
 
 .coordinate-preview-head {
@@ -419,6 +419,7 @@ tr:last-child td {
   gap: 3px;
   padding: 10px 12px;
   border-bottom: 1px solid rgba(174, 184, 201, 0.14);
+  background: var(--scene-panel-header);
 }
 
 .coordinate-preview-head strong {
@@ -447,7 +448,7 @@ tr:last-child td {
   padding: 8px 10px;
   border: 1px solid rgba(174, 184, 201, 0.14);
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.035);
+  background: var(--surface-card);
 }
 
 .coordinate-preview-metrics dt {
@@ -468,7 +469,7 @@ tr:last-child td {
   width: 100%;
   height: 100%;
   min-height: 420px;
-  background: rgba(3, 8, 14, 0.72);
+  background: var(--scene-bg);
   cursor: grab;
   touch-action: none;
   user-select: none;
@@ -481,16 +482,17 @@ tr:last-child td {
 }
 
 .coordinate-action.primary {
-  border-color: rgba(66, 214, 164, 0.48);
-  background: linear-gradient(180deg, #52e0b5, var(--accent-strong));
-  color: #04110d;
-  box-shadow: 0 12px 28px rgba(47, 189, 148, 0.18);
+  border-color: var(--primary-button-border);
+  background: var(--primary-button-bg);
+  color: var(--primary-button-text);
+  box-shadow: var(--primary-button-shadow);
 }
 
 .coordinate-action.primary:hover {
-  border-color: rgba(92, 237, 193, 0.78);
-  background: linear-gradient(180deg, #68e8c2, #35cba0);
-  color: #04110d;
+  border-color: var(--primary-button-border-hover);
+  background: var(--primary-button-bg-hover);
+  color: var(--primary-button-text);
+  box-shadow: var(--primary-button-shadow-hover);
 }
 
 @media (max-width: 980px) {

@@ -56,7 +56,7 @@ const store = usePackingStore();
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.042), rgba(255, 255, 255, 0.022));
+  background: linear-gradient(180deg, var(--section-bg-start), var(--section-bg-end));
 }
 
 h2 {

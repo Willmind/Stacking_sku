@@ -105,9 +105,9 @@ legend {
 }
 
 .orientation-option--selected {
-  border-color: rgba(66, 214, 164, 0.54);
-  background: rgba(66, 214, 164, 0.12);
-  color: var(--accent);
+  border-color: var(--orientation-selected-border);
+  background: var(--orientation-selected-bg);
+  color: var(--orientation-selected-text);
 }
 
 .orientation-option input {
@@ -123,20 +123,22 @@ legend {
   width: 18px;
   height: 18px;
   place-items: center;
-  border: 1px solid rgba(161, 175, 192, 0.34);
+  border: 1px solid var(--orientation-check-border);
   border-radius: 5px;
   color: transparent;
-  background: rgba(4, 11, 17, 0.2);
+  background: var(--orientation-check-bg);
+  box-shadow: inset 0 1px 2px rgba(16, 36, 29, 0.08);
 }
 
 .orientation-option--selected .orientation-check {
-  border-color: rgba(66, 214, 164, 0.74);
-  color: var(--accent);
-  background: rgba(66, 214, 164, 0.18);
+  border-color: var(--orientation-check-selected-border);
+  color: var(--orientation-check-selected-text);
+  background: var(--orientation-check-selected-bg);
+  box-shadow: none;
 }
 
 .orientation-option:has(input:focus-visible) {
-  outline: 2px solid rgba(66, 214, 164, 0.5);
+  outline: 2px solid var(--orientation-focus-ring);
   outline-offset: 2px;
 }
 

@@ -19,8 +19,32 @@
   --accent: #42d6a4;
   --accent-strong: #2fbd94;
   --accent-soft: rgba(66, 214, 164, 0.14);
+  --primary-button-bg: linear-gradient(180deg, #52e0b5, #2fbd94);
+  --primary-button-bg-hover: linear-gradient(180deg, #68e8c2, #35cba0);
+  --primary-button-bg-active: linear-gradient(180deg, #35cba0, #279e7d);
+  --primary-button-border: rgba(66, 214, 164, 0.54);
+  --primary-button-border-hover: rgba(92, 237, 193, 0.82);
+  --primary-button-text: #04110d;
+  --primary-button-shadow: 0 16px 34px rgba(47, 189, 148, 0.2);
+  --primary-button-shadow-hover: 0 18px 40px rgba(47, 189, 148, 0.26);
+  --primary-button-shadow-active: inset 0 2px 8px rgba(0, 0, 0, 0.24);
   --range-track-filled: rgba(66, 214, 164, 0.78);
   --range-track-rest: rgba(190, 205, 224, 0.2);
+  --range-track-border: rgba(190, 205, 224, 0.18);
+  --range-track-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28);
+  --range-thumb-bg: var(--accent);
+  --range-thumb-border: rgba(255, 255, 255, 0.86);
+  --range-thumb-shadow: 0 8px 18px rgba(66, 214, 164, 0.34);
+  --range-thumb-shadow-hover: 0 10px 22px rgba(66, 214, 164, 0.42);
+  --orientation-selected-border: rgba(66, 214, 164, 0.54);
+  --orientation-selected-bg: rgba(66, 214, 164, 0.12);
+  --orientation-selected-text: var(--accent);
+  --orientation-check-border: rgba(161, 175, 192, 0.34);
+  --orientation-check-bg: rgba(4, 11, 17, 0.2);
+  --orientation-check-selected-border: rgba(66, 214, 164, 0.74);
+  --orientation-check-selected-bg: rgba(66, 214, 164, 0.18);
+  --orientation-check-selected-text: var(--accent);
+  --orientation-focus-ring: rgba(66, 214, 164, 0.5);
   --blue: #68a6ff;
   --blue-soft: rgba(104, 166, 255, 0.14);
   --warning: #d9a64f;
@@ -31,4 +55,264 @@
   --popover-bg: rgba(15, 23, 32, 0.96);
   --popover-border: rgba(190, 205, 224, 0.23);
   --popover-shadow: 0 22px 60px rgba(0, 0, 0, 0.36);
+  --body-accent-green: rgba(66, 214, 164, 0.07);
+  --body-accent-blue: rgba(104, 166, 255, 0.05);
+  --section-bg-start: rgba(255, 255, 255, 0.042);
+  --section-bg-end: rgba(255, 255, 255, 0.022);
+  --surface-row: rgba(16, 24, 33, 0.72);
+  --surface-row-soft: rgba(16, 24, 33, 0.68);
+  --surface-button: rgba(255, 255, 255, 0.045);
+  --surface-button-hover: rgba(255, 255, 255, 0.075);
+  --surface-card: rgba(255, 255, 255, 0.035);
+  --surface-card-soft: rgba(255, 255, 255, 0.028);
+  --surface-card-strong: rgba(255, 255, 255, 0.075);
+  --surface-table-head: #17212c;
+  --surface-floating: rgba(18, 27, 38, 0.98);
+  --surface-floating-strong: rgba(26, 36, 49, 0.98);
+  --fullscreen-bg: #071016;
+  --fullscreen-header: rgba(15, 24, 33, 0.92);
+  --fullscreen-toolbar: rgba(7, 16, 22, 0.9);
+  --overlay-bg: rgba(2, 6, 12, 0.72);
+  --overlay-bg-strong: rgba(2, 6, 12, 0.78);
+  --task-card-border: rgba(174, 184, 201, 0.26);
+  --task-card-shadow: 0 28px 90px rgba(0, 0, 0, 0.56);
+  --task-spinner-border: rgba(66, 214, 164, 0.3);
+  --task-spinner-bg: radial-gradient(circle, rgba(66, 214, 164, 0.16), transparent 68%), rgba(8, 18, 25, 0.72);
+  --task-spinner-color: var(--accent);
+  --task-spinner-shadow: 0 0 38px rgba(66, 214, 164, 0.14);
+  --task-divider: rgba(174, 184, 201, 0.18);
+  --visual-card-start: rgba(13, 24, 33, 0.9);
+  --visual-card-end: rgba(4, 10, 16, 0.88);
+  --visual-canvas: rgba(3, 8, 14, 0.72);
+  --visual-accent-green: rgba(66, 214, 164, 0.1);
+  --visual-accent-blue: rgba(104, 166, 255, 0.09);
+  --visual-grid-line: rgba(255, 255, 255, 0.028);
+  --visual-inset-line: rgba(255, 255, 255, 0.05);
+  --visual-overlay-start: rgba(255, 255, 255, 0.04);
+  --visual-overlay-blend: screen;
+  --visual-label-bg: rgba(5, 14, 17, 0.88);
+  --visual-label-text: rgba(245, 247, 251, 0.96);
+  --visual-guide: rgba(245, 247, 251, 0.64);
+  --visual-empty-text: rgba(245, 247, 251, 0.78);
+  --warning-text: #f0bc68;
+  --blue-text: #8dbdff;
+  --danger-text: #ff8d8d;
+  --danger-action-text: #ffabab;
+  --scene-bg: #071016;
+  --scene-accent-green: rgba(66, 214, 164, 0.12);
+  --scene-accent-blue: rgba(104, 166, 255, 0.1);
+  --scene-panel-bg: rgba(3, 8, 14, 0.72);
+  --scene-panel-header: rgba(7, 16, 22, 0.76);
+  --scene-inset-line: rgba(255, 255, 255, 0.045);
+  --scene-inset-shadow: rgba(0, 0, 0, 0.16);
+  --scene-label-bg: rgba(6, 11, 17, 0.76);
+  --scene-label-shadow: 0 8px 22px rgba(0, 0, 0, 0.26);
+  --scene-label-text-shadow: 0 1px 2px rgba(0, 0, 0, 0.72);
+  --scene-selected-label-bg: rgba(2, 38, 46, 0.84);
+  --scene-selected-label-text: #d9ffff;
+  --scene-selected-accent: #6efcff;
+  --scene-legend-bg: rgba(7, 13, 20, 0.78);
+  --scene-legend-text: #d8e3ec;
+  --scene-swatch-border: rgba(255, 255, 255, 0.72);
+  --scene-swatch-ring: rgba(255, 255, 255, 0.28);
+  --scene-notice-bg: rgba(5, 14, 22, 0.8);
+  --scene-notice-text: #cbdcf2;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #edf3f1;
+  --panel: #ffffff;
+  --panel-strong: #f5f8f7;
+  --panel-soft: rgba(19, 49, 40, 0.035);
+  --field: #eff4f2;
+  --control-bg: rgba(20, 52, 42, 0.045);
+  --control-bg-strong: rgba(20, 52, 42, 0.025);
+  --control-bg-hover: rgba(20, 52, 42, 0.082);
+  --control-border: rgba(38, 67, 58, 0.18);
+  --control-border-hover: rgba(29, 65, 54, 0.36);
+  --line: rgba(38, 67, 58, 0.14);
+  --line-strong: rgba(38, 67, 58, 0.26);
+  --text: #17231f;
+  --muted: #52635e;
+  --subtle: #74827e;
+  --text-disabled: #9aa6a2;
+  --accent: #08785b;
+  --accent-strong: #06684e;
+  --accent-soft: rgba(8, 120, 91, 0.1);
+  --primary-button-bg: linear-gradient(180deg, #118665, #087457);
+  --primary-button-bg-hover: linear-gradient(180deg, #159273, #087c5d);
+  --primary-button-bg-active: linear-gradient(180deg, #087457, #05634a);
+  --primary-button-border: rgba(5, 103, 77, 0.72);
+  --primary-button-border-hover: rgba(4, 92, 69, 0.9);
+  --primary-button-text: #ffffff;
+  --primary-button-shadow: 0 6px 14px rgba(8, 92, 71, 0.18);
+  --primary-button-shadow-hover: 0 8px 18px rgba(8, 92, 71, 0.22);
+  --primary-button-shadow-active: inset 0 2px 5px rgba(3, 55, 41, 0.24);
+  --range-track-filled: #478b78;
+  --range-track-rest: #d8e1de;
+  --range-track-border: rgba(46, 76, 67, 0.14);
+  --range-track-shadow: inset 0 1px 2px rgba(30, 55, 47, 0.1);
+  --range-thumb-bg: #ffffff;
+  --range-thumb-border: #217b64;
+  --range-thumb-shadow: 0 2px 7px rgba(30, 70, 59, 0.2);
+  --range-thumb-shadow-hover: 0 3px 9px rgba(30, 70, 59, 0.26);
+  --orientation-selected-border: rgba(8, 120, 91, 0.42);
+  --orientation-selected-bg: #eaf5f1;
+  --orientation-selected-text: #0a674f;
+  --orientation-check-border: rgba(45, 72, 64, 0.3);
+  --orientation-check-bg: #ffffff;
+  --orientation-check-selected-border: #08785b;
+  --orientation-check-selected-bg: #08785b;
+  --orientation-check-selected-text: #ffffff;
+  --orientation-focus-ring: rgba(8, 120, 91, 0.32);
+  --blue: #2864b7;
+  --blue-soft: rgba(40, 100, 183, 0.1);
+  --warning: #8a5a0a;
+  --danger: #bd3946;
+  --focus-ring: 0 0 0 3px rgba(8, 120, 91, 0.16);
+  --control-inner-shadow: 0 0 0 0 transparent;
+  --panel-shadow: 0 18px 55px rgba(30, 55, 47, 0.12);
+  --popover-bg: rgba(255, 255, 255, 0.97);
+  --popover-border: rgba(38, 67, 58, 0.2);
+  --popover-shadow: 0 22px 60px rgba(30, 55, 47, 0.2);
+  --body-accent-green: rgba(8, 120, 91, 0.09);
+  --body-accent-blue: rgba(40, 100, 183, 0.07);
+  --section-bg-start: rgba(20, 52, 42, 0.035);
+  --section-bg-end: rgba(20, 52, 42, 0.018);
+  --surface-row: rgba(238, 244, 242, 0.94);
+  --surface-row-soft: rgba(241, 246, 244, 0.92);
+  --surface-button: rgba(20, 52, 42, 0.045);
+  --surface-button-hover: rgba(20, 52, 42, 0.085);
+  --surface-card: rgba(20, 52, 42, 0.035);
+  --surface-card-soft: rgba(20, 52, 42, 0.025);
+  --surface-card-strong: rgba(20, 52, 42, 0.065);
+  --surface-table-head: #e8efed;
+  --surface-floating: rgba(255, 255, 255, 0.98);
+  --surface-floating-strong: rgba(246, 250, 248, 0.98);
+  --fullscreen-bg: #f2f6f5;
+  --fullscreen-header: rgba(255, 255, 255, 0.96);
+  --fullscreen-toolbar: rgba(244, 248, 247, 0.96);
+  --overlay-bg: rgba(18, 32, 28, 0.38);
+  --overlay-bg-strong: rgba(18, 32, 28, 0.5);
+  --task-card-border: rgba(38, 67, 58, 0.18);
+  --task-card-shadow: 0 28px 70px rgba(30, 55, 47, 0.2);
+  --task-spinner-border: rgba(8, 120, 91, 0.24);
+  --task-spinner-bg: radial-gradient(circle, rgba(8, 120, 91, 0.1), transparent 68%), linear-gradient(180deg, #ffffff, #edf6f2);
+  --task-spinner-color: #08785b;
+  --task-spinner-shadow: 0 12px 28px rgba(30, 70, 59, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.74);
+  --task-divider: rgba(38, 67, 58, 0.14);
+  --visual-card-start: #ffffff;
+  --visual-card-end: #f8faf9;
+  --visual-canvas: #f4f7f6;
+  --visual-accent-green: rgba(8, 120, 91, 0.035);
+  --visual-accent-blue: rgba(40, 100, 183, 0.028);
+  --visual-grid-line: rgba(45, 72, 64, 0.045);
+  --visual-inset-line: rgba(45, 72, 64, 0.1);
+  --visual-overlay-start: rgba(255, 255, 255, 0.48);
+  --visual-overlay-blend: normal;
+  --visual-label-bg: rgba(255, 255, 255, 0.94);
+  --visual-label-text: #21332d;
+  --visual-guide: rgba(33, 51, 45, 0.68);
+  --visual-empty-text: rgba(33, 51, 45, 0.76);
+  --warning-text: #8a5a0a;
+  --blue-text: #2864b7;
+  --danger-text: #bd3946;
+  --danger-action-text: #a52e3b;
+  --scene-bg: #f1f5f4;
+  --scene-accent-green: rgba(8, 120, 91, 0.045);
+  --scene-accent-blue: rgba(40, 100, 183, 0.035);
+  --scene-panel-bg: #f4f7f6;
+  --scene-panel-header: rgba(255, 255, 255, 0.88);
+  --scene-inset-line: rgba(39, 67, 58, 0.12);
+  --scene-inset-shadow: rgba(30, 55, 47, 0.06);
+  --scene-label-bg: rgba(255, 255, 255, 0.92);
+  --scene-label-shadow: 0 5px 14px rgba(30, 55, 47, 0.16);
+  --scene-label-text-shadow: 0 0 0 transparent;
+  --scene-selected-label-bg: rgba(225, 245, 240, 0.96);
+  --scene-selected-label-text: #075f5f;
+  --scene-selected-accent: #0a7477;
+  --scene-legend-bg: rgba(255, 255, 255, 0.9);
+  --scene-legend-text: #40534d;
+  --scene-swatch-border: rgba(32, 57, 49, 0.38);
+  --scene-swatch-ring: rgba(32, 57, 49, 0.24);
+  --scene-notice-bg: rgba(255, 255, 255, 0.9);
+  --scene-notice-text: #40534d;
+}
+
+:root[data-theme="light"] .field-group,
+:root[data-theme="light"] .sku-card {
+  background: linear-gradient(180deg, var(--section-bg-start), var(--section-bg-end));
+}
+
+:root[data-theme="light"] .metric-grid div,
+:root[data-theme="light"] .detail-list div {
+  background: var(--surface-row);
+}
+
+:root[data-theme="light"] .strategy-notes {
+  background: var(--surface-row-soft);
+}
+
+:root[data-theme="light"] .sku-breakdown-row,
+:root[data-theme="light"] .batch-setting-card,
+:root[data-theme="light"] .coordinate-preview-metrics div {
+  background: var(--surface-card);
+}
+
+:root[data-theme="light"] .clearance-reset-button,
+:root[data-theme="light"] .batch-file-picker,
+:root[data-theme="light"] .batch-template-link,
+:root[data-theme="light"] .batch-clearance-reset,
+:root[data-theme="light"] .dialog-action,
+:root[data-theme="light"] .coordinate-button,
+:root[data-theme="light"] .coordinate-action,
+:root[data-theme="light"] .base-dialog-close,
+:root[data-theme="light"] .view-expand-button {
+  background: var(--surface-button);
+}
+
+:root[data-theme="light"] .orientation-menu-panel,
+:root[data-theme="light"] .batch-import-loading-card,
+:root[data-theme="light"] .sku-drag-preview {
+  background: linear-gradient(180deg, var(--surface-floating-strong), var(--surface-floating));
+}
+
+:root[data-theme="light"] .base-dialog-content--fullscreen {
+  background: var(--fullscreen-bg);
+}
+
+:root[data-theme="light"] .base-dialog-content--fullscreen .base-dialog-header {
+  background: var(--fullscreen-header);
+}
+
+:root[data-theme="light"] .base-dialog-content--fullscreen .base-dialog-toolbar {
+  background: var(--fullscreen-toolbar);
+}
+
+:root[data-theme="light"] .base-dialog-overlay,
+:root[data-theme="light"] .batch-import-loading {
+  background: var(--overlay-bg);
+}
+
+:root[data-theme="light"] .blocking-task-overlay {
+  background: var(--overlay-bg-strong);
+}
+
+:root[data-theme="light"] .plan-view-card {
+  background: linear-gradient(180deg, var(--visual-card-start), var(--visual-card-end));
+}
+
+:root[data-theme="light"] .empty-state,
+:root[data-theme="light"] .plan-canvas-shell {
+  background-color: var(--visual-canvas);
+}
+
+:root[data-theme="light"] .plan-guide-label {
+  background: var(--visual-label-bg);
+  color: var(--visual-label-text);
+}
+
+:root[data-theme="light"] .coordinate-table-shell th {
+  background: var(--surface-table-head);
 }

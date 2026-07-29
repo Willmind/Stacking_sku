@@ -173,7 +173,10 @@ async function readCanvasScreenshotFrame(page: Page, canvasLocator: Locator) {
         const green = pixels[index + 1];
         const blue = pixels[index + 2];
         const alpha = pixels[index + 3];
-        const isContent = alpha > 0 && (red > 30 || green > 34 || blue > 34);
+        const maxChannel = Math.max(red, green, blue);
+        const minChannel = Math.min(red, green, blue);
+        const isNeutralLightBackground = minChannel > 185 && maxChannel - minChannel < 24;
+        const isContent = alpha > 0 && !isNeutralLightBackground && (red > 30 || green > 34 || blue > 34);
         if (!isContent) continue;
         litPixels += 1;
         minX = Math.min(minX, x);
@@ -213,6 +216,45 @@ async function readCanvasScreenshotFrame(page: Page, canvasLocator: Locator) {
 async function readSceneCanvasScreenshotFrame(page: Page) {
   return readCanvasScreenshotFrame(page, page.locator("#scene-canvas"));
 }
+
+test("switches and persists the global appearance mode", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto("/");
+
+  const root = page.locator("html");
+  const themeTrigger = page.getByRole("button", { name: /外观：/ });
+  await expect(root).toHaveAttribute("data-theme-mode", "system");
+  await expect(root).toHaveAttribute("data-theme", "dark");
+  await expect(themeTrigger).toHaveAccessibleName("外观：跟随系统，当前为深色");
+
+  const headingBox = await page.getByRole("heading", { name: "智能装柜助手" }).boundingBox();
+  const triggerBox = await themeTrigger.boundingBox();
+  expect(headingBox).not.toBeNull();
+  expect(triggerBox).not.toBeNull();
+  expect(triggerBox!.x).toBeGreaterThan(headingBox!.x);
+  expect(triggerBox!.y).toBeLessThan(headingBox!.y + headingBox!.height);
+
+  await themeTrigger.click();
+  await page.getByRole("menuitemradio", { name: /浅色/ }).click();
+  await expect(root).toHaveAttribute("data-theme-mode", "light");
+  await expect(root).toHaveAttribute("data-theme", "light");
+  await expect(themeTrigger).toHaveAccessibleName("外观：浅色模式");
+  await expect.poll(() => page.evaluate(() => window.localStorage.getItem("STACKING_SKU_THEME_MODE"))).toBe("light");
+
+  await page.reload();
+  await expect(root).toHaveAttribute("data-theme-mode", "light");
+  await expect(root).toHaveAttribute("data-theme", "light");
+
+  await themeTrigger.click();
+  await page.getByRole("menuitemradio", { name: /跟随系统/ }).click();
+  await expect(root).toHaveAttribute("data-theme-mode", "system");
+  await expect(root).toHaveAttribute("data-theme", "dark");
+
+  await page.emulateMedia({ colorScheme: "light" });
+  await expect(root).toHaveAttribute("data-theme-mode", "system");
+  await expect(root).toHaveAttribute("data-theme", "light");
+  await expect(themeTrigger).toHaveAccessibleName("外观：跟随系统，当前为浅色");
+});
 
 test("shows a global loading dialog for single and multi SKU calculations", async ({ page }) => {
   await page.goto("/");
@@ -298,14 +340,27 @@ test("calculates the 488 x 360 x 291 benchmark", async ({ page }) => {
   await expect(page.locator("#blocked-count")).toHaveText("1 箱");
 });
 
-test("sets the progress slider to full after the initial calculation", async ({ page }) => {
+test("sets the progress slider to full and keeps its width stable while the count changes", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "计算装载" }).click();
 
   await expect(page.locator("#total-boxes")).toHaveText("1,349");
   await expect(page.locator("#progress-text")).toHaveText("1,349 / 1,349");
-  await expect(page.locator("#stack-progress")).toHaveValue("1349");
-  await expect(page.locator("#stack-progress")).toHaveAttribute("style", /--range-progress:\s*100%/);
+  const progressSlider = page.locator("#stack-progress");
+  const progressRail = page.locator(".top-strip .range-control");
+  const fullProgressBox = await progressRail.boundingBox();
+
+  await expect(progressSlider).toHaveValue("1349");
+  await expect(progressSlider).toHaveAttribute("style", /--range-progress:\s*100%/);
+  expect(fullProgressBox).not.toBeNull();
+
+  await progressSlider.fill("9");
+  await expect(page.locator("#progress-text")).toHaveText("9 / 1,349");
+  const shortProgressBox = await progressRail.boundingBox();
+
+  expect(shortProgressBox).not.toBeNull();
+  expect(shortProgressBox?.x).toBeCloseTo(fullProgressBox?.x ?? 0, 1);
+  expect(shortProgressBox?.width).toBeCloseTo(fullProgressBox?.width ?? 0, 1);
 });
 
 test("shows and downloads the carton coordinate table", async ({ page }) => {

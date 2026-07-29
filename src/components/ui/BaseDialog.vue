@@ -137,7 +137,7 @@ onBeforeUnmount(clearCloseTimer);
   position: fixed;
   inset: 0;
   z-index: 80;
-  background: rgba(2, 6, 12, 0.72);
+  background: var(--overlay-bg);
   backdrop-filter: blur(12px);
   animation: base-dialog-overlay-in 220ms ease both;
 }
@@ -196,7 +196,7 @@ onBeforeUnmount(clearCloseTimer);
   height: min(92dvh, 1080px);
   max-height: min(92dvh, 1080px);
   padding: 0;
-  background: #071016;
+  background: var(--fullscreen-bg);
 }
 
 .base-dialog-content:focus {
@@ -214,7 +214,7 @@ onBeforeUnmount(clearCloseTimer);
 .base-dialog-content--fullscreen .base-dialog-header {
   padding: 14px 16px;
   border-bottom: 1px solid rgba(174, 184, 201, 0.18);
-  background: rgba(15, 24, 33, 0.92);
+  background: var(--fullscreen-header);
 }
 
 .base-dialog-title-row {
@@ -262,13 +262,13 @@ onBeforeUnmount(clearCloseTimer);
   place-items: center;
   border: 1px solid rgba(174, 184, 201, 0.22);
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--surface-button);
   color: var(--text);
 }
 
 .base-dialog-close:hover {
   border-color: var(--control-border-hover);
-  background: rgba(255, 255, 255, 0.075);
+  background: var(--surface-button-hover);
 }
 
 .base-dialog-close:active {
@@ -289,7 +289,7 @@ onBeforeUnmount(clearCloseTimer);
   align-items: center;
   padding: 11px 16px;
   border-bottom: 1px solid rgba(174, 184, 201, 0.14);
-  background: rgba(7, 16, 22, 0.9);
+  background: var(--fullscreen-toolbar);
 }
 
 .base-dialog-toolbar :deep(.progress-control) {
@@ -312,8 +312,8 @@ onBeforeUnmount(clearCloseTimer);
 .base-dialog-body--grid {
   padding: 14px;
   background:
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px), rgba(3, 8, 14, 0.74);
+    linear-gradient(var(--visual-grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--visual-grid-line) 1px, transparent 1px),
+    var(--visual-canvas);
   background-size: 32px 32px;
 }
 

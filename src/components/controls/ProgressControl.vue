@@ -56,6 +56,11 @@ const progressPercent = computed(() => {
   font-weight: 850;
 }
 
+.progress-control .range-control {
+  --range-thumb-size: 15px;
+  --range-track-height: 5px;
+}
+
 input {
   accent-color: var(--accent);
 }
