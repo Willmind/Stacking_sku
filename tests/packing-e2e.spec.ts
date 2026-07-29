@@ -319,11 +319,12 @@ test("shows and downloads the carton coordinate table", async ({ page }) => {
   const dialog = page.getByRole("dialog", { name: "查看坐标" });
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText("坐标系");
-  await expect(dialog).toContainText("中心点X");
-  await expect(dialog).toContainText("欧拉角X");
+  await expect(dialog).toContainText("总ID");
+  await expect(dialog).toContainText("排内ID");
+  await expect(dialog).toContainText("所属层");
+  await expect(dialog).toContainText("所属排");
   await expect(dialog).toContainText("旋转顺序 XYZ");
-  await expect(dialog).not.toContainText("柜门面X");
-  await expect(dialog).not.toContainText("上表面X");
+  await expect(dialog).toContainText("远离柜门面的左下角");
   await expect(dialog.locator(".coordinate-virtual-spacer")).toHaveCount(1);
   const renderedCoordinateRows = dialog.locator("tbody tr:not(.coordinate-virtual-spacer)");
   await expect(renderedCoordinateRows.first()).toBeVisible();
@@ -334,14 +335,14 @@ test("shows and downloads the carton coordinate table", async ({ page }) => {
   expect(previewBox.width).toBeGreaterThan(tableBox.width * 1.25);
   const previewCanvas = dialog.locator("#coordinate-preview-canvas");
   await expect(previewCanvas).toBeVisible();
-  await expect(dialog).toContainText("当前选中：#1");
+  await expect(dialog).toContainText("当前选中：总ID 1");
   const previewFrame = await readCanvasScreenshotFrame(page, previewCanvas);
   expect(previewFrame.screenshotBytes).toBeGreaterThan(1000);
   expect(previewFrame.litPixels).toBeGreaterThan(1000);
   expect(previewFrame.selectedPixels).toBeGreaterThan(50);
 
   await renderedCoordinateRows.nth(9).click();
-  await expect(dialog).toContainText("当前选中：#10");
+  await expect(dialog).toContainText("当前选中：总ID 10");
 
   const downloadPromise = page.waitForEvent("download");
   await dialog.getByRole("button", { name: "导出 CSV" }).click();
@@ -350,7 +351,7 @@ test("shows and downloads the carton coordinate table", async ({ page }) => {
   const downloadedPath = await download.path();
   if (!downloadedPath) throw new Error("Downloaded coordinate CSV is missing");
   const csv = fs.readFileSync(downloadedPath, "utf8");
-  expect(csv).toContain("序号,装载顺序,SKU,中心点X,中心点Y,中心点Z,欧拉角X,欧拉角Y,欧拉角Z");
+  expect(csv).toContain("总ID,SKU,长,宽,高,X,Y,Z,A,B,C,所属层,所属排,排内ID");
   expect(csv.split("\n").length).toBeGreaterThan(700);
 });
 
